@@ -474,12 +474,28 @@ tersebut:
 3. Path hasil pertemuan forward/backward divalidasi ulang dengan aturan
    TransJakarta yang sama seperti implementasi Dijkstra lama: koridor aktif,
    batas transit, edge transit, total jarak, total waktu, dan kepadatan segmen.
-4. Kandidat alternatif tetap dibuat dengan strategi lama: blokir satu segmen
-   pada rute utama, lalu jalankan ulang shortest path.
+4. Kandidat alternatif dibuat dengan dua strategi:
+   - blokir satu segmen pada rute utama, lalu jalankan ulang shortest path;
+   - blokir seluruh edge segmen dari satu koridor yang dipakai rute utama,
+     sehingga kombinasi koridor yang benar-benar berbeda bisa muncul.
 
-Ranking akhir tidak berubah: kandidat tetap diurutkan dengan primary score
-berbasis estimasi waktu, total jarak, dan jumlah transit; kepadatan dan
-rekomendasi bus spesifik dihitung setelah kandidat rute terbentuk.
+> **Update 2026-09-19 (branch `polestar-like`, commit `4b57739`):**
+> Primary ranking sekarang sadar kepadatan:
+>
+> ```text
+> density_norm = minmax(rata_kepadatan antar kandidat)
+> primary_score = 0.30·time_norm + 0.20·distance_norm
+>               + 0.30·transfer_norm + 0.20·density_norm
+> ```
+>
+> `density_norm` dan weight `density` ikut dilaporkan di `ranking_phase_1`.
+> Kandidat tetap diurutkan ascending by `primary_score`; kepadatan aktual
+> per bus tetap dihitung setelah kandidat terbentuk (fase 2).
+>
+> Smoke test offline:
+> `./venv/Scripts/python.exe scripts/smoke_severe_conflict.py`
+> memverifikasi konflik parah menghasilkan >= 2 kandidat dan re-ranking
+> memilih rute paling sepi.
 
 Pada `sim_time`, backend mengambil crowding segment dari trip instance yang sedang aktif:
 

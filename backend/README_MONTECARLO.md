@@ -263,6 +263,23 @@ Jika top route berubah-ubah antar replikasi, maka eksperimen menunjukkan routing
 
 Monte Carlo tidak mengubah logika routing inti. Yang berubah hanya input crowding-nya.
 
+> **Update 2026-09-19 (branch `polestar-like`, commit `4b57739`):**
+> `services/dijkstra.py` sekarang menambahkan kepadatan ke primary ranking:
+>
+> ```text
+> primary_score = 0.30·time_norm + 0.20·distance_norm
+>               + 0.30·transfer_norm + 0.20·density_norm
+> ```
+>
+> `density_norm` adalah min-max `rata_kepadatan` antar kandidat dan ikut
+> dilaporkan di `ranking_phase_1`. Ini memperbaiki gap lama di mana fase 1
+> buta terhadap kepadatan. Re-ranking fase 2 (`density_norm`, `primary_score`)
+> tidak berubah.
+>
+> Smoke test offline: `./venv/Scripts/python.exe scripts/smoke_severe_conflict.py`
+> — memverifikasi konflik parah (koridor cepat-padat vs lambat-sepi) menghasilkan
+> >= 2 kandidat dan re-ranking memilih rute paling sepi.
+
 ```text
 snapshot LFsegment per replikasi
         |
