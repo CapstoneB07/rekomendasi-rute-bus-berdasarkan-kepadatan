@@ -21,9 +21,6 @@ node_modules/
 .claude
 .hermes/
 
-head.v1i.yolo26/
-runs/
-
 # Generated results and CSV exports
 result/
 results/
@@ -37,8 +34,3 @@ uvicorn.out
 
 # Monte Carlo raw experiment dumps
 monte-carlo-result.json
-
-# ML weights / large artifacts
-*.pt
-*.pth
-*.onnx
