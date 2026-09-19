@@ -19,6 +19,7 @@ frontend/.env*
 .DS_Store
 node_modules/
 .claude
+.hermes/
 
 head.v1i.yolo26/
 runs/
