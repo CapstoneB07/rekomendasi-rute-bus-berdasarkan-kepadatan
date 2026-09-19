@@ -1,11 +1,14 @@
 import math
 from types import SimpleNamespace
 
+import pytest
+
 from routers import rute as rute_router
 from services.gtfs_simulation import SimulationContext
 from services.monte_carlo import (
     MC_POISSON_SCALE_FACTOR,
     _scaled_poisson_draw,
+    _segment_ids_from_signature,
     run_load_factor_monte_carlo,
     run_routing_sensitivity,
 )
@@ -255,3 +258,116 @@ def test_rekomendasi_uses_seeded_monte_carlo_snapshot(monkeypatch):
     assert captured["sim_time"] == 8 * 3600
     assert isinstance(result, list)
     assert result
+
+
+def test_synthetic_reranking_selects_less_crowded_alternative_route():
+    """Route via koridor 1 (T1) and koridor 2 (T2) tie on distance/time; koridor 1
+    is far more crowded. Two-ranking must select koridor 2 instead of the k=1
+    baseline, and the reported density must reflect the actually selected bus.
+    """
+    ctx = _mc_context()
+    graph_data = _graph_data()
+    load_factor_experiment = {
+        "replications": [
+            {
+                "replication_index": 0,
+                "replication_seed": 111,
+                "trip_loads": {
+                    "T1": {"trip_load_factor": 0.90, "estimated_passengers": 72.0, "tanggal": "2026-05-01"},
+                    "T2": {"trip_load_factor": 0.20, "estimated_passengers": 16.0, "tanggal": "2026-05-01"},
+                },
+                "segment_loads": {
+                    "T1": {"S1": 0.90, "S2": 0.90},
+                    "T2": {"S3": 0.20, "S4": 0.20},
+                },
+            },
+        ]
+    }
+
+    result = run_routing_sensitivity(
+        ctx,
+        graph_data,
+        scenarios=[{"name": "crowded-vs-sparse", "halte_asal": "A", "halte_tujuan": "C"}],
+        load_factor_experiment=load_factor_experiment,
+        jam=8,
+        hari_tipe="weekday",
+        sim_time=8 * 3600,
+        tanggal="2026-05-01",
+    )
+
+    replication = result["scenarios"][0]["replications"][0]
+    baseline_segment_ids = _segment_ids_from_signature(replication["baseline_route_signature"])
+    top_segment_ids = _segment_ids_from_signature(replication["top_route_signature"])
+
+    # k=1 baseline ignores crowding and picks the shorter koridor 1 (via B) route.
+    assert baseline_segment_ids == {"S1", "S2"}
+    # Two-ranking must switch to the far less crowded koridor 2 (via D) route.
+    assert top_segment_ids == {"S3", "S4"}
+    assert replication["baseline_route_signature"] != replication["top_route_signature"]
+    assert replication["recommended_density"] < replication["baseline_density"]
+    assert replication["recommended_density"] == pytest.approx(0.20, abs=0.05)
+    assert replication["baseline_density"] == pytest.approx(0.90, abs=0.05)
+
+
+def test_paired_comparison_metrics_across_replications():
+    """Replication 0: koridor 2 is far sparser, so two-ranking should win.
+    Replication 1: koridor 1 is sparser, so baseline and two-ranking tie on the
+    same route. Paired metrics must reflect this replication-by-replication,
+    not just an aggregated mean that could hide the mixed outcome.
+    """
+    ctx = _mc_context()
+    graph_data = _graph_data()
+    load_factor_experiment = {
+        "replications": [
+            {
+                "replication_index": 0,
+                "replication_seed": 111,
+                "trip_loads": {
+                    "T1": {"trip_load_factor": 0.90, "estimated_passengers": 72.0, "tanggal": "2026-05-01"},
+                    "T2": {"trip_load_factor": 0.20, "estimated_passengers": 16.0, "tanggal": "2026-05-01"},
+                },
+                "segment_loads": {
+                    "T1": {"S1": 0.90, "S2": 0.90},
+                    "T2": {"S3": 0.20, "S4": 0.20},
+                },
+            },
+            {
+                "replication_index": 1,
+                "replication_seed": 222,
+                "trip_loads": {
+                    "T1": {"trip_load_factor": 0.30, "estimated_passengers": 24.0, "tanggal": "2026-05-01"},
+                    "T2": {"trip_load_factor": 0.80, "estimated_passengers": 64.0, "tanggal": "2026-05-01"},
+                },
+                "segment_loads": {
+                    "T1": {"S1": 0.30, "S2": 0.30},
+                    "T2": {"S3": 0.80, "S4": 0.80},
+                },
+            },
+        ]
+    }
+
+    result = run_routing_sensitivity(
+        ctx,
+        graph_data,
+        scenarios=[{"name": "crowded-vs-sparse", "halte_asal": "A", "halte_tujuan": "C"}],
+        load_factor_experiment=load_factor_experiment,
+        jam=8,
+        hari_tipe="weekday",
+        sim_time=8 * 3600,
+        tanggal="2026-05-01",
+    )
+
+    replications = result["scenarios"][0]["replications"]
+    assert replications[0]["is_better"] is True
+    assert replications[0]["route_changed"] is True
+    assert replications[0]["density_delta"] == pytest.approx(0.70, abs=0.05)
+
+    assert replications[1]["is_better"] is False
+    assert replications[1]["route_changed"] is False
+    assert replications[1]["density_delta"] == pytest.approx(0.0, abs=0.05)
+
+    paired = result["scenarios"][0]["paired_comparison"]
+    assert paired["improvement_rate"] == pytest.approx(0.5)
+    assert paired["route_change_rate"] == pytest.approx(0.5)
+    assert paired["tie_rate"] == pytest.approx(0.5)
+    assert paired["mean_density_delta"] == pytest.approx(0.35, abs=0.05)

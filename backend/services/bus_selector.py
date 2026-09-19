@@ -221,3 +221,49 @@ def select_bus_per_segmen(
         }
 
     return segmen_list
+
+
+def apply_selected_bus_density(formatted: dict) -> dict:
+    """Hitung ulang kepadatan rute setelah bus_rekomendasi dipilih.
+
+    Ini menyelaraskan implementasi dengan Bab 4.6.2: kepadatan rute memakai
+    load factor trip/bus yang benar-benar direkomendasikan pada tiap segmen
+    naik. Jika bus tidak tersedia, fallback ke kepadatan edge yang sudah ada.
+
+    Dipakai bersama oleh routers/rute.py (rekomendasi deterministik) dan
+    services/monte_carlo.py (routing sensitivity per replikasi) agar kedua
+    alur memakai definisi kepadatan rute yang sama persis.
+    """
+    naik_items = [s for s in formatted["segmen"] if s.get("tipe") == "naik"]
+    density_values: list[float] = []
+    selected_count = 0
+
+    for item in naik_items:
+        rek = item.get("bus_rekomendasi")
+        if rek is not None and rek.get("kepadatan") is not None:
+            density = float(rek["kepadatan"])
+            selected_count += 1
+            item["kepadatan"] = round(density, 3)
+        else:
+            density = float(item.get("kepadatan", 0.0))
+        density_values.append(density)
+
+    if not density_values:
+        return formatted
+
+    rata_kepadatan = sum(density_values) / len(density_values)
+
+    formatted["rata_kepadatan"] = round(rata_kepadatan, 3)
+    density_norm = min(rata_kepadatan, 1.0)
+    formatted["density_norm"] = round(density_norm, 3)
+    formatted["skor"] = round(density_norm, 4)
+    formatted["ranking_phase_2"] = {
+        "rata_kepadatan": round(rata_kepadatan, 3),
+        "density_norm": round(density_norm, 3),
+    }
+    formatted["density_source"] = (
+        "selected_bus"
+        if selected_count == len(density_values)
+        else "mixed_edge_fallback"
+    )
+    return formatted

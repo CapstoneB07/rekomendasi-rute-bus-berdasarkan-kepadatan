@@ -13,13 +13,13 @@ from services.supabase_client import get_client
 ROOT = Path(__file__).resolve().parents[2]
 RESULT_DIR = ROOT / "backend" / "result"
 OUTPUT = ROOT / "results" / "final_comparison_table.csv"
-FILES = [
-    ("08h00", "no-transfer", "monte_carlo_raw_08h00_no-transfer_20260813_195331.json"),
-    ("08h00", "one-transfer", "monte_carlo_raw_08h00_one-transfer_20260813_195426.json"),
-    ("08h00", "two-transfer", "monte_carlo_raw_08h00_two-transfer_20260813_195521.json"),
-    ("14h00", "no-transfer", "monte_carlo_raw_14h00_no-transfer_comparison.json"),
-    ("14h00", "one-transfer", "monte_carlo_raw_14h00_one-transfer_comparison.json"),
-    ("14h00", "two-transfer", "monte_carlo_raw_14h00_two-transfer_comparison.json"),
+SCENARIOS = [
+    ("08h00", "no-transfer"),
+    ("08h00", "one-transfer"),
+    ("08h00", "two-transfer"),
+    ("14h00", "no-transfer"),
+    ("14h00", "one-transfer"),
+    ("14h00", "two-transfer"),
 ]
 FIELDNAMES = [
     "scenario_type", "time_period", "origin", "destination",
@@ -30,7 +30,18 @@ FIELDNAMES = [
     "delta_transfers", "is_better", "route_changed", "stability_rate",
     "unique_top_route_count", "highest_variance_segment_id", "segment_mean",
     "segment_std", "segment_p05", "segment_p95",
+    "improvement_rate", "paired_route_change_rate", "tie_rate",
+    "mean_density_delta", "median_density_delta", "p05_density_delta",
+    "p95_density_delta", "mean_extra_time_minutes",
 ]
+
+
+def _latest_result_file(time_period: str, scenario_type: str) -> Path:
+    pattern = f"monte_carlo_raw_{time_period}_{scenario_type}_*.json"
+    candidates = sorted(RESULT_DIR.glob(pattern), key=lambda p: p.stat().st_mtime)
+    if not candidates:
+        raise FileNotFoundError(f"No result file matching {pattern!r} in {RESULT_DIR}")
+    return candidates[-1]
 
 
 def route_text(signature):
@@ -72,8 +83,9 @@ def route_metrics(signature, graph_data):
 async def main():
     graph_data = await load_graph_data(get_client())
     rows = []
-    for time_period, scenario_type, filename in FILES:
-        data = json.loads((RESULT_DIR / filename).read_text(encoding="utf-8"))
+    for time_period, scenario_type in SCENARIOS:
+        result_file = _latest_result_file(time_period, scenario_type)
+        data = json.loads(result_file.read_text(encoding="utf-8"))
         scenario = data["routing_sensitivity"]["scenarios"][0]
         baseline_signature = scenario["baseline_route_signature"]
         recommended_signature = scenario["recommended_route_signature"]
@@ -86,6 +98,8 @@ async def main():
         )
         baseline_density = float(scenario["baseline_density_mean"])
         recommended_density = float(scenario["recommended_density_mean"])
+        paired = scenario.get("paired_comparison") or {}
+        mean_extra_time_seconds = paired.get("mean_extra_time_seconds")
         rows.append({
             "scenario_type": scenario_type,
             "time_period": time_period,
@@ -114,6 +128,18 @@ async def main():
             "segment_std": round(float(highest_stats["std_dev"]), 6),
             "segment_p05": round(float(highest_stats["p05"]), 6),
             "segment_p95": round(float(highest_stats["p95"]), 6),
+            "improvement_rate": paired.get("improvement_rate"),
+            "paired_route_change_rate": paired.get("route_change_rate"),
+            "tie_rate": paired.get("tie_rate"),
+            "mean_density_delta": paired.get("mean_density_delta"),
+            "median_density_delta": paired.get("median_density_delta"),
+            "p05_density_delta": paired.get("p05_density_delta"),
+            "p95_density_delta": paired.get("p95_density_delta"),
+            "mean_extra_time_minutes": (
+                round(mean_extra_time_seconds / 60.0, 3)
+                if mean_extra_time_seconds is not None
+                else None
+            ),
         })
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
