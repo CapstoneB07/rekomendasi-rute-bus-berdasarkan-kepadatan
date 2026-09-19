@@ -390,3 +390,18 @@ def test_primary_ranking_penalizes_crowded_fast_route():
     assert k1["primary_score"] < k2["primary_score"], (
         "operational factors still win phase 1; density flip is phase 2"
     )
+
+
+def test_dijkstra_accepts_weight_override():
+    data = _severe_conflict_graph_data()
+    graph = build_graph(data, jam=8, hari_tipe="weekday")
+
+    routes = dijkstra(graph, "A", "C", k=3, weights={
+        "time": 0.0, "distance": 0.0, "transfer": 0.0, "density": 1.0,
+    })
+
+    by_corridor = {
+        tuple(e["koridor_id"] for e in r["path"] if e["tipe"] == "segmen")[0]: r
+        for r in routes
+    }
+    assert by_corridor[2]["primary_score"] < by_corridor[1]["primary_score"]

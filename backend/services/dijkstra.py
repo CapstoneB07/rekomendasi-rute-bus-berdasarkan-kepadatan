@@ -298,7 +298,18 @@ def _apply_candidate_metrics(rute: dict) -> dict:
     return rute
 
 
-def _apply_primary_ranking(hasil: list[dict], maks_transit: int) -> None:
+def _apply_primary_ranking(
+    hasil: list[dict],
+    maks_transit: int,
+    weights: dict[str, float] | None = None,
+) -> None:
+    if weights is None:
+        weights = {
+            "time": PRIMARY_WEIGHT_TIME,
+            "distance": PRIMARY_WEIGHT_DISTANCE,
+            "transfer": PRIMARY_WEIGHT_TRANSFER,
+            "density": PRIMARY_WEIGHT_DENSITY,
+        }
     if not hasil:
         return
 
@@ -323,10 +334,10 @@ def _apply_primary_ranking(hasil: list[dict], maks_transit: int) -> None:
         )
         transfer_norm = min(rute["transit_count"] / max(1, maks_transit), 1.0)
         primary_score = (
-            PRIMARY_WEIGHT_TIME * waktu_norm
-            + PRIMARY_WEIGHT_DISTANCE * jarak_norm
-            + PRIMARY_WEIGHT_TRANSFER * transfer_norm
-            + PRIMARY_WEIGHT_DENSITY * density_norm
+            weights["time"] * waktu_norm
+            + weights["distance"] * jarak_norm
+            + weights["transfer"] * transfer_norm
+            + weights["density"] * density_norm
         )
         rute["primary_score"] = primary_score
         rute["time_norm"] = waktu_norm
@@ -632,6 +643,7 @@ def dijkstra(
     tujuan: str,
     k: int = KANDIDAT_RUTE_DEFAULT,
     maks_transit: int = MAKS_TRANSIT_DEFAULT,
+    weights: dict[str, float] | None = None,
 ) -> list[dict]:
     """Cari k kandidat rute.
 
@@ -665,7 +677,7 @@ def dijkstra(
 
     if k <= 1:
         hasil_single = [_apply_candidate_metrics(rute_pertama)]
-        _apply_primary_ranking(hasil_single, maks_transit)
+        _apply_primary_ranking(hasil_single, maks_transit, weights)
         return hasil_single
 
     # Kandidat deviasi: blokir satu segmen rute pertama lalu re-run Dijkstra
@@ -722,7 +734,7 @@ def dijkstra(
 
     for rute in hasil:
         _apply_candidate_metrics(rute)
-    _apply_primary_ranking(hasil, maks_transit)
+    _apply_primary_ranking(hasil, maks_transit, weights)
 
     hasil.sort(key=lambda r: (
         r["primary_score"],

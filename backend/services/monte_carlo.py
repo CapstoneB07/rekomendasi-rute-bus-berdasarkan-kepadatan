@@ -11,10 +11,10 @@ import math
 import random
 from collections import Counter, defaultdict
 from itertools import combinations
-from statistics import mean, stdev
+from statistics import mean, median, stdev
 from typing import Any
 
-from services.bus_selector import select_bus_per_segmen
+from services.bus_selector import apply_selected_bus_density, select_bus_per_segmen
 from services.dijkstra import KANDIDAT_RUTE_DEFAULT, build_graph, dijkstra, format_rute
 from services.gtfs_simulation import (
     BUS_CAPACITY,
@@ -34,6 +34,8 @@ from services.gtfs_simulation import (
 
 MC_DEFAULT_REPLICATIONS = 100
 MC_POISSON_SCALE_FACTOR = 25
+# Below this, a density change is treated as noise rather than a real win/loss.
+DENSITY_IMPROVEMENT_TOLERANCE = 0.01
 MC_SEGMENT_POISSON_LAMBDA = 1.0
 
 
@@ -681,6 +683,34 @@ def build_recommendation_crowding_snapshot(
     }
 
 
+def _baseline_route_for_scenario(
+    graph_data: dict[str, Any],
+    scenario: dict,
+    jam: int,
+    hari_tipe: str,
+) -> dict | None:
+    """Crowding-unaware reference route: shortest path by time/distance only.
+
+    Computed once per scenario (not per replication) since it must not depend
+    on any replication's sampled crowding, otherwise "baseline" would itself be
+    a stochastic quantity instead of a fixed point of comparison.
+    """
+    baseline_graph = build_graph(
+        graph_data,
+        jam=jam,
+        hari_tipe=hari_tipe,
+        segment_crowding=None,
+        daily_mean_by_koridor=None,
+    )
+    baseline_routes = dijkstra(
+        baseline_graph,
+        scenario["halte_asal"],
+        scenario["halte_tujuan"],
+        k=1,
+    )
+    return baseline_routes[0] if baseline_routes else None
+
+
 def _route_pipeline_for_replication(
     ctx: SimulationContext,
     graph_data: dict[str, Any],
@@ -690,6 +720,8 @@ def _route_pipeline_for_replication(
     hari_tipe: str,
     sim_time: int,
     tanggal: str | None,
+    raw_baseline_route: dict | None,
+    weights: dict[str, float] | None = None,
 ) -> dict:
     daily_mean_by_koridor = {
         kid: daily_mean_for(
@@ -712,14 +744,8 @@ def _route_pipeline_for_replication(
         scenario["halte_asal"],
         scenario["halte_tujuan"],
         k=KANDIDAT_RUTE_DEFAULT,
+        weights=weights,
     )
-    baseline_routes = dijkstra(
-        graph,
-        scenario["halte_asal"],
-        scenario["halte_tujuan"],
-        k=1,
-    )
-    raw_baseline_route = baseline_routes[0] if baseline_routes else None
     baseline_weights = (
         _boarding_trip_route_weights(
             ctx,
@@ -731,12 +757,13 @@ def _route_pipeline_for_replication(
         if raw_baseline_route is not None
         else []
     )
-    baseline_density = (
-        sum(row["value_used"] for row in baseline_weights) / len(baseline_weights)
-        if baseline_weights
-        else None
-    )
     realtime_kepadatan = _realtime_trip_load_snapshot(replication.get("trip_loads", {}))
+    baseline_density = None
+    if raw_baseline_route is not None:
+        baseline_formatted = format_rute(raw_baseline_route, graph_data)
+        select_bus_per_segmen(baseline_formatted["segmen"], sim_time, ctx.jadwal, realtime_kepadatan)
+        apply_selected_bus_density(baseline_formatted)
+        baseline_density = float(baseline_formatted.get("rata_kepadatan", 0.0))
     ranked_routes: list[dict] = []
     for route in routes:
         boarding_weights = _boarding_trip_route_weights(
@@ -763,28 +790,12 @@ def _route_pipeline_for_replication(
         }
         formatted = format_rute(route, graph_data)
         select_bus_per_segmen(formatted["segmen"], sim_time, ctx.jadwal, realtime_kepadatan)
-        density_values = [
-            float(item.get("kepadatan", 0.0))
-            for item in formatted["segmen"]
-            if item.get("tipe") == "naik"
-        ]
-        if density_values:
-            rata_kepadatan = sum(density_values) / len(density_values)
-        else:
-            rata_kepadatan = float(formatted.get("rata_kepadatan", 0.0))
-        formatted["rata_kepadatan"] = round(rata_kepadatan, 3)
-        formatted["density_norm"] = round(min(rata_kepadatan, 1.0), 3)
-        formatted["skor"] = round(float(formatted.get("density_norm", 0.0)), 4)
+        apply_selected_bus_density(formatted)
         ranked_routes.append({
             "raw": route,
             "formatted": formatted,
             "boarding_weights": boarding_weights,
-            "route_density": (
-                sum(row["value_used"] for row in boarding_weights)
-                / len(boarding_weights)
-                if boarding_weights
-                else float(formatted.get("rata_kepadatan", 0.0))
-            ),
+            "route_density": float(formatted.get("rata_kepadatan", 0.0)),
         })
 
     ranked_routes.sort(key=lambda item: (
@@ -839,6 +850,15 @@ def _route_pipeline_for_replication(
             if raw_baseline_route is not None
             else None
         ),
+        "recommended_route_metrics": (
+            {
+                "total_waktu_detik": ranked_routes[0]["raw"].get("total_waktu_detik", 0),
+                "total_jarak_meter": ranked_routes[0]["raw"].get("total_jarak_meter", 0.0),
+                "transit_count": ranked_routes[0]["raw"].get("transit_count", 0),
+            }
+            if ranked_routes
+            else None
+        ),
         "baseline_segment_weights": baseline_weights,
     }
 
@@ -852,11 +872,13 @@ def run_routing_sensitivity(
     hari_tipe: str,
     sim_time: int,
     tanggal: str | None = None,
+    weights: dict[str, float] | None = None,
 ) -> dict:
     replications = load_factor_experiment.get("replications", [])
     scenario_rows: list[dict] = []
 
     for scenario in scenarios:
+        raw_baseline_route = _baseline_route_for_scenario(graph_data, scenario, jam, hari_tipe)
         replication_rows: list[dict] = []
         ranking_signatures: list[list[str]] = []
         top_signatures: list[tuple | None] = []
@@ -872,6 +894,8 @@ def run_routing_sensitivity(
                 hari_tipe,
                 sim_time,
                 tanggal,
+                raw_baseline_route,
+                weights,
             )
             ranked_routes = route_result["ranked_routes"]
             candidate_signatures = [_route_signature(item["raw"]) for item in ranked_routes]
@@ -887,6 +911,22 @@ def run_routing_sensitivity(
             }
             for row in top_route_segment_weights:
                 route_segment_series[row["segment_id"]].append(row["value_used"])
+
+            baseline_density = route_result["baseline_density"]
+            recommended_density = route_result["recommended_density"]
+            density_delta = (
+                baseline_density - recommended_density
+                if baseline_density is not None and recommended_density is not None
+                else None
+            )
+            route_changed = route_result["baseline_route_signature"] != top_route_signature
+            baseline_metrics = route_result["baseline_route_metrics"]
+            recommended_metrics = route_result["recommended_route_metrics"]
+            extra_time_seconds = (
+                recommended_metrics["total_waktu_detik"] - baseline_metrics["total_waktu_detik"]
+                if baseline_metrics is not None and recommended_metrics is not None
+                else None
+            )
             replication_rows.append({
                 "replication_index": replication["replication_index"],
                 "replication_seed": replication["replication_seed"],
@@ -897,9 +937,15 @@ def run_routing_sensitivity(
                 "top_route_segment_weights": route_result["top_route_segment_weights"],
                 "baseline_route_signature": route_result["baseline_route_signature"],
                 "baseline_primary_score": route_result["baseline_primary_score"],
-                "baseline_density": route_result["baseline_density"],
-                "recommended_density": route_result["recommended_density"],
+                "baseline_density": baseline_density,
+                "recommended_density": recommended_density,
                 "candidate_details": route_result["candidate_details"],
+                "density_delta": density_delta,
+                "is_better": (
+                    density_delta is not None and density_delta > DENSITY_IMPROVEMENT_TOLERANCE
+                ),
+                "route_changed": route_changed,
+                "extra_time_seconds": extra_time_seconds,
             })
 
         top_counts = Counter(signature for signature in top_signatures if signature is not None)
@@ -936,6 +982,39 @@ def run_routing_sensitivity(
             if kendall is not None:
                 kendall_values.append(kendall)
 
+        density_deltas = [
+            row["density_delta"] for row in replication_rows if row["density_delta"] is not None
+        ]
+        extra_times = [
+            row["extra_time_seconds"]
+            for row in replication_rows
+            if row["extra_time_seconds"] is not None
+        ]
+        route_changed_flags = [row["route_changed"] for row in replication_rows]
+        paired_comparison = {
+            "improvement_rate": (
+                sum(1 for row in replication_rows if row["is_better"]) / len(replication_rows)
+                if replication_rows
+                else None
+            ),
+            "route_change_rate": (
+                sum(route_changed_flags) / len(route_changed_flags)
+                if route_changed_flags
+                else None
+            ),
+            "tie_rate": (
+                sum(1 for d in density_deltas if abs(d) <= DENSITY_IMPROVEMENT_TOLERANCE)
+                / len(density_deltas)
+                if density_deltas
+                else None
+            ),
+            "mean_density_delta": mean(density_deltas) if density_deltas else None,
+            "median_density_delta": median(density_deltas) if density_deltas else None,
+            "p05_density_delta": _percentile(density_deltas, 0.05) if density_deltas else None,
+            "p95_density_delta": _percentile(density_deltas, 0.95) if density_deltas else None,
+            "mean_extra_time_seconds": mean(extra_times) if extra_times else None,
+        }
+
         scenario_rows.append({
             "name": scenario.get("name") or f"{scenario['halte_asal']}->{scenario['halte_tujuan']}",
             "halte_asal": scenario["halte_asal"],
@@ -965,6 +1044,7 @@ def run_routing_sensitivity(
                 if replication_rows
                 else None
             ),
+            "paired_comparison": paired_comparison,
             "average_spearman_rho": round(mean(spearman_values), 4) if spearman_values else None,
             "average_kendall_tau": round(mean(kendall_values), 4) if kendall_values else None,
         })
@@ -986,6 +1066,7 @@ def run_monte_carlo_experiment(
     hari_tipe: str = "weekday",
     sim_time: int = 0,
     diagnostic_segment_ids: set[str] | None = None,
+    weights: dict[str, float] | None = None,
 ) -> dict:
     load_factor_experiment = run_load_factor_monte_carlo(
         ctx,
@@ -1005,6 +1086,7 @@ def run_monte_carlo_experiment(
             hari_tipe=hari_tipe,
             sim_time=sim_time,
             tanggal=tanggal,
+            weights=weights,
         )
         if scenarios
         else None

@@ -7,7 +7,11 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from services.bus_selector import MAX_ETA_DETIK_DEFAULT, select_bus_per_segmen
+from services.bus_selector import (
+    MAX_ETA_DETIK_DEFAULT,
+    apply_selected_bus_density,
+    select_bus_per_segmen,
+)
 from services.dijkstra import (
     KANDIDAT_RUTE_DEFAULT,
     MAKS_TRANSIT_DEFAULT,
@@ -34,48 +38,6 @@ def _jam_sekarang_wib() -> int:
 def _hari_tipe_sekarang() -> str:
     # Senin-Jumat (0-4) = weekday; Sabtu-Minggu (5-6) = weekend
     return "weekday" if datetime.now(WIB).weekday() < 5 else "weekend"
-
-
-def _apply_selected_bus_density(formatted: dict) -> dict:
-    """Hitung ulang kepadatan rute setelah bus_rekomendasi dipilih.
-
-    Ini menyelaraskan implementasi dengan Bab 4.6.2: kepadatan rute memakai
-    load factor trip/bus yang benar-benar direkomendasikan pada tiap segmen
-    naik. Jika bus tidak tersedia, fallback ke kepadatan edge yang sudah ada.
-    """
-    naik_items = [s for s in formatted["segmen"] if s.get("tipe") == "naik"]
-    density_values: list[float] = []
-    selected_count = 0
-
-    for item in naik_items:
-        rek = item.get("bus_rekomendasi")
-        if rek is not None and rek.get("kepadatan") is not None:
-            density = float(rek["kepadatan"])
-            selected_count += 1
-            item["kepadatan"] = round(density, 3)
-        else:
-            density = float(item.get("kepadatan", 0.0))
-        density_values.append(density)
-
-    if not density_values:
-        return formatted
-
-    rata_kepadatan = sum(density_values) / len(density_values)
-
-    formatted["rata_kepadatan"] = round(rata_kepadatan, 3)
-    density_norm = min(rata_kepadatan, 1.0)
-    formatted["density_norm"] = round(density_norm, 3)
-    formatted["skor"] = round(density_norm, 4)
-    formatted["ranking_phase_2"] = {
-        "rata_kepadatan": round(rata_kepadatan, 3),
-        "density_norm": round(density_norm, 3),
-    }
-    formatted["density_source"] = (
-        "selected_bus"
-        if selected_count == len(density_values)
-        else "mixed_edge_fallback"
-    )
-    return formatted
 
 
 def _normalized_halte_name(value: str | None) -> str:
@@ -177,6 +139,7 @@ class MonteCarloRequest(BaseModel):
     replications: int = Field(default=100, ge=1)
     routing_scenarios: list[RoutingScenario] = Field(default_factory=list)
     diagnostic_segment_ids: list[str] = Field(default_factory=list)
+    weights: dict[str, float] | None = None
 
 
 @router.post("/monte-carlo")
@@ -201,6 +164,7 @@ def monte_carlo(req: MonteCarloRequest, request: Request) -> dict:
         hari_tipe=hari_tipe,
         sim_time=sim_time,
         diagnostic_segment_ids=set(req.diagnostic_segment_ids),
+        weights=req.weights,
     )
     result["request"] = {
         "jam": jam,
@@ -210,6 +174,7 @@ def monte_carlo(req: MonteCarloRequest, request: Request) -> dict:
         "simulation_run_id": req.simulation_run_id,
         "master_seed": req.master_seed,
         "replications": req.replications,
+        "weights": req.weights,
     }
     return result
 
@@ -317,7 +282,7 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
         select_bus_per_segmen(
             formatted["segmen"], sim_time, jadwal, realtime_kepadatan
         )
-        hasil.append(_apply_selected_bus_density(formatted))
+        hasil.append(apply_selected_bus_density(formatted))
 
     hasil.sort(key=lambda r: (
         r["density_norm"],
