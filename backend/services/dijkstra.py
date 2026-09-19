@@ -37,9 +37,10 @@ from services.geo import distance_meters
 MAKS_TRANSIT_DEFAULT: int = 4  # maksimum 5 koridor (1 boarding + 4 transit)
 KEPADATAN_FALLBACK: float = 0.5  # default jika data kepadatan tidak ada
 KANDIDAT_RUTE_DEFAULT: int = 5
-PRIMARY_WEIGHT_TIME: float = 0.35
-PRIMARY_WEIGHT_DISTANCE: float = 0.25
-PRIMARY_WEIGHT_TRANSFER: float = 0.40
+PRIMARY_WEIGHT_TIME: float = 0.30
+PRIMARY_WEIGHT_DISTANCE: float = 0.20
+PRIMARY_WEIGHT_TRANSFER: float = 0.30
+PRIMARY_WEIGHT_DENSITY: float = 0.20
 SCOPED_KORIDOR: set[str] = {"1", "2", "3", "4", "5"}
 HALTE_ALIAS_RADIUS_METER: float = 80.0
 
@@ -303,8 +304,12 @@ def _apply_primary_ranking(hasil: list[dict], maks_transit: int) -> None:
 
     waktu_values = [float(r.get("total_waktu_detik", 0.0)) for r in hasil]
     jarak_values = [float(r.get("total_jarak_meter", 0.0)) for r in hasil]
+    density_values = [
+        float(r.get("rata_kepadatan", 0.0)) for r in hasil
+    ]
     min_waktu, max_waktu = min(waktu_values), max(waktu_values)
     min_jarak, max_jarak = min(jarak_values), max(jarak_values)
+    min_density, max_density = min(density_values), max(density_values)
 
     for rute in hasil:
         waktu_norm = _normalize_minmax(
@@ -313,15 +318,20 @@ def _apply_primary_ranking(hasil: list[dict], maks_transit: int) -> None:
         jarak_norm = _normalize_minmax(
             float(rute.get("total_jarak_meter", 0.0)), min_jarak, max_jarak
         )
+        density_norm = _normalize_minmax(
+            float(rute.get("rata_kepadatan", 0.0)), min_density, max_density
+        )
         transfer_norm = min(rute["transit_count"] / max(1, maks_transit), 1.0)
         primary_score = (
             PRIMARY_WEIGHT_TIME * waktu_norm
             + PRIMARY_WEIGHT_DISTANCE * jarak_norm
             + PRIMARY_WEIGHT_TRANSFER * transfer_norm
+            + PRIMARY_WEIGHT_DENSITY * density_norm
         )
         rute["primary_score"] = primary_score
         rute["time_norm"] = waktu_norm
         rute["distance_norm"] = jarak_norm
+        rute["density_norm"] = density_norm
         rute["transfer_norm"] = transfer_norm
 
 
@@ -352,6 +362,23 @@ def _has_repeated_koridor(rute: dict) -> bool:
 
 def _edge_block_key(edge: dict) -> tuple:
     return (edge["asal"], edge["tipe"], edge["segmen_id"], edge["koridor_id"])
+
+
+def _corridor_block_keys(graph: dict[str, list[dict]], koridor_id: Any) -> set[tuple]:
+    """Kunci blokir untuk semua edge segmen milik satu koridor.
+
+    Dipakai untuk memaksa kandidat rute menghindari koridor tsb sepenuhnya,
+    berbeda dari _edge_block_key yang hanya memblokir satu edge (detour
+    lokal). Blokir per-koridor menghasilkan kandidat dengan kombinasi
+    koridor/transfer yang benar-benar berbeda, bukan sekadar reroute di
+    dalam koridor yang sama.
+    """
+    blokir: set[tuple] = set()
+    for node, edges in graph.items():
+        for edge in edges:
+            if edge["tipe"] == "segmen" and edge["koridor_id"] == koridor_id:
+                blokir.add((node, edge["tipe"], edge["segmen_id"], edge["koridor_id"]))
+    return blokir
 
 
 def _build_reverse_graph(graph: dict[str, list[dict]]) -> dict[str, list[dict]]:
@@ -637,7 +664,9 @@ def dijkstra(
     signature_terlihat: set[tuple] = {_signature_path(rute_pertama)}
 
     if k <= 1:
-        return [_apply_candidate_metrics(rute_pertama)]
+        hasil_single = [_apply_candidate_metrics(rute_pertama)]
+        _apply_primary_ranking(hasil_single, maks_transit)
+        return hasil_single
 
     # Kandidat deviasi: blokir satu segmen rute pertama lalu re-run Dijkstra
     kandidat: list[tuple] = []
@@ -646,6 +675,29 @@ def dijkstra(
         if edge["tipe"] != "segmen":
             continue
         blokir = {_edge_block_key(edge)}
+        alt = _bidirectional_dijkstra_single(
+            graph, reverse_graph, asal, tujuan, maks_transit, blokir
+        )
+        if alt is None:
+            alt = _dijkstra_single(graph, asal, tujuan, maks_transit, blokir)
+        if alt is None:
+            continue
+        if _has_repeated_koridor(alt):
+            continue
+        sig = _signature_path(alt)
+        if sig in signature_terlihat:
+            continue
+        cnt += 1
+        heapq.heappush(kandidat, (alt["cost"], cnt, alt, sig))
+
+    # Kandidat deviasi koridor: blokir seluruh koridor yang dipakai rute
+    # pertama, agar kandidat tidak hanya reroute lokal di koridor yang sama
+    # tapi benar-benar mencoba kombinasi koridor/transfer lain.
+    koridor_terpakai = {
+        edge["koridor_id"] for edge in rute_pertama["path"] if edge["tipe"] == "segmen"
+    }
+    for koridor_id in koridor_terpakai:
+        blokir = _corridor_block_keys(graph, koridor_id)
         alt = _bidirectional_dijkstra_single(
             graph, reverse_graph, asal, tujuan, maks_transit, blokir
         )
@@ -676,6 +728,43 @@ def dijkstra(
         r["primary_score"],
     ))
     return hasil
+
+
+def candidate_diversity_report(routes: list[dict]) -> dict:
+    """Ringkasan diversitas kandidat rute untuk diagnostik/inspeksi.
+
+    Tidak dipakai untuk ranking; murni untuk mengetahui apakah candidate set
+    yang dihasilkan dijkstra() benar-benar beragam (kombinasi koridor dan
+    segmen berbeda) atau hanya variasi kecil dari rute yang sama.
+    """
+    if not routes:
+        return {
+            "candidate_count": 0,
+            "unique_corridor_sequences": 0,
+            "unique_segment_signatures": 0,
+            "min_route_distance_meter": None,
+            "max_route_distance_meter": None,
+            "min_rata_kepadatan": None,
+            "max_rata_kepadatan": None,
+        }
+
+    corridor_sequences = {tuple(_koridor_sequence(r["path"])) for r in routes}
+    segment_signatures = {_signature_path(r) for r in routes}
+    distances = [float(r.get("total_jarak_meter", 0.0)) for r in routes]
+    densities = [
+        float(r["rata_kepadatan"])
+        for r in routes
+        if r.get("rata_kepadatan") is not None
+    ]
+    return {
+        "candidate_count": len(routes),
+        "unique_corridor_sequences": len(corridor_sequences),
+        "unique_segment_signatures": len(segment_signatures),
+        "min_route_distance_meter": min(distances) if distances else None,
+        "max_route_distance_meter": max(distances) if distances else None,
+        "min_rata_kepadatan": min(densities) if densities else None,
+        "max_rata_kepadatan": max(densities) if densities else None,
+    }
 
 
 def _normalize_koridor_id(value: Any) -> str:
@@ -935,11 +1024,13 @@ def format_rute(rute: dict, graph_data: dict) -> dict:
             "time_norm": round(rute.get("time_norm", 0.0), 3),
             "distance_norm": round(rute.get("distance_norm", 0.0), 3),
             "transfer_norm": round(rute.get("transfer_norm", 0.0), 3),
+            "density_norm": round(rute.get("density_norm", 0.0), 3),
             "primary_score": round(rute.get("primary_score", 0.0), 4),
             "weights": {
                 "time": PRIMARY_WEIGHT_TIME,
                 "distance": PRIMARY_WEIGHT_DISTANCE,
                 "transfer": PRIMARY_WEIGHT_TRANSFER,
+                "density": PRIMARY_WEIGHT_DENSITY,
             },
         },
         "ranking_phase_2": {
