@@ -75,12 +75,10 @@ def main() -> None:
     print(f"top formatted: density_norm={formatted_top['ranking_phase_2']['density_norm']} "
           f"primary={formatted_top['primary_score']}")
 
-    # Re-ranking fase 2: urutkan berdasarkan (density_norm, primary_score).
-    # Ini adalah perilaku routers/rute.py dan services/monte_carlo.py.
-    reranked = sorted(
-        routes,
-        key=lambda r: (float(r["density_norm"]), float(r["primary_score"])),
-    )
+    # Re-ranking fase 2: urutkan berdasarkan kategori kepadatan lalu primary.
+    # Ini adalah perilaku routers/rute.py dan services/monte_carlo.py via rerank_routes.
+    from services.bus_selector import rerank_routes
+    reranked = rerank_routes(routes)
     top = reranked[0]
     print(f"final reranked: {_path_text(top)} density={top['rata_kepadatan']:.3f} "
           f"density_norm={top['density_norm']:.3f} primary={top['primary_score']:.4f}")

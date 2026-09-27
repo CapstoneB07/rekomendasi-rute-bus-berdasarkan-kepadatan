@@ -315,12 +315,8 @@ def _apply_primary_ranking(
 
     waktu_values = [float(r.get("total_waktu_detik", 0.0)) for r in hasil]
     jarak_values = [float(r.get("total_jarak_meter", 0.0)) for r in hasil]
-    density_values = [
-        float(r.get("rata_kepadatan", 0.0)) for r in hasil
-    ]
     min_waktu, max_waktu = min(waktu_values), max(waktu_values)
     min_jarak, max_jarak = min(jarak_values), max(jarak_values)
-    min_density, max_density = min(density_values), max(density_values)
 
     for rute in hasil:
         waktu_norm = _normalize_minmax(
@@ -329,9 +325,7 @@ def _apply_primary_ranking(
         jarak_norm = _normalize_minmax(
             float(rute.get("total_jarak_meter", 0.0)), min_jarak, max_jarak
         )
-        density_norm = _normalize_minmax(
-            float(rute.get("rata_kepadatan", 0.0)), min_density, max_density
-        )
+        density_norm = min(max(float(rute.get("rata_kepadatan", 0.0)), 0.0), 1.0)
         transfer_norm = min(rute["transit_count"] / max(1, maks_transit), 1.0)
         primary_score = (
             weights["time"] * waktu_norm

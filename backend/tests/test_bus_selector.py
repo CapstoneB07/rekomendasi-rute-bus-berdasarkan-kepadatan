@@ -1,6 +1,11 @@
 """Unit test untuk services/bus_selector.py (Algoritma 2)."""
 
-from services.bus_selector import MAX_ETA_MENIT_DEFAULT, select_bus_per_segmen
+from services.bus_selector import (
+    MAX_ETA_MENIT_DEFAULT,
+    density_category,
+    rerank_routes,
+    select_bus_per_segmen,
+)
 
 
 def _jadwal_dummy() -> dict[str, list[dict]]:
@@ -371,3 +376,62 @@ def test_first_leg_uses_sim_time_unchanged():
     rek1 = segmen[0]["bus_rekomendasi"]
     assert rek1["leg_clock_detik"] == sim_time
     assert rek1["eta_menit"] == 5
+
+
+# ----------------------------------------------------------------------
+# Re-ranking kategori kepadatan (masalah #4)
+# ----------------------------------------------------------------------
+
+def test_density_category_thresholds():
+    assert density_category(0.49) == "sepi"
+    assert density_category(0.50) == "sedang"
+    assert density_category(0.79) == "sedang"
+    assert density_category(0.80) == "padat"
+    assert density_category(0.99) == "padat"
+    assert density_category(1.00) == "sangat_padat"
+    assert density_category(1.30) == "sangat_padat"
+
+
+def test_rerank_routes_sorts_by_density_category_first():
+    """Rute sepi harus di atas rute padat meski primary_score-nya lebih besar."""
+    routes = [
+        {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.90, "primary_score": 0.05},
+        {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.20, "primary_score": 0.50},
+    ]
+    ordered = rerank_routes(routes)
+    assert ordered[0]["rata_kepadatan"] == 0.20
+    assert ordered[0]["kategori_kepadatan"] == "sepi"
+    assert ordered[1]["kategori_kepadatan"] == "padat"
+
+
+def test_rerank_routes_ties_within_category_by_primary_score():
+    """Dalam kategori sama, primary_score terkecil menang."""
+    routes = [
+        {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.30, "primary_score": 0.40},
+        {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.25, "primary_score": 0.10},
+    ]
+    ordered = rerank_routes(routes)
+    assert ordered[0]["primary_score"] == 0.10
+
+
+def test_rerank_routes_cap_penalizes_extreme_detour():
+    """Rute sepi tapi jauh lebih lama/lebih jauh melebihi cap -> diturunkan."""
+    routes = [
+        # Tercepat & terpendek, tapi padat.
+        {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.90, "primary_score": 0.05},
+        # Sepi tapi 40 menit lebih lama (melebihi cap 15 mnt).
+        {"estimasi_menit": 50, "total_jarak_meter": 2000, "rata_kepadatan": 0.10, "primary_score": 0.90},
+    ]
+    ordered = rerank_routes(routes, max_extra_time_menit=15, max_extra_distance_meter=3000)
+    assert ordered[0]["rata_kepadatan"] == 0.90  # padat tetap menang karena sepi melebihi cap
+
+
+def test_rerank_routes_key_fn_extracts_formatted_dict():
+    """key_fn dipakai untuk mengambil dict formatted dari item wrapper."""
+    items = [
+        {"formatted": {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.90, "primary_score": 0.05}},
+        {"formatted": {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.20, "primary_score": 0.50}},
+    ]
+    ordered = rerank_routes(items, key_fn=lambda item: item["formatted"])
+    assert ordered[0]["formatted"]["rata_kepadatan"] == 0.20
+    assert ordered[0]["formatted"]["kategori_kepadatan"] == "sepi"

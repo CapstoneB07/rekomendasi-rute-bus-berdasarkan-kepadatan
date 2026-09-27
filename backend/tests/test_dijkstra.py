@@ -357,16 +357,18 @@ def test_severe_conflict_returns_multi_corridor_candidates():
 def test_primary_ranking_penalizes_crowded_fast_route():
     """Fast-but-crowded K1 vs slow-but-empty K2.
 
-    Primary ranking harus menghitung kepadatan sebagai komponen skor, bukan
-    sekadar time/distance/transfer. Dengan bobot saat ini
-    (time .30, distance .20, transfer .30, density .20):
+    Primary ranking menghitung kepadatan sebagai komponen skor. Sejak masalah
+    #4 (2026-09-27), `density_norm` fase 1 memakai clamp absolut [0,1] (sama
+    dengan fase 2), BUKAN min-max antar kandidat (yang dengan 2 kandidat selalu
+    menghasilkan 0/1). Dengan bobot (time .30, distance .20, transfer .30,
+    density .20) dan kepadatan K1=0.90, K2=0.20:
 
-        K1 = .30*0 + .20*0 + .30*0 + .20*1 = .20
-        K2 = .30*1 + .20*1 + .30*0 + .20*0 = .50
+        K1 = .30*0 + .20*0 + .30*0 + .20*0.90 = .18
+        K2 = .30*1 + .20*1 + .30*0 + .20*0.20 = .54
 
     Jadi rute cepat-padat (K1) tetap menang fase 1, tetapi sudah terkena
-    penalti kepadatan (skor naik dari 0.00 menjadi 0.20). Pergeseran final
-    ke rute sepi terjadi di re-ranking, bukan di fase ini.
+    penalti kepadatan. Pergeseran final ke rute sepi terjadi di re-ranking
+    (sort kategori kepadatan), bukan di fase ini.
     """
     data = _severe_conflict_graph_data()
     graph = build_graph(data, jam=8, hari_tipe="weekday")
@@ -380,11 +382,13 @@ def test_primary_ranking_penalizes_crowded_fast_route():
     k2 = by_corridor[2]
 
     assert k1["rata_kepadatan"] > k2["rata_kepadatan"]
+    assert k1["density_norm"] == pytest.approx(0.90, abs=1e-9)
+    assert k2["density_norm"] == pytest.approx(0.20, abs=1e-9)
     assert k1["density_norm"] > k2["density_norm"]
-    assert k1["primary_score"] == pytest.approx(0.20, abs=1e-9), (
-        "crowded route must be penalized by its density_norm=1"
+    assert k1["primary_score"] == pytest.approx(0.18, abs=1e-9), (
+        "crowded route must be penalized by its density_norm=0.90"
     )
-    assert k2["primary_score"] == pytest.approx(0.50, abs=1e-9), (
+    assert k2["primary_score"] == pytest.approx(0.54, abs=1e-9), (
         "sparse slow route must pay time+distance cost"
     )
     assert k1["primary_score"] < k2["primary_score"], (

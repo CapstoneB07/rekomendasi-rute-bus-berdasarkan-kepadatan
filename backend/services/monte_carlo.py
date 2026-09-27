@@ -17,6 +17,7 @@ from typing import Any
 from services.bus_selector import (
     apply_selected_bus_density,
     collect_bus_candidates,
+    rerank_routes,
     select_bus_per_segmen,
 )
 from services.dijkstra import KANDIDAT_RUTE_DEFAULT, build_graph, dijkstra, format_rute
@@ -802,10 +803,11 @@ def _route_pipeline_for_replication(
             "route_density": float(formatted.get("rata_kepadatan", 0.0)),
         })
 
-    ranked_routes.sort(key=lambda item: (
-        float(item["formatted"].get("density_norm", 0.0)),
-        float(item["formatted"].get("primary_score", 0.0)),
-    ))
+    # Re-ranking kategori kepadatan (masalah #4), konsisten dengan routers/rute.py.
+    ranked_routes = rerank_routes(
+        ranked_routes,
+        key_fn=lambda item: item["formatted"],
+    )
 
     top_route_segment_weights: list[dict] = []
     if ranked_routes:

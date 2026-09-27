@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from services.bus_selector import (
     MAX_ETA_DETIK_DEFAULT,
     apply_selected_bus_density,
+    rerank_routes,
     select_bus_per_segmen,
 )
 from services.dijkstra import (
@@ -284,10 +285,7 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
         )
         hasil.append(apply_selected_bus_density(formatted))
 
-    hasil.sort(key=lambda r: (
-        r["density_norm"],
-        r["primary_score"],
-    ))
+    hasil = rerank_routes(hasil)
 
     debug_items_final = []
     for idx, r in enumerate(hasil, start=1):

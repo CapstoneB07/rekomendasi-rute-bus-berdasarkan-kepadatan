@@ -12,7 +12,7 @@ bus_selector tidak perlu tahu topologi graf. State tidak dibagi.
 """
 
 from collections import defaultdict
-from typing import Any
+from typing import Any, Callable
 
 KEPADATAN_DECIMAL = 2  # presisi bulatan untuk grouping kepadatan setara
 BUS_CAPACITY = 80
@@ -35,13 +35,94 @@ def _label_kepadatan(k: float) -> str:
 
 
 def _kategori_kepadatan(k: float) -> str:
-    if k < 0.50:
+    return density_category(k)
+
+
+# Kategori kepadatan c251 §4.2: <0.50 sepi, 0.50–0.80 sedang, 0.80–1.00 padat,
+# >=1.00 sangat padat. Urutan ini jadi kunci sort re-ranking (masalah #4).
+DENSITY_CATEGORY_ORDER: dict[str, int] = {
+    "sepi": 0,
+    "sedang": 1,
+    "padat": 2,
+    "sangat_padat": 3,
+}
+# Batas penalti Pareto: rute tidak dipromosikan ke kategori kepadatan lebih baik
+# bila waktu/jaraknya melebihi batas ini relatif terhadap rute tercepat/terpendek.
+MAX_EXTRA_TIME_MENIT_DEFAULT = 15
+MAX_EXTRA_DISTANCE_METER_DEFAULT = 3000
+
+
+def density_category(load_factor: float) -> str:
+    if load_factor < 0.50:
         return "sepi"
-    if k < 0.80:
+    if load_factor < 0.80:
         return "sedang"
-    if k < 1.00:
+    if load_factor < 1.00:
         return "padat"
     return "sangat_padat"
+
+
+def rerank_routes(
+    routes: list[dict],
+    key_fn: Callable[[dict], dict] | None = None,
+    max_extra_time_menit: int = MAX_EXTRA_TIME_MENIT_DEFAULT,
+    max_extra_distance_meter: int = MAX_EXTRA_DISTANCE_METER_DEFAULT,
+) -> list[dict]:
+    """Re-ranking tahap 2: kategori kepadatan dulu, lalu primary_score.
+
+    Menggantikan sort lexicographic `(density_norm, primary_score)` (masalah
+    #4). Urutan:
+      1. Kategori kepadatan (c251 §4.2) — sepi < sedang < padat < sangat_padat.
+      2. Dalam kategori yang sama, primary_score (skor gabungan yang sudah
+         menghukum waktu/jarak/transfer).
+
+    Batas penalti Pareto mencegah rute ekstrem (jauh lebih lama/lebih jauh)
+    menang hanya karena sedikit lebih sepi: rute yang waktu ATAU jaraknya
+    melebihi (tercepat + cap) / (terpendek + cap) diturunkan ke bawah semua
+    rute yang masih dalam batas.
+
+    `key_fn` (opsional) memetakan tiap item ke dict `formatted` yang memuat
+    `estimasi_menit`, `total_jarak_meter`, `rata_kepadatan`, `primary_score`.
+    Default: item itu sendiri adalah dict formatted (dipakai routers/rute.py).
+    """
+    if key_fn is None:
+        key_fn = lambda r: r
+    if len(routes) <= 1:
+        return list(routes)
+
+    formatted = [key_fn(r) for r in routes]
+
+    def _est_menit(f: dict) -> float:
+        if "estimasi_menit" in f:
+            return float(f.get("estimasi_menit", 0.0) or 0.0)
+        # Raw route dict (belum format_rute) membawa total_waktu_detik, bukan
+        # estimasi_menit.
+        return float(f.get("total_waktu_detik", 0.0) or 0.0) / 60.0
+
+    ref_time = min(_est_menit(f) for f in formatted)
+    ref_dist = min(float(f.get("total_jarak_meter", 0.0) or 0.0) for f in formatted)
+
+    def _sort_key(r: dict) -> tuple:
+        f = key_fn(r)
+        t = _est_menit(f)
+        d = float(f.get("total_jarak_meter", 0.0) or 0.0)
+        within_cap = (
+            t <= ref_time + max_extra_time_menit
+            and d <= ref_dist + max_extra_distance_meter
+        )
+        lf = float(f.get("rata_kepadatan", 0.0) or 0.0)
+        cat_rank = DENSITY_CATEGORY_ORDER[density_category(lf)]
+        primary = float(f.get("primary_score", 0.0) or 0.0)
+        return (0 if within_cap else 1, cat_rank, primary)
+
+    ordered = sorted(routes, key=_sort_key)
+    for r in ordered:
+        f = key_fn(r)
+        lf = float(f.get("rata_kepadatan", 0.0) or 0.0)
+        cat = density_category(lf)
+        f["kategori_kepadatan"] = cat
+        f["kategori_rank"] = DENSITY_CATEGORY_ORDER[cat]
+    return ordered
 
 
 def _bus_selection_score(
