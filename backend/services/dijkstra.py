@@ -457,31 +457,39 @@ def _bidirectional_dijkstra_single(
 ) -> dict | None:
     """Cari kandidat shortest path dengan bidirectional Dijkstra.
 
-    Search dua arah dipakai untuk candidate generation. Karena validitas rute
-    TransJakarta bergantung pada state koridor/transit, path gabungan selalu
-    divalidasi ulang memakai aturan traversal yang sama dengan Dijkstra lama.
+    State = (node, koridor_aktif, transit_count) untuk kedua arah, konsisten
+    dengan graf virtual c251 (s=(h,k)) dan `_dijkstra_single`. State backward
+    menyimpan koridor edge pertama pada path-nya (edge tepat setelah titik
+    temu), sehingga `maybe_update` hanya menggabungkan pasangan state yang
+    kompatibel, lalu path gabungan divalidasi penuh oleh
+    `_metrics_if_valid_path`.
     """
     counter = 0
-    forward_heap: list[tuple] = [(0.0, counter, asal, [])]
-    backward_heap: list[tuple] = [(0.0, counter, tujuan, [])]
-    best_forward: dict[str, float] = {asal: 0.0}
-    best_backward: dict[str, float] = {tujuan: 0.0}
-    path_forward: dict[str, list[dict]] = {asal: []}
-    path_backward: dict[str, list[dict]] = {tujuan: []}
+    # Heap entries: (cost, counter, node, koridor, transit_count, path)
+    forward_heap: list[tuple] = [(0.0, counter, asal, None, 0, [])]
+    backward_heap: list[tuple] = [(0.0, counter, tujuan, None, 0, [])]
+    best_forward: dict[tuple, float] = {(asal, None, 0): 0.0}
+    best_backward: dict[tuple, float] = {(tujuan, None, 0): 0.0}
+    path_forward: dict[tuple, list[dict]] = {(asal, None, 0): []}
+    path_backward: dict[tuple, list[dict]] = {(tujuan, None, 0): []}
     target_terbaik: dict | None = None
 
     def maybe_update(node: str) -> None:
         nonlocal target_terbaik
-        if node not in path_forward or node not in path_backward:
-            return
-        full_path = path_forward[node] + path_backward[node]
-        if any(_edge_block_key(edge) in edge_diblokir for edge in full_path):
-            return
-        kandidat = _metrics_if_valid_path(full_path, maks_transit)
-        if kandidat is None:
-            return
-        if target_terbaik is None or kandidat["cost"] < target_terbaik["cost"]:
-            target_terbaik = kandidat
+        f_states = [s for s in path_forward if s[0] == node]
+        b_states = [s for s in path_backward if s[0] == node]
+        for f_state in f_states:
+            for b_state in b_states:
+                if f_state[2] + b_state[2] > maks_transit:
+                    continue
+                full_path = path_forward[f_state] + path_backward[b_state]
+                if any(_edge_block_key(edge) in edge_diblokir for edge in full_path):
+                    continue
+                kandidat = _metrics_if_valid_path(full_path, maks_transit)
+                if kandidat is None:
+                    continue
+                if target_terbaik is None or kandidat["cost"] < target_terbaik["cost"]:
+                    target_terbaik = kandidat
 
     while forward_heap and backward_heap:
         lower_bound = forward_heap[0][0] + backward_heap[0][0]
@@ -489,44 +497,76 @@ def _bidirectional_dijkstra_single(
             break
 
         if forward_heap[0][0] <= backward_heap[0][0]:
-            cost, _, node, path = heapq.heappop(forward_heap)
-            if cost > best_forward.get(node, float("inf")) + 1e-9:
+            cost, _, node, koridor, transit, path = heapq.heappop(forward_heap)
+            state = (node, koridor, transit)
+            if cost > best_forward.get(state, float("inf")) + 1e-9:
                 continue
             maybe_update(node)
             for edge in graph.get(node, []):
                 edge_entry = {**edge, "asal": node}
                 if _edge_block_key(edge_entry) in edge_diblokir:
                     continue
+                if edge["tipe"] == "transit":
+                    if koridor is None or koridor == edge["koridor_id"]:
+                        continue
+                    if path and path[-1].get("tipe") == "transit":
+                        continue
+                    new_koridor = edge["koridor_id"]
+                    new_transit = transit + 1
+                else:
+                    if koridor is not None and koridor != edge["koridor_id"]:
+                        continue
+                    new_koridor = edge["koridor_id"]
+                    new_transit = transit
+                if new_transit > maks_transit:
+                    continue
                 new_node = edge["tujuan"]
                 new_cost = cost + float(edge.get("jarak_meter", 0.0))
-                if new_cost < best_forward.get(new_node, float("inf")) - 1e-9:
-                    best_forward[new_node] = new_cost
-                    path_forward[new_node] = path + [edge_entry]
+                new_state = (new_node, new_koridor, new_transit)
+                if new_cost < best_forward.get(new_state, float("inf")) - 1e-9:
+                    best_forward[new_state] = new_cost
+                    new_path = path + [edge_entry]
+                    path_forward[new_state] = new_path
                     counter += 1
                     heapq.heappush(
                         forward_heap,
-                        (new_cost, counter, new_node, path_forward[new_node]),
+                        (new_cost, counter, new_node, new_koridor, new_transit, new_path),
                     )
         else:
-            cost, _, node, path_to_tujuan = heapq.heappop(backward_heap)
-            if cost > best_backward.get(node, float("inf")) + 1e-9:
+            cost, _, node, koridor_depan, transit, path_to_tujuan = heapq.heappop(
+                backward_heap
+            )
+            state = (node, koridor_depan, transit)
+            if cost > best_backward.get(state, float("inf")) + 1e-9:
                 continue
             maybe_update(node)
             for edge in reverse_graph.get(node, []):
                 if _edge_block_key(edge) in edge_diblokir:
                     continue
+                if (
+                    edge["tipe"] == "transit"
+                    and path_to_tujuan
+                    and path_to_tujuan[0].get("tipe") == "transit"
+                ):
+                    continue
                 new_node = edge["asal"]
+                new_transit = transit + (1 if edge["tipe"] == "transit" else 0)
+                if new_transit > maks_transit:
+                    continue
                 new_cost = cost + float(edge.get("jarak_meter", 0.0))
-                if new_cost < best_backward.get(new_node, float("inf")) - 1e-9:
-                    best_backward[new_node] = new_cost
-                    path_backward[new_node] = [edge] + path_to_tujuan
+                new_state = (new_node, edge["koridor_id"], new_transit)
+                if new_cost < best_backward.get(new_state, float("inf")) - 1e-9:
+                    best_backward[new_state] = new_cost
+                    new_path = [edge] + path_to_tujuan
+                    path_backward[new_state] = new_path
                     counter += 1
                     heapq.heappush(
                         backward_heap,
-                        (new_cost, counter, new_node, path_backward[new_node]),
+                        (new_cost, counter, new_node, edge["koridor_id"], new_transit, new_path),
                     )
 
-    for node in set(path_forward).intersection(path_backward):
+    meeting_nodes = {s[0] for s in path_forward} & {s[0] for s in path_backward}
+    for node in meeting_nodes:
         maybe_update(node)
     return target_terbaik
 
