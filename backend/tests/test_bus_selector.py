@@ -271,3 +271,103 @@ def test_label_kepadatan_threshold():
             realtime_kepadatan={"B-K2-01": kepadatan},
         )
         assert segmen[0]["bus_rekomendasi"]["label_kepadatan"] == label
+
+
+# ----------------------------------------------------------------------
+# Part A (masalah #9): journey clock antar kaki perjalanan
+# ----------------------------------------------------------------------
+
+def _dua_kaki_dummy() -> tuple[list[dict], dict, dict]:
+    """Kaki 1: A->C koridor 1. Kaki 2: C->E koridor 2.
+
+    sim_time = 08:00:00. Bus K1-01 tiba A 08:05 dan C 08:20.
+    Bus K2-01 tiba C 08:15 (terlalu mepet dari sudut sim_time kalau pakai
+    sim_time global: ETA = 15 menit masih masuk jendela). Dengan journey clock,
+    jam tiba C = 08:20, maka bus K2-01 sudah lewat -> kandidat harus gugur.
+    """
+    sim_time = 8 * 3600
+    segmen = [
+        {
+            "tipe": "naik",
+            "koridor_id": 1,
+            "naik_di_id": "A",
+            "turun_di_id": "C",
+            "segmen_detail": [
+                {"dari_id": "A", "ke_id": "B", "waktu_menit": 5},
+                {"dari_id": "B", "ke_id": "C", "waktu_menit": 5},
+            ],
+        },
+        {
+            "tipe": "naik",
+            "koridor_id": 2,
+            "naik_di_id": "C",
+            "turun_di_id": "E",
+            "segmen_detail": [{"dari_id": "C", "ke_id": "E", "waktu_menit": 5}],
+        },
+    ]
+    jadwal = {
+        "B-K1-01": [
+            {"halte_id": "A", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 5 * 60},
+            {"halte_id": "B", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 12 * 60},
+            {"halte_id": "C", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 20 * 60},
+        ],
+        "B-K2-01": [
+            {"halte_id": "C", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 15 * 60},
+            {"halte_id": "E", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 20 * 60},
+        ],
+        "B-K2-02": [
+            {"halte_id": "C", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 25 * 60},
+            {"halte_id": "E", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 30 * 60},
+        ],
+    }
+    realtime = {
+        "B-K1-01": 0.30,
+        "B-K2-01": 0.30,
+        "B-K2-02": 0.30,
+    }
+    return segmen, jadwal, realtime, sim_time
+
+
+def test_transfer_leg_eta_uses_previous_arrival_clock():
+    """ETA kaki kedua dihitung dari kedatangan kaki pertama, bukan sim_time."""
+    segmen, jadwal, realtime, sim_time = _dua_kaki_dummy()
+    select_bus_per_segmen(segmen, sim_time=sim_time, jadwal=jadwal, realtime_kepadatan=realtime)
+
+    rek1 = segmen[0]["bus_rekomendasi"]
+    rek2 = segmen[1]["bus_rekomendasi"]
+
+    assert rek1["bus_id"] == "B-K1-01"
+    assert rek1["eta_menit"] == 5  # 08:05 - 08:00
+
+    # Dengan journey clock, jam berdiri di C = 08:20 (bukan 08:00). Bus K2-01
+    # sudah lewat, bus K2-02 (08:25) yang tersedia -> ETA 5 menit dari 08:20.
+    assert rek2["bus_id"] == "B-K2-02"
+    assert rek2["eta_menit"] == 5
+    assert rek2["leg_clock_detik"] == 8 * 3600 + 20 * 60
+
+
+def test_transfer_wait_can_shift_bus_choice_outside_window():
+    """Bus yang terlihat tersedia dari sim_time global bisa gugur karena sudah
+    lewat saat penumpang benar-benar tiba di titik transfer."""
+    segmen, jadwal, realtime, sim_time = _dua_kaki_dummy()
+
+    # Buat K2-02 jauh lebih sepi: kalau K2-01 masih dianggap tersedia (sim_time
+    # global), K2-01 menang karena lebih dulu; dengan journey clock K2-01 gugur
+    # dan K2-02 yang menang.
+    realtime["B-K2-01"] = 0.10
+    realtime["B-K2-02"] = 0.90
+    select_bus_per_segmen(segmen, sim_time=sim_time, jadwal=jadwal, realtime_kepadatan=realtime)
+
+    rek2 = segmen[1]["bus_rekomendasi"]
+    assert rek2["bus_id"] == "B-K2-02"
+    assert rek2["leg_clock_detik"] == 8 * 3600 + 20 * 60
+
+
+def test_first_leg_uses_sim_time_unchanged():
+    """Kaki pertama tetap menghitung ETA dari sim_time global."""
+    segmen, jadwal, realtime, sim_time = _dua_kaki_dummy()
+    select_bus_per_segmen(segmen, sim_time=sim_time, jadwal=jadwal, realtime_kepadatan=realtime)
+
+    rek1 = segmen[0]["bus_rekomendasi"]
+    assert rek1["leg_clock_detik"] == sim_time
+    assert rek1["eta_menit"] == 5

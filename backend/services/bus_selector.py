@@ -22,6 +22,7 @@ MAX_EXTRA_WAIT_MENIT_DEFAULT = 20
 SAFE_NEXT_BUS_DENSITY_THRESHOLD = 0.35
 BUS_SCORE_DENSITY_WEIGHT = 0.85
 BUS_SCORE_WAIT_WEIGHT = 0.15
+TRANSFER_WALK_PENALTY_DETIK = 0  # tunable: waktu jalan antar platform saat transfer
 
 
 def _label_kepadatan(k: float) -> str:
@@ -95,6 +96,74 @@ def _eta_menit_ke_halte(
     return None
 
 
+def _find_stop_time(
+    stops: list[dict],
+    halte_id: str,
+    koridor_id: int,
+    after_detik: int | None = None,
+) -> int | None:
+    """Waktu tiba (detik) bus di halte_id untuk koridor_id.
+
+    Bila after_detik diberikan, hanya kunjungan dengan waktu_tiba_detik >=
+    after_detik yang dikembalikan (untuk menghindari kunjungan sebelum naik).
+    Return None bila stop tidak ditemukan.
+    """
+    for stop in stops:
+        if stop.get("halte_id") != halte_id:
+            continue
+        if stop.get("koridor_id") != koridor_id:
+            continue
+        tiba = int(stop.get("waktu_tiba_detik", 0))
+        if after_detik is not None and tiba < after_detik:
+            continue
+        return tiba
+    return None
+
+
+def collect_bus_candidates(
+    jadwal: dict[str, list[dict]],
+    realtime_kepadatan: dict[str, float],
+    koridor_id: int,
+    halte_naik: str,
+    reference_time: int,
+    max_eta_menit: int = MAX_ETA_MENIT_DEFAULT,
+) -> list[dict]:
+    """Kumpulkan kandidat bus untuk satu blok 'naik'.
+
+    Logika filter sama persis dengan loop kandidat di select_bus_per_segmen:
+    bus harus punya entri realtime_kepadatan dan ETA valid (belum lewat, tidak
+    lebih dari max_eta_menit) dihitung dari reference_time. Dipakai juga oleh
+    screen_bus_scenarios.py supaya klasifikasi bus-level memakai definisi
+    kandidat yang sama dengan produksi.
+    """
+    bus_per_koridor: dict[int, list[str]] = defaultdict(list)
+    for bus_id, stops in jadwal.items():
+        if not stops:
+            continue
+        bus_per_koridor[stops[0]["koridor_id"]].append(bus_id)
+
+    kandidat: list[dict] = []
+    for bus_id in bus_per_koridor.get(koridor_id, []):
+        kepadatan = realtime_kepadatan.get(bus_id)
+        if kepadatan is None:
+            continue
+        eta = _eta_menit_ke_halte(
+            jadwal[bus_id],
+            halte_naik,
+            koridor_id,
+            reference_time,
+            max_eta_detik=max_eta_menit * 60,
+        )
+        if eta is None:
+            continue
+        kandidat.append({
+            "bus_id": bus_id,
+            "kepadatan": float(kepadatan),
+            "eta_menit": eta,
+        })
+    return kandidat
+
+
 def select_bus_per_segmen(
     segmen_list: list[dict],
     sim_time: int,
@@ -117,11 +186,9 @@ def select_bus_per_segmen(
     Bus tanpa kandidat valid -> `bus_rekomendasi: None` (frontend graceful).
     """
     # Index bus per koridor sekali, dipakai ulang untuk setiap segmen 'naik'.
-    bus_per_koridor: dict[int, list[str]] = defaultdict(list)
-    for bus_id, stops in jadwal.items():
-        if not stops:
-            continue
-        bus_per_koridor[stops[0]["koridor_id"]].append(bus_id)
+    # (logika kandidat dipindah ke collect_bus_candidates agar identik dengan
+    # screen_bus_scenarios.py)
+    leg_clock_detik = sim_time
 
     for segmen in segmen_list:
         if segmen.get("tipe") != "naik":
@@ -130,25 +197,14 @@ def select_bus_per_segmen(
         koridor_id = segmen["koridor_id"]
         halte_naik = segmen["naik_di_id"]
 
-        kandidat: list[dict[str, Any]] = []
-        for bus_id in bus_per_koridor.get(koridor_id, []):
-            kepadatan = realtime_kepadatan.get(bus_id)
-            if kepadatan is None:
-                continue
-            eta = _eta_menit_ke_halte(
-                jadwal[bus_id],
-                halte_naik,
-                koridor_id,
-                sim_time,
-                max_eta_detik=max_eta_menit * 60,
-            )
-            if eta is None:
-                continue
-            kandidat.append({
-                "bus_id": bus_id,
-                "kepadatan": float(kepadatan),
-                "eta_menit": eta,
-            })
+        kandidat = collect_bus_candidates(
+            jadwal,
+            realtime_kepadatan,
+            koridor_id,
+            halte_naik,
+            reference_time=leg_clock_detik,
+            max_eta_menit=max_eta_menit,
+        )
 
         if not kandidat:
             segmen["bus_rekomendasi"] = None
@@ -219,6 +275,36 @@ def select_bus_per_segmen(
                 )[:5]
             ],
         }
+
+        # --- Journey clock (masalah #9): majukan jam ke kedatangan bus terpilih
+        # di halte turun, supaya kaki berikutnya menghitung ETA dari waktu
+        # benar-benar sampai di titik transit, bukan dari sim_time global.
+        turun_di_id = segmen.get("turun_di_id")
+        terbaik_eta_detik = terbaik["eta_menit"] * 60
+        arrival_at_turun = None
+        if turun_di_id:
+            arrival_at_turun = _find_stop_time(
+                jadwal[terbaik["bus_id"]],
+                turun_di_id,
+                koridor_id,
+                after_detik=leg_clock_detik,
+            )
+        if arrival_at_turun is None:
+            # Fallback: leg_clock + wait + akumulasi waktu_tempuh_detik segmen.
+            segmen_waktu_total = sum(
+                d.get("waktu_menit", 0) * 60
+                for d in segmen.get("segmen_detail", [])
+            )
+            arrival_at_turun = leg_clock_detik + terbaik_eta_detik + segmen_waktu_total
+
+        transfer_wait_menit = max(
+            0,
+            round((arrival_at_turun - leg_clock_detik) / 60) - terbaik["eta_menit"],
+        )
+        segmen["bus_rekomendasi"]["transfer_wait_menit"] = transfer_wait_menit
+        segmen["bus_rekomendasi"]["leg_clock_detik"] = leg_clock_detik
+
+        leg_clock_detik = arrival_at_turun + TRANSFER_WALK_PENALTY_DETIK
 
     return segmen_list
 
