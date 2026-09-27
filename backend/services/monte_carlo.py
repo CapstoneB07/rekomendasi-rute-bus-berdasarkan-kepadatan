@@ -14,7 +14,11 @@ from itertools import combinations
 from statistics import mean, median, stdev
 from typing import Any
 
-from services.bus_selector import apply_selected_bus_density, select_bus_per_segmen
+from services.bus_selector import (
+    apply_selected_bus_density,
+    collect_bus_candidates,
+    select_bus_per_segmen,
+)
 from services.dijkstra import KANDIDAT_RUTE_DEFAULT, build_graph, dijkstra, format_rute
 from services.gtfs_simulation import (
     BUS_CAPACITY,
@@ -1095,4 +1099,149 @@ def run_monte_carlo_experiment(
     return {
         "load_factor": load_factor_experiment,
         "routing_sensitivity": routing_sensitivity,
+    }
+
+
+# ----------------------------------------------------------------------
+# Bus-level Monte Carlo (Part B / masalah #6)
+# ----------------------------------------------------------------------
+#
+# Route-level MC membandingkan rute (baseline shortest-path vs density-weighted
+# route). Bus-level MC membandingkan BUS di dalam satu rute yang sudah tetap:
+# karena 118 pasangan D tidak punya alternatif rute, yang berubah antar
+# replikasi hanyalah kepadatan bus (stokastik), sehingga pertanyaan evaluasinya
+# adalah "apakah density-aware bus picker memilih bus lebih sepi daripada
+# baseline earliest-only, dan berapa biaya tunggunya".
+#
+# Decoupled: fungsi ini TIDAK memanggil dijkstra/format_rute/primary ranking.
+# Ia hanya butuh satu blok 'naik' (koridor_id + halte_naik) dan ctx untuk
+# generator snapshot. Dengan begitu hasilnya tidak terpengaruh perubahan #4
+# (re-ranking) maupun A1 (search cost) — dua-duanya menyentuh layer rute, bukan
+# layer pemilihan bus.
+
+def _baseline_earliest_bus(candidates: list[dict]) -> dict:
+    """Baseline crowding-unaware: bus dengan ETA terkecil (tiebreak bus_id)."""
+    return min(candidates, key=lambda b: (b["eta_menit"], b["bus_id"]))
+
+
+def run_bus_level_monte_carlo(
+    ctx: SimulationContext,
+    jadwal: dict[str, list[dict]],
+    koridor_id: int,
+    halte_naik: str,
+    sim_time: int,
+    tanggal: str | None = None,
+    replications: int = 500,
+    master_seed: int | str | None = None,
+    max_eta_menit: int | None = None,
+    max_extra_wait_menit: int | None = None,
+) -> dict:
+    """Replikasi pemilihan bus pada satu blok 'naik' (rute tetap).
+
+    Setiap replikasi membangkitkan snapshot kepadatan baru lalu membandingkan
+    bus terpilih (density-aware) terhadap bus tercepat (earliest-only).
+
+    Returns:
+        dict dengan metrik agregat: bus_change_rate, tie_rate, mean/median
+        density_delta (baseline - recommended, positif = lebih sepi),
+        mean_extra_wait_menit, dan per-replication breakdown (dipanggil oleh
+        unit test & smoke).
+    """
+    from services.bus_selector import MAX_ETA_MENIT_DEFAULT, MAX_EXTRA_WAIT_MENIT_DEFAULT
+
+    if max_eta_menit is None:
+        max_eta_menit = MAX_ETA_MENIT_DEFAULT
+    if max_extra_wait_menit is None:
+        max_extra_wait_menit = MAX_EXTRA_WAIT_MENIT_DEFAULT
+
+    resolved_date = resolve_ridership_date(ctx, tanggal)
+    seed_text = _coerce_master_seed(
+        master_seed, resolved_date, replications, len(ctx.instances)
+    )
+
+    rows: list[dict] = []
+    for index in range(replications):
+        replication = simulate_load_factor_replication(
+            ctx, resolved_date, index, seed_text, sim_time=sim_time
+        )
+        realtime = _realtime_trip_load_snapshot(replication["trip_loads"])
+        candidates = collect_bus_candidates(
+            jadwal,
+            realtime,
+            koridor_id,
+            halte_naik,
+            reference_time=sim_time,
+            max_eta_menit=max_eta_menit,
+        )
+        if len(candidates) < 2:
+            rows.append({
+                "replication_index": index,
+                "eligible": False,
+                "reason": "kurang dari 2 kandidat bus",
+            })
+            continue
+
+        baseline = _baseline_earliest_bus(candidates)
+        segmen = [{
+            "tipe": "naik",
+            "koridor_id": koridor_id,
+            "naik_di_id": halte_naik,
+        }]
+        select_bus_per_segmen(
+            segmen,
+            sim_time,
+            jadwal,
+            realtime,
+            max_eta_menit=max_eta_menit,
+            max_extra_wait_menit=max_extra_wait_menit,
+        )
+        rek = segmen[0].get("bus_rekomendasi")
+        if not rek:
+            rows.append({
+                "replication_index": index,
+                "eligible": True,
+                "changed": False,
+                "reason": "selector tidak menghasilkan rekomendasi",
+            })
+            continue
+
+        baseline_density = float(baseline["kepadatan"])
+        recommended_density = float(rek["kepadatan"])
+        delta = baseline_density - recommended_density
+        extra_wait = round(rek["eta_menit"] - baseline["eta_menit"], 3)
+        changed = rek["bus_id"] != baseline["bus_id"]
+        rows.append({
+            "replication_index": index,
+            "eligible": True,
+            "changed": changed,
+            "tie": rek["bus_id"] == baseline["bus_id"] and abs(delta) < 1e-9,
+            "baseline_bus_id": baseline["bus_id"],
+            "recommended_bus_id": rek["bus_id"],
+            "baseline_density": baseline_density,
+            "recommended_density": recommended_density,
+            "density_delta": round(delta, 3),
+            "extra_wait_menit": extra_wait,
+            "baseline_eta_menit": baseline["eta_menit"],
+            "recommended_eta_menit": rek["eta_menit"],
+        })
+
+    eligible = [r for r in rows if r.get("eligible")]
+    changed = [r for r in eligible if r.get("changed")]
+    deltas = [r["density_delta"] for r in eligible if "density_delta" in r]
+    waits = [r["extra_wait_menit"] for r in changed if "extra_wait_menit" in r]
+
+    return {
+        "koridor_id": koridor_id,
+        "halte_naik": halte_naik,
+        "replication_count": replications,
+        "eligible_count": len(eligible),
+        "master_seed": seed_text,
+        "bus_change_rate": round(len(changed) / len(eligible), 4) if eligible else 0.0,
+        "tie_rate": round(
+            sum(1 for r in eligible if r.get("tie")) / len(eligible), 4
+        ) if eligible else 0.0,
+        "mean_density_delta": round(mean(deltas), 4) if deltas else 0.0,
+        "median_density_delta": round(median(deltas), 4) if deltas else 0.0,
+        "mean_extra_wait_menit": round(mean(waits), 3) if waits else 0.0,
+        "replications": rows,
     }

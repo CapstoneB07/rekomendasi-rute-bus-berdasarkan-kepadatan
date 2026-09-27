@@ -9,6 +9,7 @@ from services.monte_carlo import (
     MC_POISSON_SCALE_FACTOR,
     _scaled_poisson_draw,
     _segment_ids_from_signature,
+    run_bus_level_monte_carlo,
     run_load_factor_monte_carlo,
     run_routing_sensitivity,
 )
@@ -371,3 +372,103 @@ def test_paired_comparison_metrics_across_replications():
     assert paired["route_change_rate"] == pytest.approx(0.5)
     assert paired["tie_rate"] == pytest.approx(0.5)
     assert paired["mean_density_delta"] == pytest.approx(0.35, abs=0.05)
+
+
+# ----------------------------------------------------------------------
+# Bus-level Monte Carlo (Part B / masalah #6)
+# ----------------------------------------------------------------------
+
+def _bus_level_context() -> SimulationContext:
+    """Satu koridor (1) dengan dua bus yang berangkat 10 menit terpisah."""
+    base = 8 * 3600
+    route_1a = [
+        _stop("A", 1, base, base),
+        _stop("B", 1, base + 300),
+        _stop("C", 1, base + 600),
+    ]
+    route_1b = [
+        _stop("A", 1, base + 600, base + 600),
+        _stop("B", 1, base + 900),
+        _stop("C", 1, base + 1200),
+    ]
+    instances = [
+        _instance("T1", 1, route_1a, ["S1", "S2"]),
+        _instance("T1b", 1, route_1b, ["S1", "S2"]),
+    ]
+    jadwal = {"T1": route_1a, "T1b": route_1b}
+    return SimulationContext(
+        instances=instances,
+        jadwal=jadwal,
+        trip_supply_per_koridor={"1": 2},
+        daily_mean_load_factor={("2026-05-01", "1"): 0.5},
+        latest_date="2026-05-01",
+        latest_date_per_koridor={"1": "2026-05-01"},
+        recent_dates_per_koridor={"1": ["2026-05-01"]},
+        ridership_by_date_koridor={("2026-05-01", "1"): 1000.0},
+        segmen_by_id={
+            "S1": {"segmen_id": "S1"},
+            "S2": {"segmen_id": "S2"},
+        },
+        fallback_jadwal={},
+    )
+
+
+def test_bus_level_monte_carlo_eligible_and_reproducible():
+    ctx = _bus_level_context()
+    sim_time = 8 * 3600
+
+    result_a = run_bus_level_monte_carlo(
+        ctx,
+        ctx.jadwal,
+        koridor_id=1,
+        halte_naik="A",
+        sim_time=sim_time,
+        replications=50,
+        master_seed="bus-level-seed",
+    )
+    result_b = run_bus_level_monte_carlo(
+        ctx,
+        ctx.jadwal,
+        koridor_id=1,
+        halte_naik="A",
+        sim_time=sim_time,
+        replications=50,
+        master_seed="bus-level-seed",
+    )
+
+    assert result_a["replication_count"] == 50
+    # Kedua bus selalu punya ETA valid & entri kepadatan -> semua replikasi eligible.
+    assert result_a["eligible_count"] == 50
+
+    # Deterministik untuk seed yang sama.
+    assert result_a["mean_density_delta"] == result_b["mean_density_delta"]
+    assert result_a["bus_change_rate"] == result_b["bus_change_rate"]
+
+    # Rate selalu di [0, 1].
+    assert 0.0 <= result_a["bus_change_rate"] <= 1.0
+    assert 0.0 <= result_a["tie_rate"] <= 1.0
+
+
+def test_bus_level_monte_carlo_reports_per_replication_fields():
+    ctx = _bus_level_context()
+    result = run_bus_level_monte_carlo(
+        ctx,
+        ctx.jadwal,
+        koridor_id=1,
+        halte_naik="A",
+        sim_time=8 * 3600,
+        replications=20,
+        master_seed="bus-level-seed-2",
+    )
+    eligible = [r for r in result["replications"] if r.get("eligible")]
+    assert len(eligible) == 20
+    first = eligible[0]
+    for key in (
+        "baseline_bus_id",
+        "recommended_bus_id",
+        "baseline_density",
+        "recommended_density",
+        "density_delta",
+        "extra_wait_menit",
+    ):
+        assert key in first

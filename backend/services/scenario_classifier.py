@@ -184,3 +184,72 @@ def write_catalog(rows: list[dict], path: str | Path) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({key: row.get(key, "") for key in FIELDNAMES})
+
+
+# ----------------------------------------------------------------------
+# Bus-level scenario classification (Part B / masalah #6)
+# ----------------------------------------------------------------------
+
+BUS_CROWDED_THRESHOLD = 0.80   # padat (c251 §4.2: 0.80 <= LF < 1.00)
+BUS_EMPTY_THRESHOLD = 0.35     # sepi (c251 §4.2: LF < 0.50; threshold aman repo)
+BUS_DELTA_SIMILAR = 0.15       # |Δρ| di bawah ini dianggap "semua mirip"
+
+
+def classify_bus_level(bus_candidates: list[dict]) -> dict:
+    """Klasifikasi konflik di level bus untuk satu blok 'naik'.
+
+    bus_candidates: list berisi dict {bus_id, eta_menit, kepadatan} hasil
+    penyaringan jendela tunggu oleh bus_selector (kandidat_layak).
+
+    Return:
+        scenario_type: "B'" (bus-conflict), "C'" (bus-severe), atau "D'"
+            (no-bus-alt / negative control).
+        reason + metrik pendukung.
+    """
+    if len(bus_candidates) < 2:
+        return {"scenario_type": "D'", "reason": "kurang dari 2 kandidat bus"}
+
+    earliest = min(bus_candidates, key=lambda b: b["eta_menit"])
+    earliest_density = float(earliest["kepadatan"])
+    others = [b for b in bus_candidates if b is not earliest]
+
+    later_emptier = [
+        b for b in others
+        if float(b["kepadatan"]) <= BUS_EMPTY_THRESHOLD
+        and float(b["kepadatan"]) < earliest_density
+    ]
+
+    if earliest_density >= BUS_CROWDED_THRESHOLD and later_emptier:
+        best_alt = min(later_emptier, key=lambda b: float(b["kepadatan"]))
+        best_alt_density = float(best_alt["kepadatan"])
+        delta = round(earliest_density - best_alt_density, 3)
+        severe = earliest_density >= BUS_CROWDED_THRESHOLD and delta >= 0.50
+        return {
+            "scenario_type": "C'" if severe else "B'",
+            "reason": (
+                f"bus tercepat padat ({earliest_density:.2f}), "
+                f"alternatif sepi ({best_alt_density:.2f}) dalam jendela"
+            ),
+            "earliest_bus_density": earliest_density,
+            "later_bus_density": best_alt_density,
+            "density_delta": delta,
+            "earliest_eta_menit": earliest["eta_menit"],
+            "later_eta_menit": best_alt["eta_menit"],
+            "wait_menit": best_alt["eta_menit"] - earliest["eta_menit"],
+        }
+
+    all_densities = [float(b["kepadatan"]) for b in bus_candidates]
+    spread = round(max(all_densities) - min(all_densities), 3)
+    if spread < BUS_DELTA_SIMILAR:
+        return {
+            "scenario_type": "D'",
+            "reason": f"semua kandidat bus mirip (spread={spread:.3f})",
+            "spread_density": spread,
+        }
+
+    return {
+        "scenario_type": "D'",
+        "reason": "tidak ada konflik bus tercepat-padat vs bus-sepi dalam jendela",
+        "earliest_bus_density": earliest_density,
+        "spread_density": spread,
+    }

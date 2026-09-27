@@ -1,5 +1,11 @@
 from services.dijkstra import build_graph, dijkstra
-from services.scenario_classifier import classify_od_pair, classify_routes
+from services.scenario_classifier import (
+    BUS_CROWDED_THRESHOLD,
+    BUS_EMPTY_THRESHOLD,
+    classify_bus_level,
+    classify_od_pair,
+    classify_routes,
+)
 
 
 def _severe_conflict_graph_data() -> dict:
@@ -58,3 +64,63 @@ def test_classify_od_pair_adds_context_fields():
     assert result["time_period"] == "08h00"
     assert result["candidate_count"] >= 2
     assert result["scenario_type"] == "C"
+
+
+# ----------------------------------------------------------------------
+# Part B (masalah #6): klasifikasi skenario level bus
+# ----------------------------------------------------------------------
+
+def test_classify_bus_level_conflict_awal_padat_lalu_sepi():
+    """Bus tercepat padat (>=0.80), bus berikutnya sepi (<=0.35), gap < 0.50 -> B'."""
+    candidates = [
+        {"bus_id": "BUS-PADAT", "eta_menit": 2, "kepadatan": 0.80},
+        {"bus_id": "BUS-SEPI", "eta_menit": 12, "kepadatan": 0.35},
+    ]
+    result = classify_bus_level(candidates)
+    assert result["scenario_type"] == "B'"
+    assert result["density_delta"] == 0.45
+    assert result["wait_menit"] == 10
+
+
+def test_classify_bus_level_severe_gap_besar():
+    """Gap density >= 0.50 -> C'."""
+    candidates = [
+        {"bus_id": "BUS-PADAT", "eta_menit": 2, "kepadatan": 0.95},
+        {"bus_id": "BUS-SEPI", "eta_menit": 10, "kepadatan": 0.15},
+    ]
+    result = classify_bus_level(candidates)
+    assert result["scenario_type"] == "C'"
+    assert result["density_delta"] == 0.80
+
+
+def test_classify_bus_level_no_alt_saat_semua_mirip():
+    """Semua bus mirip -> D' (negative control)."""
+    candidates = [
+        {"bus_id": "BUS-A", "eta_menit": 2, "kepadatan": 0.45},
+        {"bus_id": "BUS-B", "eta_menit": 8, "kepadatan": 0.50},
+    ]
+    result = classify_bus_level(candidates)
+    assert result["scenario_type"] == "D'"
+    assert result["spread_density"] == 0.05
+
+
+def test_classify_bus_level_kurang_dua_kandidat():
+    """Satu kandidat saja -> D'."""
+    candidates = [{"bus_id": "BUS-A", "eta_menit": 2, "kepadatan": 0.90}]
+    result = classify_bus_level(candidates)
+    assert result["scenario_type"] == "D'"
+
+
+def test_classify_bus_level_tercepat_sudah_sepi():
+    """Tercepat sudah sepi -> tidak ada konflik (bukan B'/C')."""
+    candidates = [
+        {"bus_id": "BUS-SEPI", "eta_menit": 2, "kepadatan": 0.20},
+        {"bus_id": "BUS-PADAT", "eta_menit": 8, "kepadatan": 0.90},
+    ]
+    result = classify_bus_level(candidates)
+    assert result["scenario_type"] == "D'"
+
+
+def test_classify_bus_level_threshold_konstanta_sesuai_c251():
+    assert BUS_CROWDED_THRESHOLD == 0.80
+    assert BUS_EMPTY_THRESHOLD == 0.35
