@@ -41,6 +41,9 @@ PRIMARY_WEIGHT_TIME: float = 0.30
 PRIMARY_WEIGHT_DISTANCE: float = 0.20
 PRIMARY_WEIGHT_TRANSFER: float = 0.30
 PRIMARY_WEIGHT_DENSITY: float = 0.20
+# Penalti transfer (detik) pada edge "transit" (A1, masalah #1). Mengacu pada
+# Garcia-Martinez et al. (2018): pure transfer penalty 15.2-17.7 EIVM ≈ 900 s.
+TRANSFER_PENALTY_DETIK: float = 900.0
 SCOPED_KORIDOR: set[str] = {"1", "2", "3", "4", "5"}
 HALTE_ALIAS_RADIUS_METER: float = 80.0
 
@@ -394,6 +397,18 @@ def _build_reverse_graph(graph: dict[str, list[dict]]) -> dict[str, list[dict]]:
     return dict(reverse_graph)
 
 
+def _edge_cost(edge: dict) -> float:
+    """Biaya pencarian satu edge (A1, masalah #1).
+
+    Segmen: `waktu_tempuh_detik`. Transit: penalti transfer `TRANSFER_PENALTY_DETIK`
+    (edge transit membawa `waktu_tempuh_detik=0` dan `jarak_meter=0`). Ini
+    menggantikan cost berbasis `jarak_meter` sehingga transfer tidak lagi gratis.
+    """
+    if edge.get("tipe") == "transit":
+        return TRANSFER_PENALTY_DETIK
+    return float(edge.get("waktu_tempuh_detik", 0) or 0)
+
+
 def _metrics_if_valid_path(path: list[dict], maks_transit: int) -> dict | None:
     koridor_aktif = None
     transit_count = 0
@@ -431,7 +446,7 @@ def _metrics_if_valid_path(path: list[dict], maks_transit: int) -> dict | None:
         return None
 
     return {
-        "cost": total_jarak_meter,
+        "cost": total_waktu_detik + transit_count * TRANSFER_PENALTY_DETIK,
         "path": path,
         "transit_count": transit_count,
         "sum_kepadatan": sum_kep,
@@ -515,7 +530,7 @@ def _bidirectional_dijkstra_single(
                 if new_transit > maks_transit:
                     continue
                 new_node = edge["tujuan"]
-                new_cost = cost + float(edge.get("jarak_meter", 0.0))
+                new_cost = cost + _edge_cost(edge)
                 new_state = (new_node, new_koridor, new_transit)
                 if new_cost < best_forward.get(new_state, float("inf")) - 1e-9:
                     best_forward[new_state] = new_cost
@@ -547,7 +562,7 @@ def _bidirectional_dijkstra_single(
                 new_transit = transit + (1 if edge["tipe"] == "transit" else 0)
                 if new_transit > maks_transit:
                     continue
-                new_cost = cost + float(edge.get("jarak_meter", 0.0))
+                new_cost = cost + _edge_cost(edge)
                 new_state = (new_node, edge["koridor_id"], new_transit)
                 if new_cost < best_backward.get(new_state, float("inf")) - 1e-9:
                     best_backward[new_state] = new_cost
@@ -652,7 +667,7 @@ def _dijkstra_single(
 
             edge_jarak = float(edge.get("jarak_meter", 0.0))
             edge_waktu = int(edge.get("waktu_tempuh_detik", 0) or 0)
-            new_cost = cost + edge_jarak
+            new_cost = cost + _edge_cost(edge)
             new_jarak = total_jarak_meter + edge_jarak
             new_waktu = total_waktu_detik + edge_waktu
             new_node = edge["tujuan"]

@@ -65,7 +65,7 @@ def _graph_data_dummy() -> dict:
 # ----------------------------------------------------------------------
 
 def test_rute_dalam_satu_koridor_tanpa_transit():
-    """A -> C lewat K1 saja. Dijkstra cost = total jarak Haversine."""
+    """A -> C lewat K1 saja. Dijkstra cost = total waktu tempuh (A1, 2026-09-27)."""
     data = _graph_data_dummy()
     graph = build_graph(data, jam=8, hari_tipe="weekday")
     rute = dijkstra(graph, "A", "C", k=1)
@@ -78,7 +78,8 @@ def test_rute_dalam_satu_koridor_tanpa_transit():
         distance_meters(0.0, 0.0, 0.0, 0.001)
         + distance_meters(0.0, 0.001, 0.0, 0.002)
     )
-    assert r["cost"] == pytest.approx(expected, abs=1e-6)
+    # cost sekarang = waktu_tempuh_detik (tanpa transit): 180 + 180 = 360 detik.
+    assert r["cost"] == pytest.approx(360.0, abs=1e-6)
     assert r["total_jarak_meter"] == pytest.approx(expected, abs=1e-6)
     assert r["rata_kepadatan"] == pytest.approx(KEPADATAN_DUMMY)
 
@@ -94,8 +95,9 @@ def test_rute_dalam_satu_koridor_tanpa_transit():
 def test_rute_dengan_satu_transit_lebih_mahal():
     """A -> E mengharuskan transit di C antara K1 dan K2.
 
-    Cost Dijkstra tetap jarak; metadata transfer dan kepadatan tetap dihitung
-    untuk evaluasi setelah kandidat terbentuk.
+    Sejak A1 (2026-09-27), cost = total waktu tempuh + penalti transfer per
+    transit. Total waktu = 180+180+240+240 = 840 detik, + 900 penalti = 1740.
+    Metadata transfer dan kepadatan tetap dihitung.
     """
     data = _graph_data_dummy()
     graph = build_graph(data, jam=8, hari_tipe="weekday")
@@ -110,7 +112,9 @@ def test_rute_dengan_satu_transit_lebih_mahal():
         distance_meters(0.0, i * 0.001, 0.0, (i + 1) * 0.001)
         for i in range(4)
     )
-    assert r["cost"] == pytest.approx(expected, abs=1e-6)
+    # cost = 840 (waktu) + 900 (1 transit) = 1740 detik.
+    assert r["cost"] == pytest.approx(840.0 + 900.0, abs=1e-6)
+    assert r["total_waktu_detik"] == 840
     assert r["rata_kepadatan"] == pytest.approx(KEPADATAN_DUMMY)
 
     # Cek bahwa path mengandung tepat satu edge transit
@@ -482,3 +486,87 @@ def test_bidirectional_state_key_keeps_transfer_route_alive():
     assert any(2 in seq for seq in corridor_sequences), (
         "transfer route K1->K2 lost by node-only state key"
     )
+
+
+# ----------------------------------------------------------------------
+# Test case: A1 — search cost = waktu_tempuh_detik + transfer·900
+# ----------------------------------------------------------------------
+
+def _transfer_penalty_graph_data() -> dict:
+    """Dua rute A→C: langsung (K1) vs transit (K1→K2 di B).
+
+    Rute langsung A→B→C semua K1 = 1000 s, 0 transfer.
+    Rute transit A→B (K1, 250 s) → transit di B → B→C (K2, 250 s) = 500 s + 1
+    transfer. Tanpa penalti transfer, search memilih rute transit karena lebih
+    cepat (500 < 1000); dengan A1 penalti 900 s, rute langsung menang
+    (1000 < 500 + 900). Inilah celah "transfer gratis" yang ditutup A1.
+    """
+    return {
+        "segmen": [
+            {"segmen_id": "K1_A_B", "koridor_id": 1, "halte_asal": "A",
+             "halte_tujuan": "B", "urutan": 1, "waktu_tempuh_detik": 250},
+            {"segmen_id": "K1_B_C", "koridor_id": 1, "halte_asal": "B",
+             "halte_tujuan": "C", "urutan": 2, "waktu_tempuh_detik": 750},
+            {"segmen_id": "K2_B_C", "koridor_id": 2, "halte_asal": "B",
+             "halte_tujuan": "C", "urutan": 1, "waktu_tempuh_detik": 250},
+        ],
+        "kepadatan_bus": [
+            {"bus_id": "B-K1-01", "koridor_id": 1, "jam": 8,
+             "hari_tipe": "weekday", "kepadatan": 0.2},
+            {"bus_id": "B-K2-01", "koridor_id": 2, "jam": 8,
+             "hari_tipe": "weekday", "kepadatan": 0.2},
+        ],
+        "halte": {
+            "A": {"halte_id": "A", "nama": "A", "lat": 0.0, "lng": 0.0},
+            "B": {"halte_id": "B", "nama": "B", "lat": 0.0, "lng": 0.004},
+            "C": {"halte_id": "C", "nama": "C", "lat": 0.0, "lng": 0.008},
+        },
+        "koridor_halte": [],
+        "koridor": {
+            1: {"koridor_id": 1, "nama_pendek": "K1", "nama_panjang": "Koridor 1"},
+            2: {"koridor_id": 2, "nama_pendek": "K2", "nama_panjang": "Koridor 2"},
+        },
+        "halte_to_koridor": {
+            "A": {1}, "B": {1, 2}, "C": {1, 2},
+        },
+    }
+
+
+def test_transfer_penalty_applied_on_transit_edge():
+    """A1: transfer tidak lagi gratis — rute transit yang lebih singkat kalah
+    dari rute langsung yang sedikit lebih lama karena penalti 900 s."""
+    data = _transfer_penalty_graph_data()
+    graph = build_graph(data, jam=8, hari_tipe="weekday")
+    routes = dijkstra(graph, "A", "C", k=3)
+
+    assert len(routes) >= 2
+    direct = next(r for r in routes if r["transit_count"] == 0)
+    transfer = next(r for r in routes if r["transit_count"] == 1)
+
+    # Rute langsung menang secara cost meski waktu tempuhnya lebih lama:
+    # 1000 (langsung) < 500 + 900 (transit).
+    assert direct["cost"] == pytest.approx(1000.0, abs=1e-6)
+    assert transfer["cost"] == pytest.approx(1400.0, abs=1e-6)
+    assert direct["cost"] < transfer["cost"]
+    assert direct["total_waktu_detik"] > transfer["total_waktu_detik"], (
+        "transfer route is faster in pure travel time — the penalty must flip it"
+    )
+
+
+def test_transfer_penalty_in_both_searches():
+    """A1 diterapkan di kedua pencarian (bidirectional & single fallback)."""
+    data = _transfer_penalty_graph_data()
+    graph = build_graph(data, jam=8, hari_tipe="weekday")
+
+    from services.dijkstra import _bidirectional_dijkstra_single, _dijkstra_single, _build_reverse_graph
+
+    reverse = _build_reverse_graph(graph)
+    via_bi = _bidirectional_dijkstra_single(graph, reverse, "A", "C", 4, set())
+    via_single = _dijkstra_single(graph, "A", "C", 4, set())
+
+    assert via_bi is not None and via_single is not None
+    # Kedua pencarian harus memilih rute langsung (transit_count 0).
+    assert via_bi["transit_count"] == 0
+    assert via_single["transit_count"] == 0
+    assert via_bi["cost"] == pytest.approx(1000.0, abs=1e-6)
+    assert via_single["cost"] == pytest.approx(1000.0, abs=1e-6)
