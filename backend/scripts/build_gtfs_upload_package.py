@@ -157,29 +157,148 @@ def read_ridership_daily(path: Path) -> dict[tuple[str, str], int]:
     return out
 
 
+def read_branch_counts(path: Path) -> dict[str, int]:
+    """Jumlah cabang per koridor dari blok KANAN xlsx (kolom N..Q).
+
+    Ini WAJIB: `jumlah_pelanggan_pemodelan = jumlah_pelanggan_total / cabang`.
+    Tanpa pembagian ini koridor multi-cabang (2, 3, 4, 5, 7, 9, 13) akan
+    dilaporkan 2-4x lipat, dan nilainya bertabrakan dengan data yang sudah ada
+    di Supabase untuk koridor 1-5.
+
+    Kolom: N='Koridor' (mis. "BRT 3 (3 cabang)"), O='Cabang', ...
+    """
+    import openpyxl
+
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb.active
+    out: dict[str, int] = {}
+    for i, row in enumerate(ws.iter_rows(values_only=True)):
+        if i < 4:
+            continue
+        label, cabang = row[13], row[14]
+        if label is None or cabang is None:
+            continue
+        match = re.search(r"BRT\s*(\d+)", str(label))
+        if not match:
+            continue
+        try:
+            out[match.group(1)] = int(cabang)
+        except (TypeError, ValueError):
+            continue
+    wb.close()
+    return out
+
+
 def build_ridership_rows(
-    daily: dict[tuple[str, str], int], koridor: set[str]
+    daily: dict[tuple[str, str], int],
+    koridor: set[str],
+    branch_counts: dict[str, int],
 ) -> list[dict]:
+    """Baris ridership_harian_turunan SESUAI SKEMA SUPABASE LIVE.
+
+    Skema live (diverifikasi lewat PostgREST 2026-10-01):
+      ridership_id, jenis_layanan, koridor_id, tanggal, hari_tipe,
+      jumlah_pelanggan_total, jumlah_cabang_pemodelan,
+      jumlah_pelanggan_pemodelan, sumber, catatan
+
+    Catatan: `grup_rute` dan `jumlah_cabang` TIDAK ADA di tabel live — jangan
+    dipakai (paket lama memakai header itu dan akan gagal saat import).
+    """
     import datetime
 
     rows = []
-    for (tanggal, kid) in sorted(daily, key=lambda k: (k[1], k[0])):
+    for (tanggal, kid) in sorted(daily, key=lambda k: (int(k[1]) if k[1].isdigit() else 999, k[0])):
         if kid not in koridor:
             continue
+        total = daily[(tanggal, kid)]
+        cabang = branch_counts.get(kid, 1)
         d = datetime.date.fromisoformat(tanggal)
         rows.append(
             {
-                "tanggal": tanggal,
+                "ridership_id": f"RID-{tanggal.replace('-', '')}-{kid}",
+                "jenis_layanan": "BRT",
                 "koridor_id": kid,
-                "grup_rute": kid,
+                "tanggal": tanggal,
                 "hari_tipe": "weekend" if d.weekday() >= 5 else "weekday",
-                "jumlah_pelanggan_total": daily[(tanggal, kid)],
-                "jumlah_cabang": 1,
-                "jumlah_pelanggan_pemodelan": float(daily[(tanggal, kid)]),
+                "jumlah_pelanggan_total": total,
+                "jumlah_cabang_pemodelan": cabang,
+                "jumlah_pelanggan_pemodelan": total / cabang,
                 "sumber": "BRT Pengambilan Koridor Dimodelkan.xlsx",
+                "catatan": (
+                    "jumlah_pelanggan_pemodelan = jumlah_pelanggan_total / "
+                    "jumlah_cabang_pemodelan"
+                ),
             }
         )
     return rows
+
+
+RIDERSHIP_FIELDS = [
+    "ridership_id", "jenis_layanan", "koridor_id", "tanggal", "hari_tipe",
+    "jumlah_pelanggan_total", "jumlah_cabang_pemodelan",
+    "jumlah_pelanggan_pemodelan", "sumber", "catatan",
+]
+
+
+# --------------------------------------------------------------------------
+# Waktu tempuh segmen
+# --------------------------------------------------------------------------
+def build_segment_times_feed(
+    chosen: dict[str, list[dict]], stop_times: dict[str, list[dict]]
+) -> dict[tuple[str, str, str], int]:
+    """(koridor, asal, tujuan) -> waktu tempuh dari jadwal GTFS nyata.
+
+    Definisi: `arrival(B) - departure(A)` = waktu dalam kendaraan yang dialami
+    penumpang (dwell di A tidak dihitung). Ini memakai waktu terjadiwal yang
+    sebenarnya, bukan taksiran jarak/kecepatan.
+    """
+    out: dict[tuple[str, str, str], int] = {}
+    for rid, trips in chosen.items():
+        for t in trips:
+            rows = stop_times.get(t["trip_id"], [])
+            for i in range(len(rows) - 1):
+                a, b = rows[i], rows[i + 1]
+                key = (rid, a["stop_id"], b["stop_id"])
+                if key in out:
+                    continue
+                try:
+                    delta = hhmmss_to_seconds(b["arrival_time"]) - hhmmss_to_seconds(
+                        a["departure_time"]
+                    )
+                except (ValueError, KeyError):
+                    continue
+                if delta > 0:
+                    out[key] = int(delta)
+    return out
+
+
+def build_segment_times_per_koridor(
+    chosen: dict[str, list[dict]], stop_times: dict[str, list[dict]]
+) -> dict[str, int]:
+    """Waktu tempuh KONSTAN per koridor — pendekatan paket C251.
+
+    C251 memakai satu angka per koridor (kor 1 ~216 s, kor 3 ~331 s). Direplikasi
+    di sini supaya perbandingan A/B terhadap paket lama tetap mungkin, tapi
+    BUKAN default: nilai konstan menghapus variasi antar-segmen.
+    """
+    out: dict[str, int] = {}
+    for rid, trips in chosen.items():
+        deltas: list[int] = []
+        for t in trips:
+            rows = stop_times.get(t["trip_id"], [])
+            for i in range(len(rows) - 1):
+                try:
+                    d = hhmmss_to_seconds(rows[i + 1]["arrival_time"]) - hhmmss_to_seconds(
+                        rows[i]["departure_time"]
+                    )
+                except (ValueError, KeyError):
+                    continue
+                if d > 0:
+                    deltas.append(d)
+        if deltas:
+            out[rid] = int(round(sum(deltas) / len(deltas)))
+    return out
+
 
 
 # --------------------------------------------------------------------------
@@ -213,6 +332,16 @@ def main() -> int:
         "--trips-json",
         default="",
         help='Override pilihan trip, mis. \'{"1":["1-R07","1-R08"],"8":["8-P25","8-P26"]}\'',
+    )
+    ap.add_argument(
+        "--waktu-tempuh",
+        choices=["feed", "per_koridor"],
+        default="feed",
+        help=(
+            "feed (default) = arrival(B)-departure(A) dari jadwal GTFS nyata; "
+            "per_koridor = satu angka konstan per koridor (gaya paket C251, "
+            "tanpa variasi antar-segmen)."
+        ),
     )
     args = ap.parse_args()
 
@@ -334,6 +463,8 @@ def main() -> int:
                "continuous_drop_off", "shape_dist_traveled", "timepoint"], st_rows)
 
     # --- segmen.csv (per koridor, dari urutan halte)
+    times_feed = build_segment_times_feed(chosen, stop_times)
+    times_per_kor = build_segment_times_per_koridor(chosen, stop_times)
     seg_rows, seg_id = [], 0
     for k in sorted(koridor, key=lambda x: (len(x), x)):
         seq = urutan[k]
@@ -341,14 +472,23 @@ def main() -> int:
             a, b = seq[idx], seq[idx + 1]
             if a not in stops or b not in stops:
                 continue
-            # estimasi waktu tempuh dari trip representatif bila tersedia
             seg_id += 1
-            dist = haversine(stops[a], stops[b])
+            if args.waktu_tempuh == "per_koridor":
+                waktu = times_per_kor.get(k, 0)
+                sumber = "per_koridor"
+            else:
+                waktu = times_feed.get((k, a, b))
+                if waktu is None:
+                    # fallback eksplisit bila pasangan tak ada di jadwal
+                    waktu = times_per_kor.get(k, 0)
+                    sumber = "per_koridor_fallback"
+                else:
+                    sumber = "feed"
             seg_rows.append(
                 {
-                    "segmen_id": f"{k}_{a}_{b}", "koridor_id": int(k) if k.isdigit() else k,
+                    "segmen_id": f"{k}_{a}_{b}", "koridor_id": k,
                     "halte_asal": a, "halte_tujuan": b, "urutan": idx,
-                    "waktu_tempuh_detik": int(max(30, dist / 6.0)),  # ~21.6 km/jam
+                    "waktu_tempuh_detik": int(waktu),
                     "created_at": SEGMEN_CREATED_AT,
                 }
             )
@@ -371,12 +511,18 @@ def main() -> int:
         )
     write_csv(out / "shapes.csv", ["id", "koridor_id", "shape_id", "lat", "lng", "urutan"], sh_rows)
 
-    # --- ridership_harian_turunan.csv
+    # --- ridership_harian_turunan.csv (skema Supabase LIVE)
     daily = read_ridership_daily(Path(args.ridership_xlsx))
-    rid_rows = build_ridership_rows(daily, koridor)
-    write_csv(out / "ridership_harian_turunan.csv",
-              ["tanggal", "koridor_id", "grup_rute", "hari_tipe", "jumlah_pelanggan_total",
-               "jumlah_cabang", "jumlah_pelanggan_pemodelan", "sumber"], rid_rows)
+    branch_counts = read_branch_counts(Path(args.ridership_xlsx))
+    missing_branch = sorted(k for k in koridor if k not in branch_counts)
+    if missing_branch:
+        print(
+            f"WARNING: cabang tidak ditemukan untuk koridor {missing_branch}; "
+            f"dipakai 1 (periksa blok kanan xlsx)",
+            file=sys.stderr,
+        )
+    rid_rows = build_ridership_rows(daily, koridor, branch_counts)
+    write_csv(out / "ridership_harian_turunan.csv", RIDERSHIP_FIELDS, rid_rows)
 
     # --- summary + README
     summary = {
@@ -403,6 +549,20 @@ Sumber ridership: BRT Pengambilan Koridor Dimodelkan.xlsx (BRT harian, 2026-02, 
 Scope: hanya trip mainline polos (pola "-R##", tanpa "via"), satu per direction_id.
 Pola loop "-P##"/"-L##" dan varian "via ..." dibuang.
 
+Waktu tempuh segmen: mode "{args.waktu_tempuh}"
+  - feed         = arrival(B) - departure(A) dari jadwal GTFS nyata (waktu dalam
+                   kendaraan, dwell tidak dihitung). Punya variasi antar-segmen.
+  - per_koridor  = satu angka konstan per koridor (pendekatan paket C251).
+  Nilai feed berasal dari jadwal, jadi ini waktu TERJADWAL, bukan pengukuran.
+
+Ridership: skema mengikuti tabel LIVE `ridership_harian_turunan`
+(ridership_id, jenis_layanan, koridor_id, tanggal, hari_tipe,
+ jumlah_pelanggan_total, jumlah_cabang_pemodelan, jumlah_pelanggan_pemodelan,
+ sumber, catatan).
+`jumlah_pelanggan_pemodelan = jumlah_pelanggan_total / jumlah_cabang_pemodelan`.
+Jumlah cabang diambil dari blok kanan xlsx (BRT 1=1, 2=2, 3=3, 5=2, 9=4, dst).
+Koridor 1-5 sudah diverifikasi IDENTIK dengan baris yang ada di Supabase.
+
 Upload order:
 1. koridor.csv
 2. halte.csv
@@ -419,7 +579,14 @@ Catatan:
   Bila koridor 1-5 sudah ada di Supabase, lakukan UPSERT per (tanggal, koridor_id), bukan DELETE.
 - jadwal, kepadatan_bus, kepadatan_historis adalah legacy/fallback dan tidak diregenerasi di sini.
 
-Validasi SQL:
+Validasi WAJIB sebelum upload:
+  ./venv/Scripts/python.exe scripts/validate_upload_package_live.py --pkg "<dir ini>" --live
+  -> harus "HASIL: OK", 0 error. Ini mengecek nama kolom, tipe, dan nilai
+     ridership terhadap Supabase live (menangkap salah skema & salah bagi cabang).
+  ./venv/Scripts/python.exe scripts/validate_upload_package.py --pkg "<dir ini>"
+  -> validasi topologi graf offline (node/edge/kandidat).
+
+Validasi SQL setelah upload:
 SELECT t.route_id, COUNT(DISTINCT st.trip_id) AS trips, COUNT(*) AS stop_time_rows
 FROM gtfs_stop_times st JOIN gtfs_trips t ON t.trip_id = st.trip_id
 GROUP BY t.route_id ORDER BY t.route_id;
