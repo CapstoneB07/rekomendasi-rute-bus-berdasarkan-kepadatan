@@ -404,11 +404,28 @@ def test_rerank_routes_sorts_by_density_category_first():
     assert ordered[1]["kategori_kepadatan"] == "padat"
 
 
-def test_rerank_routes_ties_within_category_by_primary_score():
-    """Dalam kategori sama, primary_score terkecil menang."""
+def test_rerank_routes_less_crowded_wins_within_same_category():
+    """Regresi route-level MC 2026-09-28 (pasangan A G00168 -> G00214).
+
+    Dua rute sama-sama 'sepi' (0.39 vs 0.31). Rute yang lebih cepat punya
+    primary_score lebih kecil, tetapi rute yang lebih sepi harus tetap menang:
+    di dalam kategori yang sama, kepadatan kontinu memutus seri sebelum
+    primary_score (c251 Eq 4.20).
+    """
+    routes = [
+        {"estimasi_menit": 20, "total_jarak_meter": 5000, "rata_kepadatan": 0.39, "primary_score": 0.10},
+        {"estimasi_menit": 21, "total_jarak_meter": 5200, "rata_kepadatan": 0.31, "primary_score": 0.60},
+    ]
+    ordered = rerank_routes(routes)
+    assert ordered[0]["rata_kepadatan"] == 0.31
+    assert [r["kategori_kepadatan"] for r in ordered] == ["sepi", "sepi"]
+
+
+def test_rerank_routes_exact_density_tie_uses_primary_score():
+    """Kategori DAN kepadatan sama -> primary_score terkecil menang."""
     routes = [
         {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.30, "primary_score": 0.40},
-        {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.25, "primary_score": 0.10},
+        {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.30, "primary_score": 0.10},
     ]
     ordered = rerank_routes(routes)
     assert ordered[0]["primary_score"] == 0.10

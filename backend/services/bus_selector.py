@@ -73,8 +73,10 @@ def rerank_routes(
     Menggantikan sort lexicographic `(density_norm, primary_score)` (masalah
     #4). Urutan:
       1. Kategori kepadatan (c251 §4.2) — sepi < sedang < padat < sangat_padat.
-      2. Dalam kategori yang sama, primary_score (skor gabungan yang sudah
-         menghukum waktu/jarak/transfer).
+      2. Dalam kategori yang sama, kepadatan kontinu `lf` (c251 Eq 4.20) —
+         rute lebih sepi menang.
+      3. Bila kepadatan juga persis sama, primary_score (skor gabungan yang
+         sudah menghukum waktu/jarak/transfer).
 
     Batas penalti Pareto mencegah rute ekstrem (jauh lebih lama/lebih jauh)
     menang hanya karena sedikit lebih sepi: rute yang waktu ATAU jaraknya
@@ -113,7 +115,7 @@ def rerank_routes(
         lf = float(f.get("rata_kepadatan", 0.0) or 0.0)
         cat_rank = DENSITY_CATEGORY_ORDER[density_category(lf)]
         primary = float(f.get("primary_score", 0.0) or 0.0)
-        return (0 if within_cap else 1, cat_rank, primary)
+        return (0 if within_cap else 1, cat_rank, lf, primary)
 
     ordered = sorted(routes, key=_sort_key)
     for r in ordered:
