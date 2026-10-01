@@ -139,7 +139,61 @@ def main() -> int:
         print(f"  ridership     : {sorted(rid_kor)}")
         print(f"  per koridor   : {_count_by(r_rows, 'koridor_id')}")
 
-    # ---- 4. Nilai ridership vs live (yang menangkap bug pembagian cabang)
+    # ---- 4. PK collision check
+    # Untuk PK surrogate (`id`): id yang sama itu AMAN bila isi barisnya identik
+    # (re-upload idempoten), dan BERBAHAYA bila isinya berbeda (menimpa data).
+    # Untuk natural key (halte_id, segmen_id, trip_id): sama = UPSERT normal.
+    if sb is not None:
+        print("\n== Cek tabrakan primary key vs data live ==")
+        for fname, (table, key) in LIVE_TABLES.items():
+            path = pkg / fname
+            if not path.exists():
+                continue
+            header, rows = read_csv(path)
+            if key not in (header or []):
+                continue
+            try:
+                live_by_key = _live_rows_by_key(sb, table, key)
+            except Exception as e:
+                warnings.append(f"{fname}: gagal ambil {key} live ({e!r})")
+                continue
+            if not live_by_key:
+                continue
+            checks += 1
+            mine = {str(r[key]) for r in rows}
+            collide = mine & set(live_by_key)
+            if key != "id":
+                if collide:
+                    print(
+                        f"  [OK ] {fname:32s} {len(collide)} {key} sama dgn live "
+                        f"(natural key -> UPSERT)"
+                    )
+                else:
+                    print(f"  [OK ] {fname:32s} tidak ada {key} yang menabrak")
+                continue
+            # PK surrogate: pisahkan tabrakan identik vs berbeda
+            identical, differing = 0, []
+            for r in rows:
+                lv = live_by_key.get(str(r[key]))
+                if lv is None:
+                    continue
+                if _row_identical(r, lv, header):
+                    identical += 1
+                else:
+                    differing.append(str(r[key]))
+            if differing:
+                errors.append(
+                    f"{fname}: {len(differing)} baris ber-id sama TAPI ISI BERBEDA "
+                    f"dari live (contoh id {sorted(differing)[:5]}) -> akan menimpa "
+                    f"data lama dengan nilai berbeda"
+                )
+            else:
+                print(
+                    f"  [OK ] {fname:32s} {identical} id sama & isi identik "
+                    f"(re-upload idempoten, aman)"
+                )
+
+    # ---- 5. Nilai ridership vs live (yang menangkap bug pembagian cabang)
     if sb is not None and args.live and (pkg / "ridership_harian_turunan.csv").exists():
         print("\n== Cek nilai ridership vs Supabase live (UPSERT safety) ==")
         _h, r_rows = read_csv(pkg / "ridership_harian_turunan.csv")
@@ -189,6 +243,54 @@ def main() -> int:
         return 2
     print("\nHASIL: OK — struktur & nilai konsisten dengan Supabase live.")
     return 0
+
+
+def _live_rows_by_key(sb, table: str, key: str) -> dict[str, dict]:
+    """Ambil baris live penuh, di-index per kolom kunci (paged)."""
+    out: dict[str, dict] = {}
+    offset = 0
+    while True:
+        chunk = sb.table(table).select("*").range(offset, offset + 999).execute().data
+        if not chunk:
+            break
+        for r in chunk:
+            if r.get(key) is not None:
+                out[str(r[key])] = r
+        if len(chunk) < 1000:
+            break
+        offset += 1000
+    return out
+
+
+def _norm(v) -> str:
+    """Normalisasi nilai CSV (str) vs live (int/float/str) untuk perbandingan."""
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v)
+    if isinstance(v, (int, float)):
+        f = float(v)
+        return str(int(f)) if f.is_integer() else repr(f)
+    s = str(v).strip()
+    if s.endswith("+00"):
+        s = s[:-3] + "+00:00"
+    try:
+        f = float(s)
+        return str(int(f)) if f.is_integer() else repr(f)
+    except (TypeError, ValueError):
+        return s
+
+
+def _row_identical(csv_row: dict, live_row: dict, header: list[str]) -> bool:
+    """True bila semua kolom CSV (kecuali created_at) sama dengan nilai live."""
+    for col in header:
+        if col == "created_at":
+            continue
+        if col not in live_row:
+            continue
+        if _norm(csv_row.get(col)) != _norm(live_row.get(col)):
+            return False
+    return True
 
 
 def _count_by(rows: list[dict], key: str) -> dict:
