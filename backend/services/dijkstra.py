@@ -33,6 +33,7 @@ from collections import defaultdict
 from typing import Any
 
 from services.geo import distance_meters
+from services.scope import SCOPED_KORIDOR, normalize_koridor_id as _normalize_koridor_id
 
 MAKS_TRANSIT_DEFAULT: int = 4  # maksimum 5 koridor (1 boarding + 4 transit)
 KEPADATAN_FALLBACK: float = 0.5  # default jika data kepadatan tidak ada
@@ -44,7 +45,6 @@ PRIMARY_WEIGHT_DENSITY: float = 0.20
 # Penalti transfer (detik) pada edge "transit" (A1, masalah #1). Mengacu pada
 # Garcia-Martinez et al. (2018): pure transfer penalty 15.2-17.7 EIVM ≈ 900 s.
 TRANSFER_PENALTY_DETIK: float = 900.0
-SCOPED_KORIDOR: set[str] = {"1", "2", "3", "4", "5"}
 HALTE_ALIAS_RADIUS_METER: float = 80.0
 
 
@@ -826,15 +826,6 @@ def candidate_diversity_report(routes: list[dict]) -> dict:
         "min_rata_kepadatan": min(densities) if densities else None,
         "max_rata_kepadatan": max(densities) if densities else None,
     }
-
-
-def _normalize_koridor_id(value: Any) -> str:
-    if value is None:
-        return ""
-    text = str(value).strip()
-    if text.endswith(".0"):
-        text = text[:-2]
-    return text
 
 
 def _normalized_transfer_halte_name(value: Any) -> str:

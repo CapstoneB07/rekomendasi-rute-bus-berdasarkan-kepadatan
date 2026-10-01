@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from services.dijkstra import KANDIDAT_RUTE_DEFAULT, build_graph, dijkstra
+from services.scope import SCOPED_KORIDOR, normalize_koridor_id
 
 DENSITY_DELTA_MILD = 0.10
 DENSITY_DELTA_SEVERE = 0.30
@@ -145,7 +146,7 @@ def classify_od_pair(
 
 
 def build_screening_pairs(graph_data: dict[str, Any]) -> list[dict]:
-    """Bangun daftar pasangan OD kandidat dari koridor scope 1-5.
+    """Bangun daftar pasangan OD kandidat dari koridor scope.
 
     Untuk menjaga waktu screening tetap terkendali, tiap koridor diambil
     maksimal 16 halte (stride). Pairs = kombinasi dalam koridor yang sama,
@@ -153,8 +154,8 @@ def build_screening_pairs(graph_data: dict[str, Any]) -> list[dict]:
     """
     members: dict[str, list[str]] = defaultdict(list)
     for row in graph_data.get("koridor_halte", []):
-        kid = str(row.get("koridor_id"))
-        if kid in {"1", "2", "3", "4", "5"}:
+        kid = normalize_koridor_id(row.get("koridor_id"))
+        if kid in SCOPED_KORIDOR:
             members[kid].append(str(row.get("halte_id")))
 
     pairs: list[dict] = []

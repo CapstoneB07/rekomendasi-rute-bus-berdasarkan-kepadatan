@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from services.dijkstra import KANDIDAT_RUTE_DEFAULT, build_graph, dijkstra, load_graph_data
+from services.scope import is_scoped
 from services.supabase_client import get_client
 
 
@@ -25,7 +26,7 @@ async def main():
     members = {}
     for row in data["koridor_halte"]:
         kid = str(row.get("koridor_id"))
-        if kid in {"1", "2", "3", "4", "5"}:
+        if is_scoped(kid):
             members.setdefault(kid, []).append(str(row["halte_id"]))
 
     candidates = []
