@@ -33,10 +33,14 @@ from collections import defaultdict
 from typing import Any
 
 from services.geo import distance_meters
-from services.scope import SCOPED_KORIDOR, normalize_koridor_id as _normalize_koridor_id
+from services.config import (
+    DENSITY_FALLBACK as KEPADATAN_FALLBACK,
+    MAKS_TRANSIT,
+    MAKS_TRANSIT_DEFAULT,
+    SCOPED_KORIDOR,
+    normalize_koridor_id as _normalize_koridor_id,
+)
 
-MAKS_TRANSIT_DEFAULT: int = 4  # maksimum 5 koridor (1 boarding + 4 transit)
-KEPADATAN_FALLBACK: float = 0.5  # default jika data kepadatan tidak ada
 KANDIDAT_RUTE_DEFAULT: int = 5
 PRIMARY_WEIGHT_TIME: float = 0.30
 PRIMARY_WEIGHT_DISTANCE: float = 0.20

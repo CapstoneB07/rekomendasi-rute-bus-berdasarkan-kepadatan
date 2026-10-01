@@ -14,8 +14,9 @@ bus_selector tidak perlu tahu topologi graf. State tidak dibagi.
 from collections import defaultdict
 from typing import Any, Callable
 
+from services.config import BUS_CAPACITY
+
 KEPADATAN_DECIMAL = 2  # presisi bulatan untuk grouping kepadatan setara
-BUS_CAPACITY = 80
 MAX_ETA_MENIT_DEFAULT = 45
 MAX_ETA_DETIK_DEFAULT = MAX_ETA_MENIT_DEFAULT * 60
 MAX_EXTRA_WAIT_MENIT_DEFAULT = 20

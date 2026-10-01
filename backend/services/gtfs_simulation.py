@@ -20,10 +20,13 @@ from typing import Any
 from services.geo import distance_meters
 from services.interpolation import compute_bearing, get_bus_position
 from services.bus_selector import MAX_ETA_DETIK_DEFAULT
-from services.scope import SCOPED_KORIDOR, normalize_koridor_id as _normalize_koridor_id
+from services.config import (
+    BUS_CAPACITY,
+    DENSITY_FALLBACK as FALLBACK_LOAD_FACTOR,
+    SCOPED_KORIDOR,
+    normalize_koridor_id as _normalize_koridor_id,
+)
 
-BUS_CAPACITY = 80
-FALLBACK_LOAD_FACTOR = 0.5
 LOAD_FACTOR_OUTPUT_CAP = float(os.getenv("LOAD_FACTOR_OUTPUT_CAP", "1.0") or 1.0)
 SIMULATION_RUN_ID_DEFAULT = "default"
 PROCESS_SIMULATION_RUN_ID = os.getenv("SIMULATION_RUN_ID") or f"run-{uuid.uuid4().hex[:8]}"
