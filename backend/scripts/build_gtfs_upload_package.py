@@ -599,10 +599,12 @@ def main() -> int:
                         "stop_id": r["stop_id"], "arrival_time": r["arrival_time"],
                         "departure_time": r["departure_time"],
                         "stop_headsign": r.get("stop_headsign", ""),
-                        "pickup_type": 0.0, "drop_off_type": 0.0,
+                        # Kolom ini NULL di Supabase live (bigint). Jangan tulis
+                        # 0.0 — dashboard CSV importer menolak "0.0" untuk bigint.
+                        "pickup_type": "", "drop_off_type": "",
                         "continuous_pickup": "", "continuous_drop_off": "",
-                        "shape_dist_traveled": r.get("shape_dist_traveled") or 0.0,
-                        "timepoint": 0.0,
+                        "shape_dist_traveled": "",
+                        "timepoint": "",
                     }
                 )
     write_csv(out / "gtfs_trips.csv",
