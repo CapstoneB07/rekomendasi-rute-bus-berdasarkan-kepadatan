@@ -280,6 +280,14 @@ Monte Carlo tidak mengubah logika routing inti. Yang berubah hanya input crowdin
 > — memverifikasi konflik parah (koridor cepat-padat vs lambat-sepi) menghasilkan
 > >= 2 kandidat dan re-ranking memilih rute paling sepi.
 
+> **Update 2026-10-01 (re-ranking, `rerank_routes` di `services/bus_selector.py`):**
+> `density_norm` fase 1 kini clamp absolut `min(max(rata_kepadatan,0),1)` (bukan
+> min-max). Urutan akhir = `(dalam_cap_Pareto, kategori_kepadatan,
+> rata_kepadatan, primary_score)` — kategori c251 §4.2, lalu kepadatan kontinu
+> (c251 Eq 4.20, tanpa pembulatan), lalu primary_score untuk seri kepadatan
+> persis. Cap Pareto: +15 menit / +3000 m dari rute tercepat/terpendek. Runner
+> route-level: `scripts/run_route_level_mc.py`.
+
 ```text
 snapshot LFsegment per replikasi
         |
