@@ -54,8 +54,7 @@ function buatPenanda(warna: string, teks: string, belah = false): HTMLElement {
   return root;
 }
 
-// Label di atas bus yang kepadatannya dari kamera CV. Cincin biru di titiknya
-// digambar layer `bus-live-ring`; elemen ini hanya membawa tulisan.
+// Label bus berdata CV; cincin birunya digambar layer bus-live-ring.
 function buatLabelLive(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'h-0 w-0';
@@ -126,7 +125,7 @@ export function RuteMap({ rute, halteMap, bus }: Props) {
   const liveMarkerRef = useRef<Marker | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Key sama dengan SimulationMap supaya cache react-query dipakai bersama.
+  // Jalur koridor untuk garis latar peta.
   const { data: shapes } = useQuery<ShapesResponse>({
     queryKey: ['shapes'],
     queryFn: async () => {
@@ -181,8 +180,7 @@ export function RuteMap({ rute, halteMap, bus }: Props) {
         paint: { 'line-color': ['get', 'warna'], 'line-width': 6 },
       });
 
-      // Bus di atas semua garis. Warna titik = kepadatan (ambang sama dengan
-      // kepadatanKeWarna); cincin biru menandai bus berdata CV live.
+      // Bus di atas semua garis: warna titik = kepadatan, cincin biru = data CV live.
       map.addSource('bus', { type: 'geojson', data: EMPTY_POINTS });
       map.addLayer({
         id: 'bus-live-ring',

@@ -1,5 +1,4 @@
-// Utilitas tipe + konstruksi GeoJSON untuk overlay rute Dijkstra di MapLibre.
-// Konsumen: RuteMap, RuteResult.
+// Tipe dan GeoJSON overlay rute Dijkstra di MapLibre, dipakai RuteMap dan RuteResult.
 
 export type Halte = {
   halte_id: string;

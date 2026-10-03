@@ -11,7 +11,7 @@ import {
 
 const LABEL_TEKS = { sepi: 'Lega', sedang: 'Cukup ramai', padat: 'Padat' } as const;
 
-// Warna label disinkronkan dengan RouteCard di halaman simulasi.
+// Warna label kepadatan bus rekomendasi.
 const BADGE_STYLE: Record<BusRekomendasi['label_kepadatan'], string> = {
   Sepi: 'bg-green-100 text-green-800',
   Sedang: 'bg-yellow-100 text-yellow-800',

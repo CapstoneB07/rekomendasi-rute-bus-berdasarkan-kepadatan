@@ -17,11 +17,9 @@ const RuteMap = dynamic(() => import('./_components/RuteMap').then((m) => m.Rute
 });
 
 const REFRESH_MS = 30_000;
-// Rute dihitung ulang tiap jam simulasi melewati batas ini (Dijkstra cukup
-// mahal untuk dijalankan tiap detik); ETA memakai jam simulasi saat fetch.
+// Rute dihitung ulang tiap 5 menit jam simulasi karena Dijkstra mahal; ETA memakai jam saat fetch.
 const RUTE_BUCKET_DETIK = 300;
-// Posisi bus diminta paling cepat tiap 5 detik simulasi, dan setelah jam
-// berhenti berubah selama POSISI_DEBOUNCE_MS (mis. saat slider digeser).
+// Posisi bus diminta tiap 5 detik simulasi, ditunda 300 ms setelah jam berhenti berubah.
 const POSISI_BUCKET_DETIK = 5;
 const POSISI_DEBOUNCE_MS = 300;
 
@@ -85,8 +83,7 @@ export default function Home() {
       Math.floor(simTime / RUTE_BUCKET_DETIK),
     ],
     queryFn: async () => {
-      // Jam dibaca saat fetch (bukan saat render) supaya ETA bus ikut segar
-      // pada tiap refetch otomatis.
+      // Jam dibaca saat fetch (bukan saat render) supaya ETA bus segar pada tiap refetch.
       const detik = simTimeRef.current;
       const jam = Math.floor(detik / 3600) % 24;
       const { hariTipe } = waktuWib();
@@ -109,8 +106,7 @@ export default function Home() {
     },
     enabled: pencarian !== null,
     refetchInterval: isLive ? REFRESH_MS : false,
-    // Selama bucket jam berganti, tetap tampilkan hasil sebelumnya untuk
-    // pasangan halte yang sama; pasangan lain mulai dari kosong.
+    // Pertahankan hasil sebelumnya saat bucket jam berganti, hanya untuk pasangan halte yang sama.
     placeholderData: (prev, prevQuery) =>
       prevQuery?.queryKey[1] === pencarian?.asal && prevQuery?.queryKey[2] === pencarian?.tujuan
         ? prev

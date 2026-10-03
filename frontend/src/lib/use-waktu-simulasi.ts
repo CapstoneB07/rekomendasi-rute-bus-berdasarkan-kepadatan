@@ -11,14 +11,12 @@ export const KECEPATAN = [1, 5, 10, 60] as const;
 
 export type WaktuSimulasi = ReturnType<typeof useWaktuSimulasi>;
 
-// Jam yang dipakai seluruh halaman: mengikuti jam nyata WIB (mode `live`) atau
-// jam simulasi yang bisa digeser, dijeda, dan dipercepat.
+// Jam seluruh halaman: jam nyata WIB (live) atau jam simulasi yang bisa digeser, dijeda, dan dipercepat.
 export function useWaktuSimulasi() {
   const [isLive, setIsLive] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [kecepatan, setKecepatan] = useState<number>(1);
-  // Nilai awal tetap (bukan jam nyata) supaya render server dan klien sama;
-  // jam nyata masuk lewat tick pertama setelah mount.
+  // Nilai awal tetap supaya render server dan klien sama; jam nyata masuk lewat tick pertama.
   const [simTime, setSimTime] = useState(JAM_MULAI);
 
   useEffect(() => {
