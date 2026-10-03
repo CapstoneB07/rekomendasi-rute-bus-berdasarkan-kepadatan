@@ -47,14 +47,18 @@ def _earliest_bus_density(
     jadwal: dict,
     realtime: dict,
     sim_time: int,
-) -> tuple[float, int, int]:
+) -> tuple[float, int, int, int, int]:
     """V1: bus tercepat per blok naik.
 
-    Return (rata-rata LF, jumlah blok, jumlah blok tanpa kandidat). Blok tanpa
-    kandidat memakai kepadatan edge (nilai sebelum mutasi pemilihan bus).
+    Return (rata-rata LF, jumlah blok, jumlah blok tanpa kandidat,
+    max kandidat dalam satu blok, jumlah blok dengan >= 2 kandidat). Blok
+    tanpa kandidat memakai kepadatan edge (nilai sebelum mutasi pemilihan
+    bus).
     """
     densities: list[float] = []
     no_candidates = 0
+    max_candidates = 0
+    blocks_with_multiple = 0
     for blok in _blocks(formatted):
         kandidat = collect_bus_candidates(
             jadwal,
@@ -67,10 +71,13 @@ def _earliest_bus_density(
             no_candidates += 1
             densities.append(float(blok.get("kepadatan", 0.0)))
             continue
+        max_candidates = max(max_candidates, len(kandidat))
+        if len(kandidat) >= 2:
+            blocks_with_multiple += 1
         earliest = min(kandidat, key=lambda b: (b["eta_menit"], b["bus_id"]))
         densities.append(float(earliest["kepadatan"]))
     rata = sum(densities) / len(densities) if densities else 0.0
-    return rata, len(densities), no_candidates
+    return rata, len(densities), no_candidates, max_candidates, blocks_with_multiple
 
 
 def _empty_result(origin: str, destination: str, reason: str) -> dict:
@@ -120,9 +127,13 @@ def evaluate_scenario_success(
     baseline_formatted = format_rute(baseline_routes[0], graph_data)
 
     # V1 dihitung SEBELUM mutasi kepadatan oleh pemilihan bus.
-    d_base_v1, n_blocks, n_no_candidates = _earliest_bus_density(
-        baseline_formatted, ctx.jadwal, realtime, sim_time
-    )
+    (
+        d_base_v1,
+        n_blocks,
+        n_no_candidates,
+        max_candidates,
+        blocks_with_multiple,
+    ) = _earliest_bus_density(baseline_formatted, ctx.jadwal, realtime, sim_time)
     # V2: baseline dengan pemilihan bus density-aware (konservatif).
     select_bus_per_segmen(baseline_formatted["segmen"], sim_time, ctx.jadwal, realtime)
     apply_selected_bus_density(baseline_formatted)
@@ -162,6 +173,8 @@ def evaluate_scenario_success(
         "candidate_count": len(routes),
         "blocks": n_blocks,
         "blocks_without_candidates": n_no_candidates,
+        "max_bus_candidates": max_candidates,
+        "blocks_with_multiple_buses": blocks_with_multiple,
         "d_base_v1": round(d_base_v1, 4),
         "d_base_v2": round(d_base_v2, 4),
         "d_rec": round(d_rec, 4),

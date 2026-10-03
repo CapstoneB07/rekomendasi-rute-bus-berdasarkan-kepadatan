@@ -46,6 +46,7 @@ SUMMARY_OUTPUT = ROOT / "results" / "success_rate_summary.json"
 FIELDNAMES = [
     "scenario_type", "origin", "destination", "time_period", "jam",
     "candidate_count", "blocks", "blocks_without_candidates",
+    "max_bus_candidates", "blocks_with_multiple_buses",
     "d_base_v1", "d_base_v2", "d_rec", "delta_v1", "delta_v2",
     "win_v1", "win_v2", "route_changed", "mean_extra_wait_menit",
 ]
