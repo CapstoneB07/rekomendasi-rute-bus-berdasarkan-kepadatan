@@ -8,6 +8,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 backend/.env*
+!backend/.env.example
 backend/*.pyc
 
 # Next.js
