@@ -1,5 +1,5 @@
 // Utilitas tipe + konstruksi GeoJSON untuk overlay rute Dijkstra di MapLibre.
-// Konsumen: SimulationMap, RoutePanel, RouteCard.
+// Konsumen: RuteMap, RuteResult.
 
 export type Halte = {
   halte_id: string;
@@ -16,8 +16,12 @@ export type SegmenDetail = {
   jarak_meter?: number;
 };
 
+// 'cv_live' = kepadatan dari kamera CV bus fisik; 'generated' = simulasi.
+export type DataSource = 'cv_live' | 'generated';
+
 export type BusRekomendasi = {
   bus_id: string;
+  data_source?: DataSource;
   kepadatan: number;
   label_kepadatan: 'Sepi' | 'Sedang' | 'Padat';
   eta_menit: number;
@@ -40,6 +44,22 @@ export type BusRekomendasi = {
     score: number;
   }>;
 };
+
+// Properti tiap bus di GET /api/simulation/positions.
+export type BusPosisi = {
+  bus_id: string;
+  koridor_id: number;
+  bearing: number;
+  next_stop: string;
+  eta_minutes: number;
+  trip_load_factor: number;
+  label_kepadatan: 'Sepi' | 'Sedang' | 'Padat';
+  estimated_passengers: number;
+  capacity: number;
+  data_source: DataSource;
+};
+
+export type PosisiBusResponse = GeoJSON.FeatureCollection<GeoJSON.Point, BusPosisi>;
 
 export type NaikItem = {
   tipe: 'naik';
@@ -101,8 +121,6 @@ export type Rute = {
   };
   segmen: RuteSegmen[];
 };
-
-export type SelectionMode = 'idle' | 'pilih_asal' | 'pilih_tujuan' | 'hasil';
 
 export type ShapeFeature = GeoJSON.Feature<GeoJSON.LineString, {
   koridor_id: number | string;
@@ -250,46 +268,4 @@ export function buildRouteGeoJSON(
     }
   }
   return { type: 'FeatureCollection', features };
-}
-
-// Kumpulkan titik transit dari rute aktif untuk dirender sebagai marker
-// khusus (bentuk berbeda dari halte biasa).
-export function collectTransitPoints(
-  segmen: RuteSegmen[],
-  halteMap: Map<string, Halte>,
-): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
-  for (const s of segmen) {
-    if (s.tipe !== 'transit') continue;
-    const h = halteMap.get(s.transit_di_id);
-    if (!h) continue;
-    features.push({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [h.lng, h.lat] },
-      properties: {
-        nama: h.nama,
-        dari_koridor: s.dari_koridor,
-        ke_koridor: s.ke_koridor,
-      },
-    });
-  }
-  return { type: 'FeatureCollection', features };
-}
-
-// FeatureCollection berisi 1 titik untuk source single-point seperti
-// titik asal / titik tujuan.
-export function titikTunggalGeoJSON(
-  halte: Halte | undefined,
-): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  if (!halte) return { type: 'FeatureCollection', features: [] };
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [halte.lng, halte.lat] },
-        properties: { nama: halte.nama, halte_id: halte.halte_id },
-      },
-    ],
-  };
 }

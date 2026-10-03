@@ -5,6 +5,7 @@ from services.gtfs_simulation import (
     BUS_CAPACITY,
     SimulationContext,
     effective_trip_loads,
+    live_bus_id,
     live_trip_instance_id,
     realtime_trip_loads,
 )
@@ -121,3 +122,24 @@ def test_selector_memilih_bus_live_yang_sepi():
     segmen = [{"tipe": "naik", "koridor_id": 1, "naik_di_id": "H1"}]
     select_bus_per_segmen(segmen, 100, jadwal, kepadatan)
     assert segmen[0]["bus_rekomendasi"]["bus_id"] == "B-K1-01"
+
+
+def test_live_bus_id_hanya_bila_data_segar():
+    instances = [_instance("BUS-1-0-001", "1", "0", 3600, 7200)]
+    assert live_bus_id(_ctx(instances, _store(60)), 4000) == "BUS-1-0-001"
+    assert live_bus_id(_ctx(instances, _store(60, age_seconds=500)), 4000) is None
+    assert live_bus_id(_ctx(instances, None), 4000) is None
+
+
+def test_rekomendasi_menandai_data_source_live():
+    jadwal = {
+        "B-K1-01": [{"halte_id": "H1", "koridor_id": 1, "waktu_tiba_detik": 300, "urutan": 1}],
+        "B-K1-02": [{"halte_id": "H1", "koridor_id": 1, "waktu_tiba_detik": 600, "urutan": 1}],
+    }
+    for live_id, expected in (("B-K1-01", "cv_live"), (None, "generated")):
+        segmen = [{"tipe": "naik", "koridor_id": 1, "naik_di_id": "H1"}]
+        select_bus_per_segmen(
+            segmen, 100, jadwal, {"B-K1-01": 0.1, "B-K1-02": 0.9}, live_bus_id=live_id
+        )
+        assert segmen[0]["bus_rekomendasi"]["bus_id"] == "B-K1-01"
+        assert segmen[0]["bus_rekomendasi"]["data_source"] == expected

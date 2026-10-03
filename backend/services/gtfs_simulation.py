@@ -1875,29 +1875,40 @@ def live_trip_instance_id(ctx: SimulationContext, sim_time: int) -> str | None:
     return best["trip_instance_id"]
 
 
+def _live_overlay(ctx: SimulationContext, sim_time: int | None) -> tuple[str, dict] | None:
+    """(trip_instance_id, payload) bus live pada sim_time; None bila data CV tidak segar."""
+    if ctx.live_crowding is None or sim_time is None:
+        return None
+    reading = ctx.live_crowding.latest()
+    if reading is None:
+        return None
+    tid = live_trip_instance_id(ctx, sim_time)
+    if tid is None:
+        return None
+    passengers = reading["jumlah_penumpang"]
+    return tid, {
+        "trip_load_factor": passengers / BUS_CAPACITY,
+        "estimated_passengers": float(passengers),
+        "data_source": LIVE_DATA_SOURCE,
+    }
+
+
+def live_bus_id(ctx: SimulationContext, sim_time: int | None) -> str | None:
+    """bus_id yang saat ini memakai data CV segar, atau None."""
+    overlay = _live_overlay(ctx, sim_time)
+    return overlay[0] if overlay else None
+
+
 def effective_trip_loads(ctx: SimulationContext, crowding: dict, sim_time: int | None) -> dict[str, dict]:
     """trip_loads hasil generate, dengan bus live ditimpa data CV bila segar.
 
     Tidak memutasi `crowding` karena itu cache yang dibagi antar request.
     """
-    trip_loads = crowding["trip_loads"]
-    if ctx.live_crowding is None or sim_time is None:
-        return trip_loads
-    reading = ctx.live_crowding.latest()
-    if reading is None:
-        return trip_loads
-    tid = live_trip_instance_id(ctx, sim_time)
-    if tid is None:
-        return trip_loads
-    passengers = reading["jumlah_penumpang"]
-    return {
-        **trip_loads,
-        tid: {
-            "trip_load_factor": passengers / BUS_CAPACITY,
-            "estimated_passengers": float(passengers),
-            "data_source": LIVE_DATA_SOURCE,
-        },
-    }
+    overlay = _live_overlay(ctx, sim_time)
+    if overlay is None:
+        return crowding["trip_loads"]
+    tid, payload = overlay
+    return {**crowding["trip_loads"], tid: payload}
 
 
 def realtime_trip_loads(

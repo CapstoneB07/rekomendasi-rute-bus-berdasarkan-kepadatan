@@ -37,6 +37,11 @@ function BusNaik({ rek }: { rek: BusRekomendasi }) {
         <div className="text-sm font-semibold text-gray-900">
           Bus {rek.bus_id} · {eta}
         </div>
+        {rek.data_source === 'cv_live' && (
+          <span className="mt-1 inline-block rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-bold text-white">
+            LIVE · kepadatan dari kamera bus
+          </span>
+        )}
       </div>
       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${BADGE_STYLE[rek.label_kepadatan]}`}>
         {rek.label_kepadatan === 'Sepi' ? 'Lega' : rek.label_kepadatan}
