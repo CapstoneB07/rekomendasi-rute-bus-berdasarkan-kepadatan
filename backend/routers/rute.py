@@ -7,7 +7,12 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from services.bus_selector import MAX_ETA_DETIK_DEFAULT, select_bus_per_segmen
+from services.bus_selector import (
+    MAX_ETA_DETIK_DEFAULT,
+    apply_selected_bus_density,
+    rerank_routes,
+    select_bus_per_segmen,
+)
 from services.dijkstra import (
     KANDIDAT_RUTE_DEFAULT,
     MAKS_TRANSIT_DEFAULT,
@@ -16,13 +21,8 @@ from services.dijkstra import (
     format_rute,
     get_realtime_kepadatan,
 )
-from services.gtfs_simulation import (
-    SCOPED_KORIDOR,
-    active_segment_crowding_snapshot,
-    daily_mean_for,
-    realtime_trip_loads,
-    upcoming_buses_for_halte,
-)
+from services.monte_carlo import build_recommendation_crowding_snapshot, run_monte_carlo_experiment
+from services.gtfs_simulation import upcoming_buses_for_halte
 from services.geo import distance_meters
 from services.supabase_client import get_client
 
@@ -39,48 +39,6 @@ def _jam_sekarang_wib() -> int:
 def _hari_tipe_sekarang() -> str:
     # Senin-Jumat (0-4) = weekday; Sabtu-Minggu (5-6) = weekend
     return "weekday" if datetime.now(WIB).weekday() < 5 else "weekend"
-
-
-def _apply_selected_bus_density(formatted: dict) -> dict:
-    """Hitung ulang kepadatan rute setelah bus_rekomendasi dipilih.
-
-    Ini menyelaraskan implementasi dengan Bab 4.6.2: kepadatan rute memakai
-    load factor trip/bus yang benar-benar direkomendasikan pada tiap segmen
-    naik. Jika bus tidak tersedia, fallback ke kepadatan edge yang sudah ada.
-    """
-    naik_items = [s for s in formatted["segmen"] if s.get("tipe") == "naik"]
-    density_values: list[float] = []
-    selected_count = 0
-
-    for item in naik_items:
-        rek = item.get("bus_rekomendasi")
-        if rek is not None and rek.get("kepadatan") is not None:
-            density = float(rek["kepadatan"])
-            selected_count += 1
-            item["kepadatan"] = round(density, 3)
-        else:
-            density = float(item.get("kepadatan", 0.0))
-        density_values.append(density)
-
-    if not density_values:
-        return formatted
-
-    rata_kepadatan = sum(density_values) / len(density_values)
-
-    formatted["rata_kepadatan"] = round(rata_kepadatan, 3)
-    density_norm = min(rata_kepadatan, 1.0)
-    formatted["density_norm"] = round(density_norm, 3)
-    formatted["skor"] = round(density_norm, 4)
-    formatted["ranking_phase_2"] = {
-        "rata_kepadatan": round(rata_kepadatan, 3),
-        "density_norm": round(density_norm, 3),
-    }
-    formatted["density_source"] = (
-        "selected_bus"
-        if selected_count == len(density_values)
-        else "mixed_edge_fallback"
-    )
-    return formatted
 
 
 def _normalized_halte_name(value: str | None) -> str:
@@ -166,6 +124,62 @@ class RuteRequest(BaseModel):
     simulation_run_id: str | None = None
 
 
+class RoutingScenario(BaseModel):
+    name: str | None = None
+    halte_asal: str
+    halte_tujuan: str
+
+
+class MonteCarloRequest(BaseModel):
+    jam: int | None = Field(default=None, ge=0, le=23)
+    hari_tipe: Literal["weekday", "weekend"] | None = None
+    sim_time: int | None = Field(default=None, ge=0)
+    tanggal: str | None = None
+    simulation_run_id: str | None = None
+    master_seed: int | str | None = None
+    replications: int = Field(default=100, ge=1)
+    routing_scenarios: list[RoutingScenario] = Field(default_factory=list)
+    diagnostic_segment_ids: list[str] = Field(default_factory=list)
+    weights: dict[str, float] | None = None
+
+
+@router.post("/monte-carlo")
+def monte_carlo(req: MonteCarloRequest, request: Request) -> dict:
+    simulation_context = getattr(request.app.state, "simulation_context", None)
+    if simulation_context is None or not simulation_context.instances:
+        raise HTTPException(503, "simulation_context tidak tersedia")
+
+    jam = req.jam if req.jam is not None else _jam_sekarang_wib()
+    hari_tipe = req.hari_tipe or _hari_tipe_sekarang()
+    sim_time = req.sim_time if req.sim_time is not None else jam * 3600
+
+    scenarios = [scenario.model_dump() for scenario in req.routing_scenarios]
+    result = run_monte_carlo_experiment(
+        simulation_context,
+        request.app.state.graph_data,
+        scenarios,
+        replications=req.replications,
+        master_seed=req.master_seed,
+        tanggal=req.tanggal,
+        jam=jam,
+        hari_tipe=hari_tipe,
+        sim_time=sim_time,
+        diagnostic_segment_ids=set(req.diagnostic_segment_ids),
+        weights=req.weights,
+    )
+    result["request"] = {
+        "jam": jam,
+        "hari_tipe": hari_tipe,
+        "sim_time": sim_time,
+        "tanggal": req.tanggal,
+        "simulation_run_id": req.simulation_run_id,
+        "master_seed": req.master_seed,
+        "replications": req.replications,
+        "weights": req.weights,
+    }
+    return result
+
+
 @router.post("/rekomendasi")
 def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
     graph_data = request.app.state.graph_data
@@ -192,23 +206,24 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
 
     segment_crowding = None
     daily_mean_by_koridor = None
+    realtime_kepadatan = None
     if simulation_context is not None and simulation_context.instances:
-        segment_crowding = active_segment_crowding_snapshot(
+        crowding_snapshot = build_recommendation_crowding_snapshot(
             simulation_context,
-            sim_time=sim_time,
             tanggal=req.tanggal,
-            simulation_run_id=req.simulation_run_id,
+            sim_time=sim_time,
+            request_seed_parts=(
+                req.halte_asal,
+                req.halte_tujuan,
+                jam,
+                hari_tipe,
+                sim_time,
+                req.simulation_run_id,
+            ),
         )
-        daily_mean_by_koridor = {}
-        for kid in SCOPED_KORIDOR:
-            value = daily_mean_for(
-                simulation_context,
-                req.tanggal,
-                kid,
-                simulation_run_id=req.simulation_run_id,
-            )
-            daily_mean_by_koridor[kid] = value
-            daily_mean_by_koridor[int(kid)] = value
+        segment_crowding = crowding_snapshot["segment_crowding"]
+        daily_mean_by_koridor = crowding_snapshot["daily_mean_by_koridor"]
+        realtime_kepadatan = crowding_snapshot["realtime_kepadatan"]
 
     graph = build_graph(
         graph_data,
@@ -223,7 +238,7 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
             graph, halte_master, req.halte_asal, req.halte_tujuan
         )
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
     if not rute_list:
         raise HTTPException(
@@ -240,14 +255,7 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
             f"tujuan_request={req.halte_tujuan} tujuan_graph={resolved_tujuan}"
         )
 
-    if simulation_context is not None and simulation_context.instances:
-        realtime_kepadatan = realtime_trip_loads(
-            simulation_context,
-            tanggal=req.tanggal,
-            simulation_run_id=req.simulation_run_id,
-            sim_time=sim_time,
-        )
-    else:
+    if realtime_kepadatan is None:
         realtime_kepadatan = get_realtime_kepadatan(graph_data, jam=jam, hari_tipe=hari_tipe)
 
     debug_items_pre = []
@@ -275,12 +283,9 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
         select_bus_per_segmen(
             formatted["segmen"], sim_time, jadwal, realtime_kepadatan
         )
-        hasil.append(_apply_selected_bus_density(formatted))
+        hasil.append(apply_selected_bus_density(formatted))
 
-    hasil.sort(key=lambda r: (
-        r["density_norm"],
-        r["primary_score"],
-    ))
+    hasil = rerank_routes(hasil)
 
     debug_items_final = []
     for idx, r in enumerate(hasil, start=1):

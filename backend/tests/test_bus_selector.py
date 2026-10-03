@@ -1,6 +1,11 @@
 """Unit test untuk services/bus_selector.py (Algoritma 2)."""
 
-from services.bus_selector import MAX_ETA_MENIT_DEFAULT, select_bus_per_segmen
+from services.bus_selector import (
+    MAX_ETA_MENIT_DEFAULT,
+    density_category,
+    rerank_routes,
+    select_bus_per_segmen,
+)
 
 
 def _jadwal_dummy() -> dict[str, list[dict]]:
@@ -271,3 +276,179 @@ def test_label_kepadatan_threshold():
             realtime_kepadatan={"B-K2-01": kepadatan},
         )
         assert segmen[0]["bus_rekomendasi"]["label_kepadatan"] == label
+
+
+# ----------------------------------------------------------------------
+# Part A (masalah #9): journey clock antar kaki perjalanan
+# ----------------------------------------------------------------------
+
+def _dua_kaki_dummy() -> tuple[list[dict], dict, dict]:
+    """Kaki 1: A->C koridor 1. Kaki 2: C->E koridor 2.
+
+    sim_time = 08:00:00. Bus K1-01 tiba A 08:05 dan C 08:20.
+    Bus K2-01 tiba C 08:15 (terlalu mepet dari sudut sim_time kalau pakai
+    sim_time global: ETA = 15 menit masih masuk jendela). Dengan journey clock,
+    jam tiba C = 08:20, maka bus K2-01 sudah lewat -> kandidat harus gugur.
+    """
+    sim_time = 8 * 3600
+    segmen = [
+        {
+            "tipe": "naik",
+            "koridor_id": 1,
+            "naik_di_id": "A",
+            "turun_di_id": "C",
+            "segmen_detail": [
+                {"dari_id": "A", "ke_id": "B", "waktu_menit": 5},
+                {"dari_id": "B", "ke_id": "C", "waktu_menit": 5},
+            ],
+        },
+        {
+            "tipe": "naik",
+            "koridor_id": 2,
+            "naik_di_id": "C",
+            "turun_di_id": "E",
+            "segmen_detail": [{"dari_id": "C", "ke_id": "E", "waktu_menit": 5}],
+        },
+    ]
+    jadwal = {
+        "B-K1-01": [
+            {"halte_id": "A", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 5 * 60},
+            {"halte_id": "B", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 12 * 60},
+            {"halte_id": "C", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 20 * 60},
+        ],
+        "B-K2-01": [
+            {"halte_id": "C", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 15 * 60},
+            {"halte_id": "E", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 20 * 60},
+        ],
+        "B-K2-02": [
+            {"halte_id": "C", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 25 * 60},
+            {"halte_id": "E", "koridor_id": 2, "waktu_tiba_detik": 8 * 3600 + 30 * 60},
+        ],
+    }
+    realtime = {
+        "B-K1-01": 0.30,
+        "B-K2-01": 0.30,
+        "B-K2-02": 0.30,
+    }
+    return segmen, jadwal, realtime, sim_time
+
+
+def test_transfer_leg_eta_uses_previous_arrival_clock():
+    """ETA kaki kedua dihitung dari kedatangan kaki pertama, bukan sim_time."""
+    segmen, jadwal, realtime, sim_time = _dua_kaki_dummy()
+    select_bus_per_segmen(segmen, sim_time=sim_time, jadwal=jadwal, realtime_kepadatan=realtime)
+
+    rek1 = segmen[0]["bus_rekomendasi"]
+    rek2 = segmen[1]["bus_rekomendasi"]
+
+    assert rek1["bus_id"] == "B-K1-01"
+    assert rek1["eta_menit"] == 5  # 08:05 - 08:00
+
+    # Dengan journey clock, jam berdiri di C = 08:20 (bukan 08:00). Bus K2-01
+    # sudah lewat, bus K2-02 (08:25) yang tersedia -> ETA 5 menit dari 08:20.
+    assert rek2["bus_id"] == "B-K2-02"
+    assert rek2["eta_menit"] == 5
+    assert rek2["leg_clock_detik"] == 8 * 3600 + 20 * 60
+
+
+def test_transfer_wait_can_shift_bus_choice_outside_window():
+    """Bus yang terlihat tersedia dari sim_time global bisa gugur karena sudah
+    lewat saat penumpang benar-benar tiba di titik transfer."""
+    segmen, jadwal, realtime, sim_time = _dua_kaki_dummy()
+
+    # Buat K2-02 jauh lebih sepi: kalau K2-01 masih dianggap tersedia (sim_time
+    # global), K2-01 menang karena lebih dulu; dengan journey clock K2-01 gugur
+    # dan K2-02 yang menang.
+    realtime["B-K2-01"] = 0.10
+    realtime["B-K2-02"] = 0.90
+    select_bus_per_segmen(segmen, sim_time=sim_time, jadwal=jadwal, realtime_kepadatan=realtime)
+
+    rek2 = segmen[1]["bus_rekomendasi"]
+    assert rek2["bus_id"] == "B-K2-02"
+    assert rek2["leg_clock_detik"] == 8 * 3600 + 20 * 60
+
+
+def test_first_leg_uses_sim_time_unchanged():
+    """Kaki pertama tetap menghitung ETA dari sim_time global."""
+    segmen, jadwal, realtime, sim_time = _dua_kaki_dummy()
+    select_bus_per_segmen(segmen, sim_time=sim_time, jadwal=jadwal, realtime_kepadatan=realtime)
+
+    rek1 = segmen[0]["bus_rekomendasi"]
+    assert rek1["leg_clock_detik"] == sim_time
+    assert rek1["eta_menit"] == 5
+
+
+# ----------------------------------------------------------------------
+# Re-ranking kategori kepadatan (masalah #4)
+# ----------------------------------------------------------------------
+
+def test_density_category_thresholds():
+    assert density_category(0.49) == "sepi"
+    assert density_category(0.50) == "sedang"
+    assert density_category(0.79) == "sedang"
+    assert density_category(0.80) == "padat"
+    assert density_category(0.99) == "padat"
+    assert density_category(1.00) == "sangat_padat"
+    assert density_category(1.30) == "sangat_padat"
+
+
+def test_rerank_routes_sorts_by_density_category_first():
+    """Rute sepi harus di atas rute padat meski primary_score-nya lebih besar."""
+    routes = [
+        {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.90, "primary_score": 0.05},
+        {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.20, "primary_score": 0.50},
+    ]
+    ordered = rerank_routes(routes)
+    assert ordered[0]["rata_kepadatan"] == 0.20
+    assert ordered[0]["kategori_kepadatan"] == "sepi"
+    assert ordered[1]["kategori_kepadatan"] == "padat"
+
+
+def test_rerank_routes_less_crowded_wins_within_same_category():
+    """Regresi route-level MC 2026-09-28 (pasangan A G00168 -> G00214).
+
+    Dua rute sama-sama 'sepi' (0.39 vs 0.31). Rute yang lebih cepat punya
+    primary_score lebih kecil, tetapi rute yang lebih sepi harus tetap menang:
+    di dalam kategori yang sama, kepadatan kontinu memutus seri sebelum
+    primary_score (c251 Eq 4.20).
+    """
+    routes = [
+        {"estimasi_menit": 20, "total_jarak_meter": 5000, "rata_kepadatan": 0.39, "primary_score": 0.10},
+        {"estimasi_menit": 21, "total_jarak_meter": 5200, "rata_kepadatan": 0.31, "primary_score": 0.60},
+    ]
+    ordered = rerank_routes(routes)
+    assert ordered[0]["rata_kepadatan"] == 0.31
+    assert [r["kategori_kepadatan"] for r in ordered] == ["sepi", "sepi"]
+
+
+def test_rerank_routes_exact_density_tie_uses_primary_score():
+    """Kategori DAN kepadatan sama -> primary_score terkecil menang."""
+    routes = [
+        {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.30, "primary_score": 0.40},
+        {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.30, "primary_score": 0.10},
+    ]
+    ordered = rerank_routes(routes)
+    assert ordered[0]["primary_score"] == 0.10
+
+
+def test_rerank_routes_cap_penalizes_extreme_detour():
+    """Rute sepi tapi jauh lebih lama/lebih jauh melebihi cap -> diturunkan."""
+    routes = [
+        # Tercepat & terpendek, tapi padat.
+        {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.90, "primary_score": 0.05},
+        # Sepi tapi 40 menit lebih lama (melebihi cap 15 mnt).
+        {"estimasi_menit": 50, "total_jarak_meter": 2000, "rata_kepadatan": 0.10, "primary_score": 0.90},
+    ]
+    ordered = rerank_routes(routes, max_extra_time_menit=15, max_extra_distance_meter=3000)
+    assert ordered[0]["rata_kepadatan"] == 0.90  # padat tetap menang karena sepi melebihi cap
+
+
+def test_rerank_routes_key_fn_extracts_formatted_dict():
+    """key_fn dipakai untuk mengambil dict formatted dari item wrapper."""
+    items = [
+        {"formatted": {"estimasi_menit": 10, "total_jarak_meter": 1000, "rata_kepadatan": 0.90, "primary_score": 0.05}},
+        {"formatted": {"estimasi_menit": 12, "total_jarak_meter": 1200, "rata_kepadatan": 0.20, "primary_score": 0.50}},
+    ]
+    ordered = rerank_routes(items, key_fn=lambda item: item["formatted"])
+    assert ordered[0]["formatted"]["rata_kepadatan"] == 0.20
+    assert ordered[0]["formatted"]["kategori_kepadatan"] == "sepi"

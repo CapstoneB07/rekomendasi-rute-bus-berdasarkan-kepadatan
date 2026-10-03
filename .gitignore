@@ -4,23 +4,38 @@ backend/venv/
 __pycache__/
 *.py[cod]
 *$py.class
-backend/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/.env*
 backend/*.pyc
-backend/.env
-backend/.env.local
 
 # Next.js
 frontend/.next/
 frontend/node_modules/
-frontend/.env.local
+frontend/.env*
 
 # General
 .DS_Store
 node_modules/
 .claude
+.hermes/
 
-head.v1i.yolo26/
-runs/
+# Generated results and CSV exports
+result/
+results/
+backend/result/
+*.csv
+
+# Server logs
+uvicorn.err
+uvicorn.out
+*.log
+
+# Monte Carlo raw experiment dumps
+monte-carlo-result.json
+
+# CV dataset dumps (new in main)
 received_images/
 received_images_latency/
 dataset_test/
