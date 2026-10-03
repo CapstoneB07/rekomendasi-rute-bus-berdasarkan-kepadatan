@@ -16,11 +16,13 @@ BUS_ENV_NAMES = (
     "BUS_MAX_EXTRA_WAIT_MENIT",
     "BUS_MAX_ETA_MENIT",
     "BUS_SCORE_DENSITY_WEIGHT",
+    "BUS_SAFE_NEXT_DENSITY_THRESHOLD",
 )
 PRINT_CODE = (
     "import services.config as c; "
     "print(c.MAX_EXTRA_WAIT_MENIT, c.MAX_ETA_MENIT, "
-    "c.BUS_SCORE_DENSITY_WEIGHT, c.BUS_SCORE_WAIT_WEIGHT)"
+    "c.BUS_SCORE_DENSITY_WEIGHT, c.BUS_SCORE_WAIT_WEIGHT, "
+    "c.BUS_SAFE_NEXT_DENSITY_THRESHOLD)"
 )
 
 
@@ -36,7 +38,7 @@ def _run_config_print(overrides: dict[str, str]) -> str:
 
 
 def test_bus_layer_defaults():
-    assert _run_config_print({}) == "20 45 0.85 0.15"
+    assert _run_config_print({}) == "20 45 0.85 0.15 0.35"
 
 
 def test_bus_layer_env_overrides():
@@ -44,8 +46,9 @@ def test_bus_layer_env_overrides():
         "BUS_MAX_EXTRA_WAIT_MENIT": "30",
         "BUS_MAX_ETA_MENIT": "60",
         "BUS_SCORE_DENSITY_WEIGHT": "0.95",
+        "BUS_SAFE_NEXT_DENSITY_THRESHOLD": "0.0",
     })
-    assert out == "30 60 0.95 0.05"
+    assert out == "30 60 0.95 0.05 0.0"
 
 
 def test_bus_layer_invalid_env_falls_back():
@@ -53,7 +56,7 @@ def test_bus_layer_invalid_env_falls_back():
         "BUS_MAX_EXTRA_WAIT_MENIT": "abc",
         "BUS_SCORE_DENSITY_WEIGHT": "1.5",  # di luar [0, 1]
     })
-    assert out == "20 45 0.85 0.15"
+    assert out == "20 45 0.85 0.15 0.35"
 
 
 def test_bus_selector_reexports_config_values():

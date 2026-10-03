@@ -113,10 +113,12 @@ MAKS_TRANSIT_DEFAULT: int = MAKS_TRANSIT
 _ENV_BUS_MAX_EXTRA_WAIT = "BUS_MAX_EXTRA_WAIT_MENIT"
 _ENV_BUS_MAX_ETA = "BUS_MAX_ETA_MENIT"
 _ENV_BUS_DENSITY_WEIGHT = "BUS_SCORE_DENSITY_WEIGHT"
+_ENV_BUS_SAFE_THRESHOLD = "BUS_SAFE_NEXT_DENSITY_THRESHOLD"
 
 BUS_MAX_EXTRA_WAIT_MENIT_DEFAULT: int = 20
 BUS_MAX_ETA_MENIT_DEFAULT: int = 45
 BUS_SCORE_DENSITY_WEIGHT_DEFAULT: float = 0.85
+BUS_SAFE_NEXT_DENSITY_THRESHOLD_DEFAULT: float = 0.35
 
 
 def _load_int_env(name: str, default: int, minimum: int = 1) -> int:
@@ -156,6 +158,13 @@ BUS_SCORE_DENSITY_WEIGHT: float = _load_float_env(
     _ENV_BUS_DENSITY_WEIGHT, BUS_SCORE_DENSITY_WEIGHT_DEFAULT
 )
 BUS_SCORE_WAIT_WEIGHT: float = round(1.0 - BUS_SCORE_DENSITY_WEIGHT, 4)
+#: Ambang "bus tercepat sudah cukup sepi" (rule UX repo, bukan dari c251).
+#: Set 0.0 untuk mematikan rule ini sehingga selector selalu optimasi
+#: kepadatan penuh sesuai c251 §4.7.2 ("semakin kecil D, semakin tinggi
+#: prioritas").
+BUS_SAFE_NEXT_DENSITY_THRESHOLD: float = _load_float_env(
+    _ENV_BUS_SAFE_THRESHOLD, BUS_SAFE_NEXT_DENSITY_THRESHOLD_DEFAULT
+)
 
 
 # ---------------------------------------------------------------------------
