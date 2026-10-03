@@ -255,6 +255,7 @@ def select_bus_per_segmen(
     realtime_kepadatan: dict[str, float],
     max_eta_menit: int = MAX_ETA_MENIT_DEFAULT,
     max_extra_wait_menit: int = MAX_EXTRA_WAIT_MENIT_DEFAULT,
+    live_bus_id: str | None = None,
 ) -> list[dict]:
     """Inject `bus_rekomendasi` ke tiap segmen tipe='naik' (mutasi in-place).
 
@@ -266,6 +267,8 @@ def select_bus_per_segmen(
             app.state.jadwal.
         realtime_kepadatan: dict bus_id -> kepadatan (0..1) pada jam request.
             Bus tanpa entri di sini akan diabaikan (tidak masuk kandidat).
+        live_bus_id: bus yang kepadatannya berasal dari CV (bukan generated);
+            hanya dipakai untuk menandai `data_source` di hasil.
 
     Bus tanpa kandidat valid -> `bus_rekomendasi: None` (frontend graceful).
     """
@@ -332,6 +335,7 @@ def select_bus_per_segmen(
 
         segmen["bus_rekomendasi"] = {
             "bus_id": terbaik["bus_id"],
+            "data_source": "cv_live" if terbaik["bus_id"] == live_bus_id else "generated",
             "kepadatan": round(terbaik["kepadatan"], 3),
             "label_kepadatan": _label_kepadatan(terbaik["kepadatan"]),
             "kategori_kepadatan": _kategori_kepadatan(terbaik["kepadatan"]),

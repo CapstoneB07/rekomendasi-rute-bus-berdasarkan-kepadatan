@@ -1,15 +1,27 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 
 import { HaltePicker, type HalteOpsi } from './_components/HaltePicker';
 import { RuteResult } from './_components/RuteResult';
+import { WaktuKontrol } from './_components/WaktuKontrol';
 import { API_BASE, waktuWib } from '@/lib/api';
-import type { Rute } from '@/lib/route-utils';
+import type { Halte, PosisiBusResponse, Rute } from '@/lib/route-utils';
+import { useWaktuSimulasi } from '@/lib/use-waktu-simulasi';
+
+// MapLibre butuh `window`, jadi hanya dirender di browser.
+const RuteMap = dynamic(() => import('./_components/RuteMap').then((m) => m.RuteMap), {
+  ssr: false,
+});
 
 const REFRESH_MS = 30_000;
+// Rute dihitung ulang tiap 5 menit jam simulasi karena Dijkstra mahal; ETA memakai jam saat fetch.
+const RUTE_BUCKET_DETIK = 300;
+// Posisi bus diminta tiap 5 detik simulasi, ditunda 300 ms setelah jam berhenti berubah.
+const POSISI_BUCKET_DETIK = 5;
+const POSISI_DEBOUNCE_MS = 300;
 
 type Pencarian = { asal: string; tujuan: string };
 
@@ -18,6 +30,34 @@ export default function Home() {
   const [tujuan, setTujuan] = useState<string | null>(null);
   const [pencarian, setPencarian] = useState<Pencarian | null>(null);
   const [aktifIdx, setAktifIdx] = useState(0);
+
+  const waktu = useWaktuSimulasi();
+  const { simTime, isLive } = waktu;
+  const simTimeRef = useRef(simTime);
+  useEffect(() => {
+    simTimeRef.current = simTime;
+  }, [simTime]);
+
+  // ---- Posisi bus pada jam simulasi ----
+  const [posisiWaktu, setPosisiWaktu] = useState<number | null>(null);
+  useEffect(() => {
+    const id = setTimeout(
+      () => setPosisiWaktu(Math.floor(simTime / POSISI_BUCKET_DETIK) * POSISI_BUCKET_DETIK),
+      POSISI_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(id);
+  }, [simTime]);
+
+  const { data: posisiBus } = useQuery<PosisiBusResponse>({
+    queryKey: ['posisi-bus', posisiWaktu],
+    queryFn: async () => {
+      const r = await fetch(`${API_BASE}/api/simulation/positions?sim_time=${posisiWaktu}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    enabled: posisiWaktu !== null,
+    placeholderData: (prev) => prev,
+  });
 
   const { data: halteList, isError: halteError, isPending: halteLoading } = useQuery<HalteOpsi[]>({
     queryKey: ['halte-user'],
@@ -36,11 +76,17 @@ export default function Home() {
     error,
     dataUpdatedAt,
   } = useQuery<Rute[]>({
-    queryKey: ['rute-user', pencarian?.asal, pencarian?.tujuan],
+    queryKey: [
+      'rute-user',
+      pencarian?.asal,
+      pencarian?.tujuan,
+      Math.floor(simTime / RUTE_BUCKET_DETIK),
+    ],
     queryFn: async () => {
-      // Waktu dihitung saat fetch (bukan saat render) supaya ETA bus ikut
-      // segar pada tiap refetch otomatis.
-      const { jam, detik, hariTipe } = waktuWib();
+      // Jam dibaca saat fetch (bukan saat render) supaya ETA bus segar pada tiap refetch.
+      const detik = simTimeRef.current;
+      const jam = Math.floor(detik / 3600) % 24;
+      const { hariTipe } = waktuWib();
       const r = await fetch(`${API_BASE}/api/rute/rekomendasi`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,9 +105,23 @@ export default function Home() {
       return r.json();
     },
     enabled: pencarian !== null,
-    refetchInterval: REFRESH_MS,
+    refetchInterval: isLive ? REFRESH_MS : false,
+    // Pertahankan hasil sebelumnya saat bucket jam berganti, hanya untuk pasangan halte yang sama.
+    placeholderData: (prev, prevQuery) =>
+      prevQuery?.queryKey[1] === pencarian?.asal && prevQuery?.queryKey[2] === pencarian?.tujuan
+        ? prev
+        : undefined,
     retry: 1,
   });
+
+  const halteMap = useMemo(
+    () => new Map<string, Halte>((halteList ?? []).map((h) => [h.halte_id, h])),
+    [halteList],
+  );
+  const ruteAktif =
+    pencarian && hasilRute && hasilRute.length > 0
+      ? hasilRute[Math.min(aktifIdx, hasilRute.length - 1)]
+      : undefined;
 
   const samaHalte = asal !== null && asal === tujuan;
   const bisaCari = asal !== null && tujuan !== null && !samaHalte;
@@ -82,7 +142,7 @@ export default function Home() {
   return (
     <div className="flex-1 bg-gray-50 text-gray-900">
       <header className="bg-red-600 px-4 pb-10 pt-6 text-white">
-        <div className="mx-auto max-w-md">
+        <div className="mx-auto max-w-md lg:max-w-6xl">
           <h1 className="text-xl font-bold">TransJakarta Lega</h1>
           <p className="mt-1 text-sm text-red-100">
             Pilih rute dan bus yang paling lega, berdasarkan kepadatan bus saat ini.
@@ -90,7 +150,13 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto -mt-6 max-w-md space-y-4 px-4 pb-10">
+      <main className="mx-auto -mt-6 max-w-md px-4 pb-10 lg:grid lg:max-w-6xl lg:grid-cols-[1fr_26rem] lg:items-start lg:gap-6">
+        <div className="mb-4 h-64 overflow-hidden rounded-2xl bg-gray-200 shadow-md lg:sticky lg:top-4 lg:mb-0 lg:h-[calc(100vh-2rem)]">
+          <RuteMap rute={ruteAktif} halteMap={halteMap} bus={posisiBus} />
+        </div>
+
+        <div className="space-y-4">
+        <WaktuKontrol waktu={waktu} />
         <form onSubmit={cari} className="space-y-3 rounded-2xl bg-white p-4 shadow-md">
           <HaltePicker
             label="Dari halte"
@@ -170,17 +236,15 @@ export default function Home() {
               setAktifIdx={setAktifIdx}
             />
             <p className="text-center text-xs text-gray-500">
-              Diperbarui otomatis tiap {REFRESH_MS / 1000} detik
-              {dataUpdatedAt ? ` · terakhir ${waktuWib(new Date(dataUpdatedAt)).label} WIB` : ''}
+              {isLive
+                ? `Diperbarui otomatis tiap ${REFRESH_MS / 1000} detik${
+                    dataUpdatedAt ? ` · terakhir ${waktuWib(new Date(dataUpdatedAt)).label} WIB` : ''
+                  }`
+                : 'Rute mengikuti jam simulasi'}
             </p>
           </>
         )}
-
-        <p className="pt-2 text-center text-xs text-gray-400">
-          <Link href="/simulation" className="underline hover:text-gray-600">
-            Lihat simulasi
-          </Link>
-        </p>
+        </div>
       </main>
     </div>
   );

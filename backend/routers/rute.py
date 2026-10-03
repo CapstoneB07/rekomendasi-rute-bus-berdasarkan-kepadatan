@@ -22,7 +22,7 @@ from services.dijkstra import (
     get_realtime_kepadatan,
 )
 from services.monte_carlo import build_recommendation_crowding_snapshot, run_monte_carlo_experiment
-from services.gtfs_simulation import upcoming_buses_for_halte
+from services.gtfs_simulation import display_load_factor, live_overlay, upcoming_buses_for_halte
 from services.geo import distance_meters
 from services.supabase_client import get_client
 
@@ -258,6 +258,16 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
     if realtime_kepadatan is None:
         realtime_kepadatan = get_realtime_kepadatan(graph_data, jam=jam, hari_tipe=hari_tipe)
 
+    # Bus fisik ber-CV: kepadatannya dari kamera, bukan snapshot generated.
+    live = live_overlay(simulation_context, sim_time) if simulation_context is not None else None
+    live_id = None
+    if live is not None:
+        live_id, live_payload = live
+        realtime_kepadatan = {
+            **realtime_kepadatan,
+            live_id: display_load_factor(live_payload["trip_load_factor"]),
+        }
+
     debug_items_pre = []
     for idx, r in enumerate(rute_list, start=1):
         debug_items_pre.append(
@@ -281,7 +291,7 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
     for r in rute_list:
         formatted = format_rute(r, graph_data)
         select_bus_per_segmen(
-            formatted["segmen"], sim_time, jadwal, realtime_kepadatan
+            formatted["segmen"], sim_time, jadwal, realtime_kepadatan, live_bus_id=live_id
         )
         hasil.append(apply_selected_bus_density(formatted))
 

@@ -86,6 +86,7 @@ def get_positions(
                         "kategori_kepadatan": pos["kategori_kepadatan"],
                         "status": pos["status"],
                         "estimated_passengers": pos["estimated_passengers"],
+                        "data_source": pos["data_source"],
                         "capacity": pos["capacity"],
                     },
                 }

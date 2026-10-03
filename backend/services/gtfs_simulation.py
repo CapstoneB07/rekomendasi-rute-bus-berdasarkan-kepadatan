@@ -26,7 +26,13 @@ from services.config import (
     SCOPED_KORIDOR,
     normalize_koridor_id as _normalize_koridor_id,
 )
+from services.live_crowding import LiveCrowding
 
+# Bus fisik ber-CV hanya satu; ia mewakili satu trip instance di koridor/arah ini.
+LIVE_BUS_KORIDOR = os.getenv("LIVE_BUS_KORIDOR", "1") or "1"
+LIVE_BUS_DIRECTION = os.getenv("LIVE_BUS_DIRECTION", "0") or "0"
+LIVE_DATA_SOURCE = "cv_live"
+GENERATED_DATA_SOURCE = "generated"
 LOAD_FACTOR_OUTPUT_CAP = float(os.getenv("LOAD_FACTOR_OUTPUT_CAP", "1.0") or 1.0)
 SIMULATION_RUN_ID_DEFAULT = "default"
 PROCESS_SIMULATION_RUN_ID = os.getenv("SIMULATION_RUN_ID") or f"run-{uuid.uuid4().hex[:8]}"
@@ -104,6 +110,7 @@ class SimulationContext:
     segmen_by_id: dict[str, dict]
     fallback_jadwal: dict[str, list[dict]]
     crowding_cache: dict[tuple[str | None, str], dict] = field(default_factory=dict)
+    live_crowding: LiveCrowding | None = None
 
 
 def parse_gtfs_time(value: Any) -> int:
@@ -1492,6 +1499,7 @@ def load_simulation_context(
     shapes_rows: list[dict] | None = None,
     fallback_jadwal: dict[str, list[dict]] | None = None,
     allowed_halte_ids: set[str] | None = None,
+    live_crowding: LiveCrowding | None = None,
 ) -> SimulationContext:
     """Load GTFS/ridership data and generate static trip instances."""
     try:
@@ -1517,7 +1525,10 @@ def load_simulation_context(
         )
     except Exception as e:
         print(f"[gtfs] WARNING: gagal load tabel GTFS/ridership ({e!r}); pakai fallback lama")
-        return SimulationContext([], fallback_jadwal or {}, {}, {}, None, {}, {}, {}, {}, fallback_jadwal or {})
+        return SimulationContext(
+            [], fallback_jadwal or {}, {}, {}, None, {}, {}, {}, {}, fallback_jadwal or {},
+            live_crowding=live_crowding,
+        )
 
     halte_by_id = {str(h["halte_id"]): h for h in halte_rows}
     shape_points_by_id = _build_shape_points_by_id(shapes_rows)
@@ -1554,6 +1565,7 @@ def load_simulation_context(
         ridership_by_date_koridor=ridership,
         segmen_by_id={str(s["segmen_id"]): s for s in segmen},
         fallback_jadwal=fallback_jadwal or {},
+        live_crowding=live_crowding,
     )
 
 
@@ -1841,15 +1853,68 @@ def active_segment_crowding_snapshot(
     return {sid: display_load_factor(sum(loads) / len(loads)) for sid, loads in values.items()}
 
 
+def live_trip_instance_id(ctx: SimulationContext, sim_time: int) -> str | None:
+    """Trip instance yang mewakili bus fisik ber-CV pada sim_time.
+
+    Simulasi bisa diputar ke jam mana pun, tapi bus fisik selalu ada, jadi
+    dipilih instance koridor/arah live yang sedang aktif (berangkat paling
+    awal); bila tidak ada yang aktif, instance berikutnya yang akan berangkat.
+    """
+    candidates = [
+        i for i in ctx.instances
+        if i["koridor_key"] == LIVE_BUS_KORIDOR
+        and i["direction_id"] == LIVE_BUS_DIRECTION
+        and sim_time < i["last_stop_arrival_time"]
+    ]
+    if not candidates:
+        return None
+    best = min(
+        candidates,
+        key=lambda i: (i["first_stop_departure_time"] > sim_time, i["departure_time"]),
+    )
+    return best["trip_instance_id"]
+
+
+def live_overlay(ctx: SimulationContext, sim_time: int | None) -> tuple[str, dict] | None:
+    """(trip_instance_id, payload) bus live pada sim_time; None bila data CV tidak segar."""
+    if ctx.live_crowding is None or sim_time is None:
+        return None
+    reading = ctx.live_crowding.latest()
+    if reading is None:
+        return None
+    tid = live_trip_instance_id(ctx, sim_time)
+    if tid is None:
+        return None
+    passengers = reading["jumlah_penumpang"]
+    return tid, {
+        "trip_load_factor": passengers / BUS_CAPACITY,
+        "estimated_passengers": float(passengers),
+        "data_source": LIVE_DATA_SOURCE,
+    }
+
+
+def effective_trip_loads(ctx: SimulationContext, crowding: dict, sim_time: int | None) -> dict[str, dict]:
+    """trip_loads hasil generate, dengan bus live ditimpa data CV bila segar.
+
+    Tidak memutasi `crowding` karena itu cache yang dibagi antar request.
+    """
+    overlay = live_overlay(ctx, sim_time)
+    if overlay is None:
+        return crowding["trip_loads"]
+    tid, payload = overlay
+    return {**crowding["trip_loads"], tid: payload}
+
+
 def realtime_trip_loads(
     ctx: SimulationContext,
     tanggal: str | None = None,
     simulation_run_id: str | None = None,
+    sim_time: int | None = None,
 ) -> dict[str, float]:
     crowding = generate_crowding(ctx, tanggal, simulation_run_id)
     return {
         tid: display_load_factor(payload.get("trip_load_factor", FALLBACK_LOAD_FACTOR))
-        for tid, payload in crowding["trip_loads"].items()
+        for tid, payload in effective_trip_loads(ctx, crowding, sim_time).items()
     }
 
 
@@ -1861,6 +1926,7 @@ def get_active_positions(
     max_visible_per_corridor_direction: int | None = None,
 ) -> list[dict]:
     crowding = generate_crowding(ctx, tanggal, simulation_run_id)
+    trip_loads = effective_trip_loads(ctx, crowding, sim_time)
     positions: list[dict] = []
     for instance in ctx.instances:
         pos = _get_bus_position_on_visual_path(
@@ -1873,10 +1939,11 @@ def get_active_positions(
             pos = get_bus_position(instance["bus_id"], instance["stops"], sim_time)
         if pos is None:
             continue
-        payload = crowding["trip_loads"].get(instance["trip_instance_id"], {})
+        payload = trip_loads.get(instance["trip_instance_id"], {})
         raw_load = float(payload.get("trip_load_factor", FALLBACK_LOAD_FACTOR))
         load = display_load_factor(raw_load)
         pos.update({
+            "data_source": payload.get("data_source", GENERATED_DATA_SOURCE),
             "trip_id": instance["trip_id"],
             "trip_instance_id": instance["trip_instance_id"],
             "direction_id": instance["direction_id"],
@@ -1920,6 +1987,7 @@ def upcoming_buses_for_halte(
     max_eta_detik: int = MAX_ETA_DETIK_DEFAULT,
 ) -> list[dict]:
     crowding = generate_crowding(ctx, tanggal, simulation_run_id)
+    trip_loads = effective_trip_loads(ctx, crowding, sim_time)
     candidates: list[dict] = []
     for instance in ctx.instances:
         for stop in instance["stops"]:
@@ -1931,10 +1999,11 @@ def upcoming_buses_for_halte(
             eta_detik = arrival - sim_time
             if eta_detik > max_eta_detik:
                 continue
-            load_payload = crowding["trip_loads"].get(instance["trip_instance_id"], {})
+            load_payload = trip_loads.get(instance["trip_instance_id"], {})
             raw_load = float(load_payload.get("trip_load_factor", FALLBACK_LOAD_FACTOR))
             load = display_load_factor(raw_load)
             candidates.append({
+                "data_source": load_payload.get("data_source", GENERATED_DATA_SOURCE),
                 "bus_id": instance["bus_id"],
                 "trip_id": instance["trip_id"],
                 "trip_instance_id": instance["trip_instance_id"],
