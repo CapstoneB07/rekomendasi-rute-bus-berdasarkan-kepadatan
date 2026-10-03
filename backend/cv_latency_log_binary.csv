@@ -1,1 +1,0 @@
-timestamp_received,timestamp_finished,bus_id,image_bytes_kb,raw_detections,valid_headcount,output_headcount,lf,status,brightness,contrast,clahe_applied,jpeg_decode_ms,preprocess_ms,inference_ms,postprocess_ms,total_processing_ms,device
