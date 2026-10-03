@@ -106,6 +106,59 @@ MAKS_TRANSIT_DEFAULT: int = MAKS_TRANSIT
 
 
 # ---------------------------------------------------------------------------
+# Tunable lapisan bus (Algoritma 2). Env-overridable dengan pola yang sama
+# seperti SCOPED_KORIDOR, supaya sweep konfigurasi bisa dijalankan tanpa
+# mengedit kode. Dibaca sekali saat import: set env SEBELUM proses start.
+# ---------------------------------------------------------------------------
+_ENV_BUS_MAX_EXTRA_WAIT = "BUS_MAX_EXTRA_WAIT_MENIT"
+_ENV_BUS_MAX_ETA = "BUS_MAX_ETA_MENIT"
+_ENV_BUS_DENSITY_WEIGHT = "BUS_SCORE_DENSITY_WEIGHT"
+
+BUS_MAX_EXTRA_WAIT_MENIT_DEFAULT: int = 20
+BUS_MAX_ETA_MENIT_DEFAULT: int = 45
+BUS_SCORE_DENSITY_WEIGHT_DEFAULT: float = 0.85
+
+
+def _load_int_env(name: str, default: int, minimum: int = 1) -> int:
+    raw = os.getenv(name, "").strip()
+    if raw:
+        try:
+            value = int(raw)
+            if value >= minimum:
+                return value
+        except ValueError:
+            pass
+    return default
+
+
+def _load_float_env(
+    name: str, default: float, minimum: float = 0.0, maximum: float = 1.0
+) -> float:
+    raw = os.getenv(name, "").strip()
+    if raw:
+        try:
+            value = float(raw)
+            if minimum <= value <= maximum:
+                return value
+        except ValueError:
+            pass
+    return default
+
+
+#: Tambahan waktu tunggu maksimum yang masih ditawarkan ke pengguna (menit).
+MAX_EXTRA_WAIT_MENIT: int = _load_int_env(
+    _ENV_BUS_MAX_EXTRA_WAIT, BUS_MAX_EXTRA_WAIT_MENIT_DEFAULT
+)
+#: Jendela ETA maksimum untuk kandidat bus (menit).
+MAX_ETA_MENIT: int = _load_int_env(_ENV_BUS_MAX_ETA, BUS_MAX_ETA_MENIT_DEFAULT)
+#: Bobot kepadatan pada skor pemilihan bus; bobot tunggu = 1 - ini.
+BUS_SCORE_DENSITY_WEIGHT: float = _load_float_env(
+    _ENV_BUS_DENSITY_WEIGHT, BUS_SCORE_DENSITY_WEIGHT_DEFAULT
+)
+BUS_SCORE_WAIT_WEIGHT: float = round(1.0 - BUS_SCORE_DENSITY_WEIGHT, 4)
+
+
+# ---------------------------------------------------------------------------
 # Kapasitas & fallback kepadatan
 # ---------------------------------------------------------------------------
 # Kapasitas per bus diseragamkan (80 penumpang). BRT TransJakarta mengoperasikan
