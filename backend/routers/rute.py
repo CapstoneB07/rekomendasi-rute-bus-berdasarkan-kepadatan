@@ -245,6 +245,7 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
             simulation_context,
             tanggal=req.tanggal,
             simulation_run_id=req.simulation_run_id,
+            sim_time=sim_time,
         )
     else:
         realtime_kepadatan = get_realtime_kepadatan(graph_data, jam=jam, hari_tipe=hari_tipe)

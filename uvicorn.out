@@ -444,3 +444,476 @@ INFO:     127.0.0.1:52721 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
 [rute_rekomendasi] asal=G00427 tujuan=G00562 kandidat=3 | pre_rank=1 primary=0.4472 waktu=265m jarak=49264.3m transfer=1 edge_kepadatan=0.649 | pre_rank=2 primary=0.4500 waktu=265m jarak=49264.3m transfer=1 edge_kepadatan=0.639 | pre_rank=3 primary=0.6500 waktu=255m jarak=49493.4m transfer=4 edge_kepadatan=0.682
 [rute_rekomendasi_final] asal=G00427 tujuan=G00562 kandidat=3 | rank=1 density_norm=0.749 primary=0.4472 waktu=265m jarak=49264.3m transfer=1 kepadatan=0.749 source=mixed_edge_fallback | rank=2 density_norm=0.749 primary=0.4500 waktu=265m jarak=49264.3m transfer=1 kepadatan=0.749 source=mixed_edge_fallback | rank=3 density_norm=0.810 primary=0.6500 waktu=255m jarak=49493.4m transfer=4 kepadatan=0.810 source=mixed_edge_fallback
 INFO:     127.0.0.1:52724 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.903 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.919 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.967
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.784 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.784 source=mixed_edge_fallback | rank=2 density_norm=0.784 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.784 source=mixed_edge_fallback | rank=3 density_norm=0.784 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.784 source=mixed_edge_fallback
+INFO:     127.0.0.1:49780 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62301 - "GET /api/rute/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56521 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56521 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56521 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53177 - "GET /api/rute/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53177 - "GET /api/rute/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59697 - "OPTIONS /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.564 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.567 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.570
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.626 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.626 source=mixed_edge_fallback | rank=2 density_norm=0.626 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.626 source=mixed_edge_fallback | rank=3 density_norm=0.626 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.626 source=mixed_edge_fallback
+INFO:     127.0.0.1:55134 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.564 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.567 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.570
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.626 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.626 source=mixed_edge_fallback | rank=2 density_norm=0.626 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.626 source=mixed_edge_fallback | rank=3 density_norm=0.626 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.626 source=mixed_edge_fallback
+INFO:     127.0.0.1:53210 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00067 kandidat=3 | pre_rank=1 primary=0.3000 waktu=51m jarak=9147.2m transfer=3 edge_kepadatan=0.883 | pre_rank=2 primary=0.4799 waktu=101m jarak=15982.1m transfer=3 edge_kepadatan=0.918 | pre_rank=3 primary=0.8000 waktu=198m jarak=37150.8m transfer=2 edge_kepadatan=0.377
+[rute_rekomendasi_final] asal=G00241 tujuan=G00067 kandidat=3 | rank=1 density_norm=0.386 primary=0.8000 waktu=198m jarak=37150.8m transfer=2 kepadatan=0.386 source=selected_bus | rank=2 density_norm=0.747 primary=0.3000 waktu=51m jarak=9147.2m transfer=3 kepadatan=0.747 source=mixed_edge_fallback | rank=3 density_norm=0.747 primary=0.4799 waktu=101m jarak=15982.1m transfer=3 kepadatan=0.747 source=mixed_edge_fallback
+INFO:     127.0.0.1:53210 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00067 kandidat=3 | pre_rank=1 primary=0.3000 waktu=51m jarak=9147.2m transfer=3 edge_kepadatan=0.883 | pre_rank=2 primary=0.4799 waktu=101m jarak=15982.1m transfer=3 edge_kepadatan=0.918 | pre_rank=3 primary=0.8000 waktu=198m jarak=37150.8m transfer=2 edge_kepadatan=0.376
+[rute_rekomendasi_final] asal=G00241 tujuan=G00067 kandidat=3 | rank=1 density_norm=0.400 primary=0.8000 waktu=198m jarak=37150.8m transfer=2 kepadatan=0.400 source=selected_bus | rank=2 density_norm=0.747 primary=0.3000 waktu=51m jarak=9147.2m transfer=3 kepadatan=0.747 source=mixed_edge_fallback | rank=3 density_norm=0.747 primary=0.4799 waktu=101m jarak=15982.1m transfer=3 kepadatan=0.747 source=mixed_edge_fallback
+INFO:     127.0.0.1:56626 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] halte_alias_resolved asal_request=G00012 asal_graph=G00012 tujuan_request=G00020 tujuan_graph=G00747
+[rute_rekomendasi] asal=G00012 tujuan=G00020 kandidat=1 | pre_rank=1 primary=0.0000 waktu=18m jarak=3380.3m transfer=0 edge_kepadatan=1.000
+[rute_rekomendasi_final] asal=G00012 tujuan=G00020 kandidat=1 | rank=1 density_norm=1.000 primary=0.0000 waktu=18m jarak=3380.3m transfer=0 kepadatan=1.000 source=selected_bus
+INFO:     127.0.0.1:53279 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00012 tujuan=G00384 kandidat=3 | pre_rank=1 primary=0.2002 waktu=111m jarak=21552.3m transfer=2 edge_kepadatan=0.693 | pre_rank=2 primary=0.2412 waktu=111m jarak=21551.6m transfer=2 edge_kepadatan=0.697 | pre_rank=3 primary=0.8000 waktu=116m jarak=22278.8m transfer=2 edge_kepadatan=0.698
+[rute_rekomendasi_final] asal=G00012 tujuan=G00384 kandidat=3 | rank=1 density_norm=0.584 primary=0.2002 waktu=111m jarak=21552.3m transfer=2 kepadatan=0.584 source=mixed_edge_fallback | rank=2 density_norm=0.584 primary=0.2412 waktu=111m jarak=21551.6m transfer=2 kepadatan=0.584 source=mixed_edge_fallback | rank=3 density_norm=0.584 primary=0.8000 waktu=116m jarak=22278.8m transfer=2 kepadatan=0.584 source=mixed_edge_fallback
+INFO:     127.0.0.1:57037 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55418 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55418 - "GET /api/simulation/shapes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50585 - "GET /api/simulation/positions?sim_time=18000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18001 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18002 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18003 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18004 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18005 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18006 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18007 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18008 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18009 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18010 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18011 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18012 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18013 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18014 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18015 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18016 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18017 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18018 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18019 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18020 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18021 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18022 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18023 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18024 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18025 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18026 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18027 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18028 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18029 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18030 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18031 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18032 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18033 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18034 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18035 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18036 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18037 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18038 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18039 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18040 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18041 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18042 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18043 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18044 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18045 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18046 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18047 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18048 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18049 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18050 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18051 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18052 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18053 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18054 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18055 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18056 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18057 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18058 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18059 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18060 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18061 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18062 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18063 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18064 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18065 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/positions?sim_time=18066 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18066 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18067 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18068 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18069 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18070 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18071 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18072 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18073 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18074 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18075 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18076 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18077 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18078 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18079 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18080 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18081 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18082 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18083 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18084 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18085 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18086 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18087 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18088 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18089 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18090 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18091 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18092 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18093 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18094 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18095 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18096 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18097 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18098 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18099 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18101 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18102 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18103 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18104 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18105 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18106 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18107 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18108 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18109 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18110 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18111 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18112 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18113 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18114 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18115 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18116 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18117 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18118 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18119 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18120 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18121 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18122 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18123 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18124 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18125 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54734 - "GET /api/simulation/positions?sim_time=18126 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61689 - "GET /api/simulation/positions?sim_time=18127 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60373 - "GET /api/simulation/positions?sim_time=18128 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60373 - "GET /api/simulation/positions?sim_time=18129 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60373 - "GET /api/simulation/positions?sim_time=18130 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50062 - "GET /api/simulation/positions?sim_time=18131 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54969 - "GET /api/rute/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54969 - "GET /api/simulation/shapes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62570 - "OPTIONS /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] halte_alias_resolved asal_request=G00031 asal_graph=G00034 tujuan_request=G00560 tujuan_graph=G00560
+[rute_rekomendasi] asal=G00031 tujuan=G00560 kandidat=2 | pre_rank=1 primary=0.1000 waktu=88m jarak=15631.9m transfer=1 edge_kepadatan=1.000 | pre_rank=2 primary=1.0000 waktu=175m jarak=31269.7m transfer=4 edge_kepadatan=0.493
+[rute_rekomendasi_final] asal=G00031 tujuan=G00560 kandidat=2 | rank=1 density_norm=0.616 primary=1.0000 waktu=175m jarak=31269.7m transfer=4 kepadatan=0.616 source=mixed_edge_fallback | rank=2 density_norm=1.000 primary=0.1000 waktu=88m jarak=15631.9m transfer=1 kepadatan=1.000 source=mixed_edge_fallback
+INFO:     127.0.0.1:62570 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58178 - "GET /api/rute/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58178 - "GET /api/simulation/shapes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52471 - "GET /api/simulation/positions?sim_time=18132 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60908 - "OPTIONS /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00560 kandidat=2 | pre_rank=1 primary=0.1000 waktu=42m jarak=7424.2m transfer=1 edge_kepadatan=0.764 | pre_rank=2 primary=0.4500 waktu=44m jarak=7424.2m transfer=1 edge_kepadatan=0.842
+[rute_rekomendasi_final] asal=G00241 tujuan=G00560 kandidat=2 | rank=1 density_norm=0.704 primary=0.1000 waktu=42m jarak=7424.2m transfer=1 kepadatan=0.704 source=mixed_edge_fallback | rank=2 density_norm=0.704 primary=0.4500 waktu=44m jarak=7424.2m transfer=1 kepadatan=0.704 source=mixed_edge_fallback
+INFO:     127.0.0.1:60908 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50908 - "GET /api/simulation/positions?sim_time=18133 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56612 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18132 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18134 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18135 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18136 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18137 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56612 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18138 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50908 - "GET /api/simulation/positions?sim_time=18137 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50908 - "GET /api/simulation/positions?sim_time=18139 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50908 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18139 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18140 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18141 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18142 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18143 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18144 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18145 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18146 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18147 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18148 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18149 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18151 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18152 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18153 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18154 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49254 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18155 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18156 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18157 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18158 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18159 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18160 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18161 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18162 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60728 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18163 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18164 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18165 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18166 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60728 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60728 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18167 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18168 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18169 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18170 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18171 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18172 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18173 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18174 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18175 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18176 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18177 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18178 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18179 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18180 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18181 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18182 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18183 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18184 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18185 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18186 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18187 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18188 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18189 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18190 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18191 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18192 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18193 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18194 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18195 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18196 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18197 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18198 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18199 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61434 - "GET /api/simulation/positions?sim_time=18201 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /api/simulation/positions?sim_time=18202 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62531 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55829 - "GET /api/simulation/positions?sim_time=18201 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55829 - "GET /api/simulation/positions?sim_time=18203 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55829 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55829 - "GET /api/simulation/shapes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62531 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /api/simulation/positions?sim_time=18000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /api/simulation/positions?sim_time=18001 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /api/simulation/positions?sim_time=18002 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /api/simulation/positions?sim_time=18003 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /api/rute/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /api/simulation/shapes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63692 - "OPTIONS /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] halte_alias_resolved asal_request=G00241 asal_graph=G00241 tujuan_request=G00384 tujuan_graph=G00383
+[rute_rekomendasi] asal=G00241 tujuan=G00384 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.760 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.771 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.802
+[rute_rekomendasi_final] asal=G00241 tujuan=G00384 kandidat=3 | rank=1 density_norm=0.703 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.703 source=mixed_edge_fallback | rank=2 density_norm=0.703 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.703 source=mixed_edge_fallback | rank=3 density_norm=0.703 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.703 source=mixed_edge_fallback
+INFO:     127.0.0.1:56386 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59222 - "GET /api/rute/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59222 - "GET /api/simulation/shapes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58168 - "OPTIONS /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00560 kandidat=2 | pre_rank=1 primary=0.1000 waktu=42m jarak=7424.2m transfer=1 edge_kepadatan=0.765 | pre_rank=2 primary=0.4500 waktu=44m jarak=7424.2m transfer=1 edge_kepadatan=0.844
+[rute_rekomendasi_final] asal=G00241 tujuan=G00560 kandidat=2 | rank=1 density_norm=0.689 primary=0.1000 waktu=42m jarak=7424.2m transfer=1 kepadatan=0.689 source=mixed_edge_fallback | rank=2 density_norm=0.689 primary=0.4500 waktu=44m jarak=7424.2m transfer=1 kepadatan=0.689 source=mixed_edge_fallback
+INFO:     127.0.0.1:58168 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] halte_alias_resolved asal_request=G00241 asal_graph=G00241 tujuan_request=G00384 tujuan_graph=G00383
+[rute_rekomendasi] asal=G00241 tujuan=G00384 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.760 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.771 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.802
+[rute_rekomendasi_final] asal=G00241 tujuan=G00384 kandidat=3 | rank=1 density_norm=0.695 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.695 source=mixed_edge_fallback | rank=2 density_norm=0.695 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.695 source=mixed_edge_fallback | rank=3 density_norm=0.695 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.695 source=mixed_edge_fallback
+INFO:     127.0.0.1:50777 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/halte HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=18000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=18001 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=18002 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=18003 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=18004 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=18095 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=18643 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=18167 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=19024 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=19429 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=20120 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=19858 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=20311 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=20740 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=21145 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=21693 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=22026 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=22336 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=22669 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=23074 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=23789 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=24194 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=24480 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=24980 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=25219 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=25552 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=26624 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=26314 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=25981 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=27053 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=27434 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=28077 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=29650 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=29149 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=28554 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=29936 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=29937 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=30460 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=30674 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=30960 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=30841 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=31055 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=31031 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=31079 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=31127 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=31151 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=31222 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=31341 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=31365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=31246 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=31389 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=31460 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=31603 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=31722 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=32080 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=32389 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=32675 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=32985 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=33199 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=34176 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=33628 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=34915 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=36034 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=36940 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=37916 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=39203 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=40084 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=41180 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=41824 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=42395 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=43253 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=43706 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=44182 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=44396 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=44516 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=44635 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=44659 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=44660 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=44754 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=44682 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=44778 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=44801 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=43896 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=44849 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=43301 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=42776 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=42086 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=41681 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=40751 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=40180 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=39656 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=38846 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=38393 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=37607 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=37083 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=36582 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=35606 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=34891 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=34367 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=33604 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=33080 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=31722 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=31341 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=32294 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=30841 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=30531 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=30198 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=30174 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50777 - "GET /api/simulation/positions?sim_time=30221 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58017 - "GET /api/simulation/positions?sim_time=30150 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54390 - "GET /api/simulation/positions?sim_time=30269 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59613 - "GET /api/simulation/positions?sim_time=30079 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63842 - "GET /api/simulation/positions?sim_time=30056 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=30055 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=30057 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=30058 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /api/simulation/positions?sim_time=30059 HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00383 tujuan=G00067 kandidat=2 | pre_rank=1 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 edge_kepadatan=0.597 | pre_rank=2 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 edge_kepadatan=0.632
+[rute_rekomendasi_final] asal=G00383 tujuan=G00067 kandidat=2 | rank=1 density_norm=0.510 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 kepadatan=0.510 source=mixed_edge_fallback | rank=2 density_norm=0.518 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 kepadatan=0.518 source=mixed_edge_fallback
+INFO:     127.0.0.1:64130 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00383 tujuan=G00067 kandidat=2 | pre_rank=1 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 edge_kepadatan=0.597 | pre_rank=2 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 edge_kepadatan=0.632
+[rute_rekomendasi_final] asal=G00383 tujuan=G00067 kandidat=2 | rank=1 density_norm=0.510 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 kepadatan=0.510 source=mixed_edge_fallback | rank=2 density_norm=0.518 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 kepadatan=0.518 source=mixed_edge_fallback
+INFO:     127.0.0.1:51106 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55021 - "GET /api/rute/halte HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00383 tujuan=G00067 kandidat=2 | pre_rank=1 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 edge_kepadatan=0.589 | pre_rank=2 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 edge_kepadatan=0.618
+[rute_rekomendasi_final] asal=G00383 tujuan=G00067 kandidat=2 | rank=1 density_norm=0.468 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 kepadatan=0.468 source=mixed_edge_fallback | rank=2 density_norm=0.518 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 kepadatan=0.518 source=mixed_edge_fallback
+INFO:     127.0.0.1:51656 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00381 tujuan=G00391 kandidat=1 | pre_rank=1 primary=0.0000 waktu=22m jarak=4694.9m transfer=0 edge_kepadatan=1.000
+[rute_rekomendasi_final] asal=G00381 tujuan=G00391 kandidat=1 | rank=1 density_norm=1.000 primary=0.0000 waktu=22m jarak=4694.9m transfer=0 kepadatan=1.000 source=mixed_edge_fallback
+INFO:     127.0.0.1:49671 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] halte_alias_resolved asal_request=G00382 asal_graph=G00381 tujuan_request=G00391 tujuan_graph=G00391
+[rute_rekomendasi] asal=G00382 tujuan=G00391 kandidat=1 | pre_rank=1 primary=0.0000 waktu=22m jarak=4694.9m transfer=0 edge_kepadatan=1.000
+[rute_rekomendasi_final] asal=G00382 tujuan=G00391 kandidat=1 | rank=1 density_norm=1.000 primary=0.0000 waktu=22m jarak=4694.9m transfer=0 kepadatan=1.000 source=mixed_edge_fallback
+INFO:     127.0.0.1:49673 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49679 - "POST /api/rute/rekomendasi HTTP/1.1" 404 Not Found
+[rute_rekomendasi] asal=G00425 tujuan=G00427 kandidat=1 | pre_rank=1 primary=0.0000 waktu=143m jarak=28483.2m transfer=0 edge_kepadatan=0.498
+[rute_rekomendasi_final] asal=G00425 tujuan=G00427 kandidat=1 | rank=1 density_norm=0.498 primary=0.0000 waktu=143m jarak=28483.2m transfer=0 kepadatan=0.498 source=mixed_edge_fallback
+INFO:     127.0.0.1:49681 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00425 tujuan=G00419 kandidat=1 | pre_rank=1 primary=0.0000 waktu=252m jarak=50276.1m transfer=0 edge_kepadatan=0.498
+[rute_rekomendasi_final] asal=G00425 tujuan=G00419 kandidat=1 | rank=1 density_norm=0.498 primary=0.0000 waktu=252m jarak=50276.1m transfer=0 kepadatan=0.498 source=mixed_edge_fallback
+INFO:     127.0.0.1:49683 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00425 tujuan=G00420 kandidat=1 | pre_rank=1 primary=0.0000 waktu=149m jarak=29746.0m transfer=0 edge_kepadatan=0.498
+[rute_rekomendasi_final] asal=G00425 tujuan=G00420 kandidat=1 | rank=1 density_norm=0.498 primary=0.0000 waktu=149m jarak=29746.0m transfer=0 kepadatan=0.498 source=mixed_edge_fallback
+INFO:     127.0.0.1:49685 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00427 tujuan=G00419 kandidat=1 | pre_rank=1 primary=0.0000 waktu=109m jarak=21792.9m transfer=0 edge_kepadatan=0.498
+[rute_rekomendasi_final] asal=G00427 tujuan=G00419 kandidat=1 | rank=1 density_norm=0.498 primary=0.0000 waktu=109m jarak=21792.9m transfer=0 kepadatan=0.498 source=mixed_edge_fallback
+INFO:     127.0.0.1:49687 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00427 tujuan=G00420 kandidat=1 | pre_rank=1 primary=0.0000 waktu=6m jarak=1262.8m transfer=0 edge_kepadatan=0.498
+[rute_rekomendasi_final] asal=G00427 tujuan=G00420 kandidat=1 | rank=1 density_norm=0.498 primary=0.0000 waktu=6m jarak=1262.8m transfer=0 kepadatan=0.498 source=mixed_edge_fallback
+INFO:     127.0.0.1:49689 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60926 - "OPTIONS /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52058 - "GET /api/rute/halte HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00383 tujuan=G00067 kandidat=2 | pre_rank=1 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 edge_kepadatan=0.590 | pre_rank=2 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 edge_kepadatan=0.620
+[rute_rekomendasi_final] asal=G00383 tujuan=G00067 kandidat=2 | rank=1 density_norm=0.468 primary=0.4500 waktu=73m jarak=14020.1m transfer=2 kepadatan=0.468 source=mixed_edge_fallback | rank=2 density_norm=0.468 primary=0.5500 waktu=73m jarak=14000.8m transfer=2 kepadatan=0.468 source=mixed_edge_fallback
+INFO:     127.0.0.1:60926 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.760 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.771 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.802
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.692 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=2 density_norm=0.692 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=3 density_norm=0.692 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.692 source=mixed_edge_fallback
+INFO:     127.0.0.1:60538 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00012 kandidat=3 | pre_rank=1 primary=0.2000 waktu=95m jarak=17734.0m transfer=2 edge_kepadatan=0.966 | pre_rank=2 primary=0.3799 waktu=145m jarak=24568.9m transfer=2 edge_kepadatan=0.972 | pre_rank=3 primary=0.9000 waktu=242m jarak=45737.6m transfer=3 edge_kepadatan=0.531
+[rute_rekomendasi_final] asal=G00241 tujuan=G00012 kandidat=3 | rank=1 density_norm=0.587 primary=0.9000 waktu=242m jarak=45737.6m transfer=3 kepadatan=0.587 source=selected_bus | rank=2 density_norm=0.787 primary=0.2000 waktu=95m jarak=17734.0m transfer=2 kepadatan=0.787 source=mixed_edge_fallback | rank=3 density_norm=0.787 primary=0.3799 waktu=145m jarak=24569.0m transfer=2 kepadatan=0.787 source=mixed_edge_fallback
+INFO:     127.0.0.1:54809 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] halte_alias_resolved asal_request=G00241 asal_graph=G00241 tujuan_request=G00384 tujuan_graph=G00383
+[rute_rekomendasi] asal=G00241 tujuan=G00384 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.768 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.779 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.810
+[rute_rekomendasi_final] asal=G00241 tujuan=G00384 kandidat=3 | rank=1 density_norm=0.692 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=2 density_norm=0.692 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=3 density_norm=0.692 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.692 source=mixed_edge_fallback
+INFO:     127.0.0.1:50360 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.768 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.779 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.810
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.692 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=2 density_norm=0.692 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=3 density_norm=0.692 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.692 source=mixed_edge_fallback
+INFO:     127.0.0.1:52095 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.768 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.779 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.810
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.692 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=2 density_norm=0.692 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.692 source=mixed_edge_fallback | rank=3 density_norm=0.692 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.692 source=mixed_edge_fallback
+INFO:     127.0.0.1:60298 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58050 - "OPTIONS /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49671 - "GET /api/rute/halte HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.767 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.778 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.809
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.721 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.721 source=mixed_edge_fallback | rank=2 density_norm=0.721 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.721 source=mixed_edge_fallback | rank=3 density_norm=0.721 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.721 source=mixed_edge_fallback
+INFO:     127.0.0.1:65439 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.772 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.782 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.813
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.712 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.712 source=mixed_edge_fallback | rank=2 density_norm=0.712 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.712 source=mixed_edge_fallback | rank=3 density_norm=0.712 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.712 source=mixed_edge_fallback
+INFO:     127.0.0.1:57677 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+[rute_rekomendasi] asal=G00241 tujuan=G00383 kandidat=3 | pre_rank=1 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 edge_kepadatan=0.772 | pre_rank=2 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 edge_kepadatan=0.782 | pre_rank=3 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 edge_kepadatan=0.813
+[rute_rekomendasi_final] asal=G00241 tujuan=G00383 kandidat=3 | rank=1 density_norm=0.712 primary=0.4002 waktu=211m jarak=40885.0m transfer=4 kepadatan=0.712 source=mixed_edge_fallback | rank=2 density_norm=0.712 primary=0.4412 waktu=212m jarak=40884.3m transfer=4 kepadatan=0.712 source=mixed_edge_fallback | rank=3 density_norm=0.712 primary=1.0000 waktu=216m jarak=41611.5m transfer=4 kepadatan=0.712 source=mixed_edge_fallback
+INFO:     127.0.0.1:59758 - "POST /api/rute/rekomendasi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60029 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60029 - "GET /openapi.json HTTP/1.1" 200 OK

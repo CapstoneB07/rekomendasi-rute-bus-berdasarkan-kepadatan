@@ -5,6 +5,8 @@ import { useId, useMemo, useState } from 'react';
 export type HalteOpsi = {
   halte_id: string;
   nama: string;
+  lat: number;
+  lng: number;
   koridor_list: number[];
 };
 
