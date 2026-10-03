@@ -1875,7 +1875,7 @@ def live_trip_instance_id(ctx: SimulationContext, sim_time: int) -> str | None:
     return best["trip_instance_id"]
 
 
-def _live_overlay(ctx: SimulationContext, sim_time: int | None) -> tuple[str, dict] | None:
+def live_overlay(ctx: SimulationContext, sim_time: int | None) -> tuple[str, dict] | None:
     """(trip_instance_id, payload) bus live pada sim_time; None bila data CV tidak segar."""
     if ctx.live_crowding is None or sim_time is None:
         return None
@@ -1893,18 +1893,12 @@ def _live_overlay(ctx: SimulationContext, sim_time: int | None) -> tuple[str, di
     }
 
 
-def live_bus_id(ctx: SimulationContext, sim_time: int | None) -> str | None:
-    """bus_id yang saat ini memakai data CV segar, atau None."""
-    overlay = _live_overlay(ctx, sim_time)
-    return overlay[0] if overlay else None
-
-
 def effective_trip_loads(ctx: SimulationContext, crowding: dict, sim_time: int | None) -> dict[str, dict]:
     """trip_loads hasil generate, dengan bus live ditimpa data CV bila segar.
 
     Tidak memutasi `crowding` karena itu cache yang dibagi antar request.
     """
-    overlay = _live_overlay(ctx, sim_time)
+    overlay = live_overlay(ctx, sim_time)
     if overlay is None:
         return crowding["trip_loads"]
     tid, payload = overlay

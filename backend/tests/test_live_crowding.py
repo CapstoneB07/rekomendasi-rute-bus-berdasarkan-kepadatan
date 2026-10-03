@@ -5,7 +5,7 @@ from services.gtfs_simulation import (
     BUS_CAPACITY,
     SimulationContext,
     effective_trip_loads,
-    live_bus_id,
+    live_overlay,
     live_trip_instance_id,
     realtime_trip_loads,
 )
@@ -124,11 +124,13 @@ def test_selector_memilih_bus_live_yang_sepi():
     assert segmen[0]["bus_rekomendasi"]["bus_id"] == "B-K1-01"
 
 
-def test_live_bus_id_hanya_bila_data_segar():
+def test_live_overlay_hanya_bila_data_segar():
     instances = [_instance("BUS-1-0-001", "1", "0", 3600, 7200)]
-    assert live_bus_id(_ctx(instances, _store(60)), 4000) == "BUS-1-0-001"
-    assert live_bus_id(_ctx(instances, _store(60, age_seconds=500)), 4000) is None
-    assert live_bus_id(_ctx(instances, None), 4000) is None
+    tid, payload = live_overlay(_ctx(instances, _store(60)), 4000)
+    assert tid == "BUS-1-0-001"
+    assert payload["trip_load_factor"] == 60 / BUS_CAPACITY
+    assert live_overlay(_ctx(instances, _store(60, age_seconds=500)), 4000) is None
+    assert live_overlay(_ctx(instances, None), 4000) is None
 
 
 def test_rekomendasi_menandai_data_source_live():
