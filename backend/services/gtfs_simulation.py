@@ -20,14 +20,17 @@ from typing import Any
 from services.geo import distance_meters
 from services.interpolation import compute_bearing, get_bus_position
 from services.bus_selector import MAX_ETA_DETIK_DEFAULT
+from services.config import (
+    BUS_CAPACITY,
+    DENSITY_FALLBACK as FALLBACK_LOAD_FACTOR,
+    SCOPED_KORIDOR,
+    normalize_koridor_id as _normalize_koridor_id,
+)
 
-BUS_CAPACITY = 80
-FALLBACK_LOAD_FACTOR = 0.5
 LOAD_FACTOR_OUTPUT_CAP = float(os.getenv("LOAD_FACTOR_OUTPUT_CAP", "1.0") or 1.0)
 SIMULATION_RUN_ID_DEFAULT = "default"
 PROCESS_SIMULATION_RUN_ID = os.getenv("SIMULATION_RUN_ID") or f"run-{uuid.uuid4().hex[:8]}"
 RIDERSHIP_RANDOM_SAMPLE_SIZE = 30
-SCOPED_KORIDOR = {"1", "2", "3", "4", "5"}
 DEFAULT_DEBUG_TIME = 5 * 3600
 AUDIT_SAMPLE_TIMES = {
     "05_00": 5 * 3600,
@@ -187,15 +190,6 @@ def label_kepadatan(load_factor: float) -> str:
     if kategori == "sedang":
         return "Sedang"
     return "Padat"
-
-
-def _normalize_koridor_id(value: Any) -> str:
-    if value is None:
-        return ""
-    text = str(value).strip()
-    if text.endswith(".0"):
-        text = text[:-2]
-    return text
 
 
 def _sort_key_date(value: Any) -> str:
