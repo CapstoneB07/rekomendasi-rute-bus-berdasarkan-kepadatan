@@ -1,64 +1,186 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+
+import { HaltePicker, type HalteOpsi } from './_components/HaltePicker';
+import { RuteResult } from './_components/RuteResult';
+import { API_BASE, waktuWib } from '@/lib/api';
+import type { Rute } from '@/lib/route-utils';
+
+const REFRESH_MS = 30_000;
+
+type Pencarian = { asal: string; tujuan: string };
 
 export default function Home() {
+  const [asal, setAsal] = useState<string | null>(null);
+  const [tujuan, setTujuan] = useState<string | null>(null);
+  const [pencarian, setPencarian] = useState<Pencarian | null>(null);
+  const [aktifIdx, setAktifIdx] = useState(0);
+
+  const { data: halteList, isError: halteError, isPending: halteLoading } = useQuery<HalteOpsi[]>({
+    queryKey: ['halte-user'],
+    queryFn: async () => {
+      const r = await fetch(`${API_BASE}/api/rute/halte`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    staleTime: 10 * 60_000,
+  });
+
+  const {
+    data: hasilRute,
+    isFetching,
+    isError: ruteError,
+    error,
+    dataUpdatedAt,
+  } = useQuery<Rute[]>({
+    queryKey: ['rute-user', pencarian?.asal, pencarian?.tujuan],
+    queryFn: async () => {
+      // Waktu dihitung saat fetch (bukan saat render) supaya ETA bus ikut
+      // segar pada tiap refetch otomatis.
+      const { jam, detik, hariTipe } = waktuWib();
+      const r = await fetch(`${API_BASE}/api/rute/rekomendasi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          halte_asal: pencarian!.asal,
+          halte_tujuan: pencarian!.tujuan,
+          jam,
+          hari_tipe: hariTipe,
+          sim_time: detik,
+        }),
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body?.detail ?? `HTTP ${r.status}`);
+      }
+      return r.json();
+    },
+    enabled: pencarian !== null,
+    refetchInterval: REFRESH_MS,
+    retry: 1,
+  });
+
+  const samaHalte = asal !== null && asal === tujuan;
+  const bisaCari = asal !== null && tujuan !== null && !samaHalte;
+
+  const cari = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bisaCari) return;
+    setAktifIdx(0);
+    setPencarian({ asal, tujuan });
+  };
+
+  const tukar = () => {
+    setAsal(tujuan);
+    setTujuan(asal);
+    setPencarian(null);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex-1 bg-gray-50 text-gray-900">
+      <header className="bg-red-600 px-4 pb-10 pt-6 text-white">
+        <div className="mx-auto max-w-md">
+          <h1 className="text-xl font-bold">TransJakarta Lega</h1>
+          <p className="mt-1 text-sm text-red-100">
+            Pilih rute dan bus yang paling lega, berdasarkan kepadatan bus saat ini.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </header>
+
+      <main className="mx-auto -mt-6 max-w-md space-y-4 px-4 pb-10">
+        <form onSubmit={cari} className="space-y-3 rounded-2xl bg-white p-4 shadow-md">
+          <HaltePicker
+            label="Dari halte"
+            placeholder="Cari halte asal"
+            halteList={halteList ?? []}
+            value={asal}
+            onChange={(id) => {
+              setAsal(id);
+              setPencarian(null);
+            }}
+            disabled={!halteList}
+          />
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={tukar}
+              className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+              aria-label="Tukar halte asal dan tujuan"
+            >
+              ⇅ Tukar
+            </button>
+          </div>
+          <HaltePicker
+            label="Ke halte"
+            placeholder="Cari halte tujuan"
+            halteList={halteList ?? []}
+            value={tujuan}
+            onChange={(id) => {
+              setTujuan(id);
+              setPencarian(null);
+            }}
+            disabled={!halteList}
+          />
+
+          {samaHalte && (
+            <p role="alert" className="text-xs text-red-700">
+              Halte asal dan tujuan tidak boleh sama.
+            </p>
+          )}
+          {halteError && (
+            <p role="alert" className="text-xs text-red-700">
+              Gagal memuat daftar halte. Pastikan server backend berjalan.
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={!bisaCari || isFetching}
+            className="w-full rounded-lg bg-red-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            {halteLoading ? 'Memuat halte…' : isFetching && !hasilRute ? 'Mencari…' : 'Cari rute'}
+          </button>
+        </form>
+
+        {pencarian && ruteError && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <div className="font-semibold">Rute tidak ditemukan</div>
+            <div className="mt-1 text-xs">
+              {error instanceof Error ? error.message : 'Terjadi kesalahan saat mencari rute.'}
+            </div>
+          </div>
+        )}
+
+        {pencarian && isFetching && !hasilRute && !ruteError && (
+          <div className="animate-pulse space-y-3" aria-hidden>
+            <div className="h-10 rounded-lg bg-gray-200" />
+            <div className="h-24 rounded-xl bg-gray-200" />
+            <div className="h-24 rounded-xl bg-gray-200" />
+          </div>
+        )}
+
+        {pencarian && hasilRute && hasilRute.length > 0 && (
+          <>
+            <RuteResult
+              hasilRute={hasilRute}
+              aktifIdx={Math.min(aktifIdx, hasilRute.length - 1)}
+              setAktifIdx={setAktifIdx}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <p className="text-center text-xs text-gray-500">
+              Diperbarui otomatis tiap {REFRESH_MS / 1000} detik
+              {dataUpdatedAt ? ` · terakhir ${waktuWib(new Date(dataUpdatedAt)).label} WIB` : ''}
+            </p>
+          </>
+        )}
+
+        <p className="pt-2 text-center text-xs text-gray-400">
+          <Link href="/simulation" className="underline hover:text-gray-600">
+            Lihat simulasi
+          </Link>
+        </p>
       </main>
     </div>
   );

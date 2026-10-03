@@ -34,3 +34,8 @@ uvicorn.out
 
 # Monte Carlo raw experiment dumps
 monte-carlo-result.json
+
+# CV dataset dumps (new in main)
+received_images/
+received_images_latency/
+dataset_test/
