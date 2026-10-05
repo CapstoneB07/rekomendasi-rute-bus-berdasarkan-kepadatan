@@ -339,6 +339,10 @@ def select_bus_per_segmen(
         segmen["bus_rekomendasi"] = {
             "bus_id": terbaik["bus_id"],
             "kepadatan": round(terbaik["kepadatan"], 3),
+            # Nilai mentah sebelum pembulatan. Dipakai konsumen yang butuh
+            # perbandingan presisi (metrik sukses) agar pembulatan 3 desimal
+            # tidak menciptakan delta palsu antar bus.
+            "kepadatan_raw": float(terbaik["kepadatan"]),
             "label_kepadatan": _label_kepadatan(terbaik["kepadatan"]),
             "kategori_kepadatan": _kategori_kepadatan(terbaik["kepadatan"]),
             "eta_menit": terbaik["eta_menit"],

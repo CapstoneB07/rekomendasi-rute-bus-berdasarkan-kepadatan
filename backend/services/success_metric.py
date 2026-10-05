@@ -35,6 +35,48 @@ def _blocks(formatted: dict) -> list[dict]:
     return [s for s in formatted.get("segmen", []) if s.get("tipe") == "naik"]
 
 
+# Kandidat membawa kepadatan MENTAH; `bus_rekomendasi["kepadatan"]` dibulatkan
+# 3 desimal untuk tampilan. Memakai nilai tampilan di sini membuat baris di mana
+# sistem memilih bus tercepat persis (delta sebenarnya 0) terbaca NEGATIF hanya
+# karena pembulatan (mis. 0.8509 -> 0.851). Pakai raw + fallback ke nilai
+# tersimpan, supaya metrik tidak menciptakan regresi palsu.
+_MISSING = object()
+
+
+def _block_recommended_density(block: dict) -> float | None:
+    """Kepadatan bus rekomendasi pada satu blok 'naik'.
+
+    Prioritaskan `kepadatan_raw` (nilai sebelum pembulatan); jatuh ke
+    `kepadatan` tersimpan bila tak ada. `None` bila blok tak punya rekomendasi.
+    """
+    rek = block.get("bus_rekomendasi")
+    if not rek:
+        return None
+    raw = rek.get("kepadatan_raw", _MISSING)
+    if raw is not _MISSING and raw is not None:
+        return float(raw)
+    tersimpan = rek.get("kepadatan")
+    if tersimpan is None:
+        return None
+    return float(tersimpan)
+
+
+def _top_route_density(formatted: dict) -> float:
+    """Rata-rata kepadatan bus rekomendasi di seluruh blok 'naik'.
+
+    Sejalan dengan `apply_selected_bus_density` (kepadatan rute = rata-rata LF
+    trip yang benar-benar direkomendasikan), tetapi memakai nilai mentah agar
+    `d_rec` sebanding langsung dengan `d_base_v1`/`d_base_v2`.
+    """
+    values = [
+        d for d in (_block_recommended_density(b) for b in _blocks(formatted))
+        if d is not None
+    ]
+    if not values:
+        return float(formatted.get("rata_kepadatan", 0.0))
+    return sum(values) / len(values)
+
+
 def _formatted_signature(formatted: dict) -> tuple:
     return tuple(
         (s.get("tipe"), s.get("naik_di_id"), s.get("turun_di_id"), s.get("koridor_id"))
@@ -159,7 +201,7 @@ def evaluate_scenario_success(
     hasil = rerank_routes(hasil)
     top = hasil[0]
 
-    d_rec = float(top.get("rata_kepadatan", 0.0))
+    d_rec = _top_route_density(top)
     delta_v1 = round(d_base_v1 - d_rec, 4)
     delta_v2 = round(d_base_v2 - d_rec, 4)
     waits = [
