@@ -1,0 +1,16 @@
+{
+  "name": "transjakarta-backend",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "containers": [
+    {
+      "class_name": "Backend",
+      "image": "./Dockerfile",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "class_name": "Backend", "name": "BACKEND" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Backend"] }]
+}

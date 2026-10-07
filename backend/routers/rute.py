@@ -22,7 +22,13 @@ from services.dijkstra import (
     get_realtime_kepadatan,
 )
 from services.monte_carlo import build_recommendation_crowding_snapshot, run_monte_carlo_experiment
-from services.gtfs_simulation import display_load_factor, live_overlay, upcoming_buses_for_halte
+from services.gtfs_simulation import (
+    display_load_factor,
+    kepadatan_bus_live,
+    live_overlay,
+    upcoming_buses_for_halte,
+)
+from services.live_buses import bangun_jadwal_live
 from services.geo import distance_meters
 from services.supabase_client import get_client
 
@@ -34,6 +40,29 @@ HALTE_ALIAS_RADIUS_METER = 80.0
 
 def _jam_sekarang_wib() -> int:
     return datetime.now(WIB).hour
+
+
+def _detik_sekarang_wib() -> int:
+    now = datetime.now(WIB)
+    return now.hour * 3600 + now.minute * 60 + now.second
+
+
+def _jadwal_dan_kepadatan_live(request: Request, halte_ids: set[str], detik: int):
+    """Jadwal (ETA asli) dan kepadatan perkiraan untuk bus MQTT yang sedang aktif.
+
+    Bus di koridor tanpa perkiraan kepadatan dilewati oleh select_bus_per_segmen
+    karena tidak punya entri kepadatan.
+    """
+    simulation_context = getattr(request.app.state, "simulation_context", None)
+    buses = request.app.state.live_buses.snapshot()
+    jadwal = bangun_jadwal_live(buses, halte_ids, detik)
+    kepadatan: dict[str, float] = {}
+    if simulation_context is not None:
+        for bus in buses:
+            perkiraan = kepadatan_bus_live(simulation_context, bus["bus_id"], bus["koridor_id"], detik)
+            if perkiraan is not None:
+                kepadatan[bus["bus_id"]] = perkiraan["trip_load_factor"]
+    return jadwal, kepadatan
 
 
 def _hari_tipe_sekarang() -> str:
@@ -122,6 +151,8 @@ class RuteRequest(BaseModel):
     sim_time: int | None = Field(default=None, ge=0)
     tanggal: str | None = None
     simulation_run_id: str | None = None
+    # True = mode waktu nyata: bus, ETA, dan jam diambil dari posisi bus asli (MQTT), bukan simulasi.
+    live: bool = False
 
 
 class RoutingScenario(BaseModel):
@@ -203,6 +234,10 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
     jam = req.jam if req.jam is not None else _jam_sekarang_wib()
     hari_tipe = req.hari_tipe or _hari_tipe_sekarang()
     sim_time = req.sim_time if req.sim_time is not None else jam * 3600
+    if req.live:
+        # Mode waktu nyata: jam server WIB adalah satu-satunya acuan ETA bus asli.
+        sim_time = _detik_sekarang_wib()
+        jam = sim_time // 3600
 
     segment_crowding = None
     daily_mean_by_koridor = None
@@ -287,12 +322,24 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
         f"kandidat={len(rute_list)} | " + " | ".join(debug_items_pre)
     )
 
+    if req.live:
+        jadwal_pilih, kepadatan_pilih = _jadwal_dan_kepadatan_live(
+            request, set(halte_master), sim_time
+        )
+        live_id = None
+    else:
+        jadwal_pilih, kepadatan_pilih = jadwal, realtime_kepadatan
+
     hasil = []
     for r in rute_list:
         formatted = format_rute(r, graph_data)
         select_bus_per_segmen(
-            formatted["segmen"], sim_time, jadwal, realtime_kepadatan, live_bus_id=live_id
+            formatted["segmen"], sim_time, jadwal_pilih, kepadatan_pilih, live_bus_id=live_id
         )
+        for item in formatted["segmen"]:
+            rek = item.get("bus_rekomendasi")
+            if rek is not None:
+                rek["eta_sumber"] = "tj_live" if req.live else "simulasi"
         hasil.append(apply_selected_bus_density(formatted))
 
     hasil = rerank_routes(hasil)
