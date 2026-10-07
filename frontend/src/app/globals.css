@@ -1,27 +1,141 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* Token desain kiosk (lihat folder "ui capstone"). Ukuran teks memakai rem karena rem sendiri
+   diskalakan mengikuti ukuran layar iPad di bawah, jadi 1rem ~ 24px di iPad 10,2" lanskap. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-tj-biru: #0f47a1;
+  --color-tj-biru-tua: #0a3478;
+  --color-tj-biru-muda: #e8f0fb;
+  --color-tj-oranye: #ee6a00;
+  --color-tj-teks: #111827;
+  --color-tj-garis: #d4d4d8;
+  /* Samakan dengan WARNA_KEPADATAN di route-utils.ts. */
+  --color-tj-sepi: #15803d;
+  --color-tj-padat: #b91c1c;
+  --font-sans: var(--font-noto), "Noto Sans", system-ui, sans-serif;
+
+  --text-kecil: 0.85rem; /* ~20px: teks terkecil yang dipakai */
+  --text-isi: 1rem; /* ~24px */
+  --text-besar: 1.3rem;
+  --text-judul: 1.9rem;
+  --text-jam: 2.3rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Skala: 1rem ikut lebar layar, dibatasi tinggi supaya tata letak selalu muat tanpa scroll. */
+html {
+  font-size: min(calc(100vw / 42), calc(100vh / 31));
+  /* dvh mengikuti tinggi tampak Safari iPad (toolbar); vh di atas jadi cadangan. */
+  font-size: min(calc(100vw / 42), calc(100dvh / 31));
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #ffffff;
+  color: var(--color-tj-teks);
+  font-family: var(--font-sans);
+  /* Kiosk: tanpa seleksi teks, menu tekan-lama, atau zoom dobel-ketuk. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Umpan balik sentuh dan fokus papan ketik untuk semua tombol. */
+button {
+  transition:
+    transform 0.08s ease-out,
+    filter 0.08s ease-out;
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+  filter: brightness(0.92);
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--color-tj-oranye);
+  outline-offset: 2px;
+}
+
+/* Pergantian layar: muncul halus. */
+@keyframes layar-masuk {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+}
+.layar-masuk {
+  animation: layar-masuk 0.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .layar-masuk {
+    animation: none;
+  }
+  button {
+    transition: none;
+  }
+}
+
+/* Slider jam simulasi: pegangan besar untuk jari (pegangan bawaan tidak ikut skala rem). */
+.slider-jam {
+  appearance: none;
+  background: transparent;
+}
+.slider-jam::-webkit-slider-runnable-track {
+  height: 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-tj-oranye) 30%, white);
+}
+.slider-jam::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.8rem;
+  height: 1.8rem;
+  margin-top: -0.6rem;
+  border-radius: 50%;
+  border: 3px solid white;
+  background: var(--color-tj-oranye);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+}
+.slider-jam::-moz-range-track {
+  height: 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-tj-oranye) 30%, white);
+}
+.slider-jam::-moz-range-thumb {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  border: 3px solid white;
+  background: var(--color-tj-oranye);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+}
+
+/* Kontrol zoom peta cukup besar untuk jari. */
+.maplibregl-ctrl-group button {
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
+/* Lencana label bus di peta dan popup mengikuti skala kiosk. */
+.maplibregl-popup-close-button {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.3rem;
+}
+.maplibregl-popup-content {
+  font-size: var(--text-kecil);
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.7rem;
 }

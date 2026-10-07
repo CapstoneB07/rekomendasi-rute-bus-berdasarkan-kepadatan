@@ -1,14 +1,28 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 
-import { HaltePicker, type HalteOpsi } from './_components/HaltePicker';
-import { RuteResult } from './_components/RuteResult';
-import { WaktuKontrol } from './_components/WaktuKontrol';
-import { API_BASE, waktuWib } from '@/lib/api';
-import type { Halte, PosisiBusResponse, Rute } from '@/lib/route-utils';
+import { Beranda } from './_components/Beranda';
+import { DaftarRencana } from './_components/DaftarRencana';
+import { DetailRencana } from './_components/DetailRencana';
+import { Footer } from './_components/Footer';
+import { Header } from './_components/Header';
+import { PeringatanIdle } from './_components/PeringatanIdle';
+import { PilihHalte } from './_components/PilihHalte';
+import { API_BASE, GalatApi, galatRute, waktuWib } from '@/lib/api';
+import { formatTanggal } from '@/lib/koridor';
+import {
+  statusBusAsli,
+  type Halte,
+  type HalteOpsi,
+  type PosisiBusAsliResponse,
+  type PosisiBusResponse,
+  type Rute,
+} from '@/lib/route-utils';
+import { useIdleReset } from '@/lib/use-idle-reset';
+import { useOnline } from '@/lib/use-online';
 import { useWaktuSimulasi } from '@/lib/use-waktu-simulasi';
 
 // MapLibre butuh `window`, jadi hanya dirender di browser.
@@ -22,13 +36,22 @@ const RUTE_BUCKET_DETIK = 300;
 // Posisi bus diminta tiap 5 detik simulasi, ditunda 300 ms setelah jam berhenti berubah.
 const POSISI_BUCKET_DETIK = 5;
 const POSISI_DEBOUNCE_MS = 300;
+// Posisi bus asli (mode waktu nyata) diambil dari backend tiap 5 detik.
+const BUS_ASLI_REFRESH_MS = 5_000;
+// Kiosk umum: kembali ke beranda bila tidak disentuh selama ini.
+const IDLE_RESET_MS = 60_000;
+// Peringatan tampil selama jendela ini sebelum reset.
+const IDLE_PERINGATAN_MS = 10_000;
+const HALTE_ASAL_DEFAULT = 'Harmoni';
 
-type Pencarian = { asal: string; tujuan: string };
+type Layar = 'beranda' | 'daftar' | 'detail';
+type Pemilih = 'tujuan' | 'asal' | null;
 
 export default function Home() {
-  const [asal, setAsal] = useState<string | null>(null);
-  const [tujuan, setTujuan] = useState<string | null>(null);
-  const [pencarian, setPencarian] = useState<Pencarian | null>(null);
+  const [layar, setLayar] = useState<Layar>('beranda');
+  const [pemilih, setPemilih] = useState<Pemilih>(null);
+  const [asalId, setAsalId] = useState<string | null>(null);
+  const [tujuanId, setTujuanId] = useState<string | null>(null);
   const [aktifIdx, setAktifIdx] = useState(0);
 
   const waktu = useWaktuSimulasi();
@@ -37,6 +60,12 @@ export default function Home() {
   useEffect(() => {
     simTimeRef.current = simTime;
   }, [simTime]);
+  // Tanggal hanya dihitung di klien (kosong di server) supaya render server dan klien sama.
+  const tanggal = useSyncExternalStore(
+    () => () => {},
+    () => formatTanggal(new Date()),
+    () => '',
+  );
 
   // ---- Posisi bus pada jam simulasi ----
   const [posisiWaktu, setPosisiWaktu] = useState<number | null>(null);
@@ -55,11 +84,24 @@ export default function Home() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.json();
     },
-    enabled: posisiWaktu !== null,
+    enabled: !isLive && posisiWaktu !== null,
     placeholderData: (prev) => prev,
   });
 
-  const { data: halteList, isError: halteError, isPending: halteLoading } = useQuery<HalteOpsi[]>({
+  // ---- Posisi bus asli (mode waktu nyata) ----
+  const { data: busAsli, isError: busAsliError } = useQuery<PosisiBusAsliResponse>({
+    queryKey: ['posisi-bus-asli'],
+    queryFn: async () => {
+      const r = await fetch(`${API_BASE}/api/live/positions`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    enabled: isLive,
+    refetchInterval: BUS_ASLI_REFRESH_MS,
+    placeholderData: (prev) => prev,
+  });
+
+  const { data: halteList, isError: halteError, refetch: muatUlangHalte } = useQuery<HalteOpsi[]>({
     queryKey: ['halte-user'],
     queryFn: async () => {
       const r = await fetch(`${API_BASE}/api/rute/halte`);
@@ -69,18 +111,36 @@ export default function Home() {
     staleTime: 10 * 60_000,
   });
 
+  const halteMap = useMemo(
+    () => new Map<string, Halte>((halteList ?? []).map((h) => [h.halte_id, h])),
+    [halteList],
+  );
+  // Halte kiosk: pilihan demo, atau Harmoni (halte asal bawaan desain) selama belum dipilih.
+  const asalDefault = useMemo(
+    () => halteList?.find((h) => h.nama === HALTE_ASAL_DEFAULT) ?? halteList?.[0],
+    [halteList],
+  );
+  const asal = asalId ?? asalDefault?.halte_id ?? null;
+  const namaAsal = asal ? (halteMap.get(asal)?.nama ?? '…') : '…';
+  const namaTujuan = tujuanId ? (halteMap.get(tujuanId)?.nama ?? null) : null;
+
+  const pencarian =
+    layar !== 'beranda' && asal && tujuanId && asal !== tujuanId ? { asal, tujuan: tujuanId } : null;
+
   const {
     data: hasilRute,
     isFetching,
-    isError: ruteError,
-    error,
     dataUpdatedAt,
+    error,
+    isError: ruteError,
+    refetch: cobaLagiRute,
   } = useQuery<Rute[]>({
     queryKey: [
       'rute-user',
       pencarian?.asal,
       pencarian?.tujuan,
       Math.floor(simTime / RUTE_BUCKET_DETIK),
+      isLive,
     ],
     queryFn: async () => {
       // Jam dibaca saat fetch (bukan saat render) supaya ETA bus segar pada tiap refetch.
@@ -96,11 +156,12 @@ export default function Home() {
           jam,
           hari_tipe: hariTipe,
           sim_time: detik,
+          live: isLive,
         }),
       });
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
-        throw new Error(body?.detail ?? `HTTP ${r.status}`);
+        throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
       }
       return r.json();
     },
@@ -114,138 +175,176 @@ export default function Home() {
     retry: 1,
   });
 
-  const halteMap = useMemo(
-    () => new Map<string, Halte>((halteList ?? []).map((h) => [h.halte_id, h])),
-    [halteList],
-  );
   const ruteAktif =
-    pencarian && hasilRute && hasilRute.length > 0
-      ? hasilRute[Math.min(aktifIdx, hasilRute.length - 1)]
-      : undefined;
+    hasilRute && hasilRute.length > 0 ? hasilRute[Math.min(aktifIdx, hasilRute.length - 1)] : undefined;
 
-  const samaHalte = asal !== null && asal === tujuan;
-  const bisaCari = asal !== null && tujuan !== null && !samaHalte;
+  // Saat satu rencana dibuka, peta hanya menampilkan koridor yang dipakai rencana itu.
+  const koridorRencana = useMemo(
+    () =>
+      layar === 'detail' && ruteAktif
+        ? [...new Set(ruteAktif.segmen.flatMap((s) => (s.tipe === 'naik' ? [s.koridor_id] : [])))]
+        : undefined,
+    [layar, ruteAktif],
+  );
 
-  const cari = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bisaCari) return;
+  // Reset penuh (pengguna berikutnya, atau asal berubah): tujuan ikut dihapus.
+  const kembaliKeBeranda = useCallback(() => {
+    setLayar('beranda');
+    setPemilih(null);
+    setTujuanId(null);
     setAktifIdx(0);
-    setPencarian({ asal, tujuan });
+  }, []);
+
+  // Pengguna berikutnya tidak boleh melihat pencarian orang sebelumnya.
+  const adaSesi = layar !== 'beranda' || tujuanId !== null || pemilih !== null;
+  const sisaIdleDetik = useIdleReset(kembaliKeBeranda, IDLE_RESET_MS, adaSesi, IDLE_PERINGATAN_MS);
+
+  // Kembali dari daftar rencana: tujuan dipertahankan supaya bisa diganti atau dicari ulang.
+  const ubahTujuan = () => {
+    setLayar('beranda');
+    setAktifIdx(0);
+  };
+  const pilihTujuan = (id: string) => {
+    setTujuanId(id);
+    setPemilih(null);
+  };
+  const pilihAsal = (id: string) => {
+    setAsalId(id);
+    setPemilih(null);
+    setAktifIdx(0);
+    // Asal baru sama dengan tujuan: pencarian tidak mungkin, ulangi dari beranda.
+    if (id === tujuanId) kembaliKeBeranda();
   };
 
-  const tukar = () => {
-    setAsal(tujuan);
-    setTujuan(asal);
-    setPencarian(null);
-  };
+  const tampilPeta = layar !== 'beranda';
+  const online = useOnline();
+  // Jam WIB data rute terakhir; hanya relevan saat daftar/detail rencana tampil.
+  const diperbaruiDetik = tampilPeta && pencarian && dataUpdatedAt > 0 ? waktuWib(new Date(dataUpdatedAt)).detik : null;
+  // Jumlah bus di label status mengikuti bus yang benar-benar tampil (setelah filter koridor).
+  const busAsliTampil = useMemo(
+    () =>
+      busAsli && koridorRencana
+        ? { ...busAsli, features: busAsli.features.filter((f) => koridorRencana.includes(f.properties.koridor_id)) }
+        : busAsli,
+    [busAsli, koridorRencana],
+  );
+  const statusLive = isLive && tampilPeta ? statusBusAsli(busAsliTampil, busAsliError) : null;
 
   return (
-    <div className="flex-1 bg-gray-50 text-gray-900">
-      <header className="bg-red-600 px-4 pb-10 pt-6 text-white">
-        <div className="mx-auto max-w-md lg:max-w-6xl">
-          <h1 className="text-xl font-bold">TransJakarta Lega</h1>
-          <p className="mt-1 text-sm text-red-100">
-            Pilih rute dan bus yang paling lega, berdasarkan kepadatan bus saat ini.
-          </p>
-        </div>
-      </header>
+    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-white">
+      <Header
+        namaHalte={namaAsal}
+        onUbahHalte={() => setPemilih('asal')}
+        halteSiap={!!halteList}
+        waktu={waktu}
+        tanggal={tanggal}
+      />
 
-      <main className="mx-auto -mt-6 max-w-md px-4 pb-10 lg:grid lg:max-w-6xl lg:grid-cols-[1fr_26rem] lg:items-start lg:gap-6">
-        <div className="mb-4 h-64 overflow-hidden rounded-2xl bg-gray-200 shadow-md lg:sticky lg:top-4 lg:mb-0 lg:h-[calc(100vh-2rem)]">
-          <RuteMap rute={ruteAktif} halteMap={halteMap} bus={posisiBus} />
-        </div>
-
-        <div className="space-y-4">
-        <WaktuKontrol waktu={waktu} />
-        <form onSubmit={cari} className="space-y-3 rounded-2xl bg-white p-4 shadow-md">
-          <HaltePicker
-            label="Dari halte"
-            placeholder="Cari halte asal"
-            halteList={halteList ?? []}
-            value={asal}
-            onChange={(id) => {
-              setAsal(id);
-              setPencarian(null);
-            }}
-            disabled={!halteList}
+      <main className="grid min-h-0 flex-1 grid-cols-[45fr_55fr] grid-rows-[minmax(0,1fr)] gap-x-[1rem] px-[1.4rem]">
+        {/* Peta tetap terpasang (hanya disembunyikan di beranda) supaya tidak dimuat ulang tiap pindah layar.
+            Di beranda panel menutupi kedua kolom; peta yang tak terlihat tidak menangkap sentuhan. */}
+        <div
+          className={`relative col-start-2 row-start-1 mb-[0.4rem] min-h-0 min-w-0 overflow-hidden rounded-2xl bg-gray-100 ${
+            tampilPeta ? '' : 'invisible'
+          }`}
+        >
+          <RuteMap
+            rute={layar === 'beranda' ? undefined : ruteAktif}
+            halteMap={halteMap}
+            bus={isLive ? busAsli : posisiBus}
+            koridorFilter={koridorRencana}
           />
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={tukar}
-              className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
-              aria-label="Tukar halte asal dan tujuan"
+          {statusLive && (
+            <p
+              role="status"
+              className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border border-tj-garis bg-white/95 px-[0.6rem] py-[0.15rem] text-kecil text-tj-teks shadow"
             >
-              ⇅ Tukar
-            </button>
-          </div>
-          <HaltePicker
-            label="Ke halte"
-            placeholder="Cari halte tujuan"
-            halteList={halteList ?? []}
-            value={tujuan}
-            onChange={(id) => {
-              setTujuan(id);
-              setPencarian(null);
-            }}
-            disabled={!halteList}
-          />
-
-          {samaHalte && (
-            <p role="alert" className="text-xs text-red-700">
-              Halte asal dan tujuan tidak boleh sama.
+              {statusLive}
             </p>
           )}
-          {halteError && (
-            <p role="alert" className="text-xs text-red-700">
-              Gagal memuat daftar halte. Pastikan server backend berjalan.
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={!bisaCari || isFetching}
-            className="w-full rounded-lg bg-red-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-          >
-            {halteLoading ? 'Memuat halte…' : isFetching && !hasilRute ? 'Mencari…' : 'Cari rute'}
-          </button>
-        </form>
-
-        {pencarian && ruteError && (
-          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <div className="font-semibold">Rute tidak ditemukan</div>
-            <div className="mt-1 text-xs">
-              {error instanceof Error ? error.message : 'Terjadi kesalahan saat mencari rute.'}
-            </div>
-          </div>
-        )}
-
-        {pencarian && isFetching && !hasilRute && !ruteError && (
-          <div className="animate-pulse space-y-3" aria-hidden>
-            <div className="h-10 rounded-lg bg-gray-200" />
-            <div className="h-24 rounded-xl bg-gray-200" />
-            <div className="h-24 rounded-xl bg-gray-200" />
-          </div>
-        )}
-
-        {pencarian && hasilRute && hasilRute.length > 0 && (
-          <>
-            <RuteResult
-              hasilRute={hasilRute}
-              aktifIdx={Math.min(aktifIdx, hasilRute.length - 1)}
-              setAktifIdx={setAktifIdx}
-            />
-            <p className="text-center text-xs text-gray-500">
-              {isLive
-                ? `Diperbarui otomatis tiap ${REFRESH_MS / 1000} detik${
-                    dataUpdatedAt ? ` · terakhir ${waktuWib(new Date(dataUpdatedAt)).label} WIB` : ''
-                  }`
-                : 'Rute mengikuti jam simulasi'}
-            </p>
-          </>
-        )}
         </div>
+
+        <section
+          className={`row-start-1 min-h-0 min-w-0 ${
+            layar === 'beranda' ? 'col-span-2 col-start-1' : 'col-start-1'
+          }`}
+        >
+          {layar === 'beranda' && (
+            <Beranda
+              namaTujuan={namaTujuan}
+              halteSiap={!!halteList}
+              bisaCari={!!asal && !!tujuanId && asal !== tujuanId}
+              onPilihTujuan={() => setPemilih('tujuan')}
+              onCari={() => {
+                setAktifIdx(0);
+                setLayar('daftar');
+              }}
+            />
+          )}
+          {layar === 'daftar' && (
+            <DaftarRencana
+              asal={namaAsal}
+              tujuan={namaTujuan ?? '…'}
+              hasilRute={hasilRute}
+              memuat={isFetching}
+              aktifIdx={aktifIdx}
+              galat={ruteError ? galatRute(error) : null}
+              onCoba={() => void cobaLagiRute()}
+              onAktif={setAktifIdx}
+              onPilih={(i) => {
+                setAktifIdx(i);
+                setLayar('detail');
+              }}
+              onKembali={ubahTujuan}
+            />
+          )}
+          {layar === 'detail' && ruteAktif && (
+            <DetailRencana
+              rute={ruteAktif}
+              tujuan={namaTujuan ?? '…'}
+              simTime={simTime}
+              onKembali={() => setLayar('daftar')}
+            />
+          )}
+        </section>
       </main>
+
+      <Footer online={online} diperbaruiDetik={diperbaruiDetik} />
+
+      {halteError && (
+        <div
+          role="alert"
+          className="fixed inset-x-0 bottom-[2.4rem] z-40 mx-auto flex w-fit items-center gap-[0.8rem] rounded-xl bg-tj-padat px-[1rem] py-[0.3rem] text-kecil text-white"
+        >
+          Gagal memuat daftar halte. Pastikan server backend berjalan.
+          <button
+            type="button"
+            onClick={() => void muatUlangHalte()}
+            className="h-[2rem] rounded-lg bg-white px-[0.8rem] font-bold text-tj-padat"
+          >
+            Coba lagi
+          </button>
+        </div>
+      )}
+
+      {pemilih && halteList && (
+        <PilihHalte
+          judul={pemilih === 'tujuan' ? 'Pilih halte tujuan' : 'Pilih halte asal (demo)'}
+          halteList={halteList}
+          terpilihId={pemilih === 'tujuan' ? tujuanId : asal}
+          nonaktifNama={pemilih === 'tujuan' ? namaAsal : namaTujuan}
+          nonaktifAlasan={pemilih === 'tujuan' ? 'Halte asal' : 'Halte tujuan'}
+          onPilih={pemilih === 'tujuan' ? pilihTujuan : pilihAsal}
+          onTutup={() => setPemilih(null)}
+        />
+      )}
+
+      {sisaIdleDetik !== null && <PeringatanIdle sisaDetik={sisaIdleDetik} />}
+
+      {/* Kiosk hanya dirancang lanskap. */}
+      <div className="fixed inset-0 z-[60] hidden items-center justify-center bg-tj-biru p-[2rem] text-center text-judul font-bold text-white [@media(orientation:portrait)]:flex">
+        Putar iPad ke posisi mendatar
+      </div>
     </div>
   );
 }
