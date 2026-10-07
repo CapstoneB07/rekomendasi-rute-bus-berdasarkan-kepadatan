@@ -7,48 +7,28 @@ import {
   type WaktuSimulasi,
 } from '@/lib/use-waktu-simulasi';
 
-function formatJam(detik: number): string {
-  const h = Math.floor(detik / 3600);
-  const m = Math.floor((detik % 3600) / 60);
-  const s = detik % 60;
-  return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
-}
+import { IkonJeda, IkonMain } from './ikon';
 
+// Bar kontrol simulasi untuk demo, memanjang di bawah baris atas header. Jam besar ada di header.
 export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
   const { simTime, isLive, isPlaying, kecepatan, aturJam, togglePlay, aturKecepatan, kembaliKeLive } = waktu;
   const berjalan = isLive || isPlaying;
 
   return (
-    <section aria-label="Jam simulasi" className="rounded-2xl bg-white p-4 shadow-md">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white hover:bg-gray-700"
-          aria-label={berjalan ? 'Jeda jam' : 'Jalankan jam'}
-        >
-          {berjalan ? '⏸' : '▶'}
-        </button>
+    <section
+      aria-label="Mode simulasi"
+      className="flex h-[2.5rem] items-center gap-[0.6rem] rounded-2xl border-2 border-tj-oranye bg-orange-50 px-[0.7rem]"
+    >
+      <span className="whitespace-nowrap text-kecil font-bold text-tj-oranye">Mode simulasi</span>
 
-        <div className="min-w-0 flex-1">
-          <div className="font-mono text-xl font-bold tabular-nums text-gray-900">
-            {formatJam(simTime)} <span className="text-xs font-normal text-gray-500">WIB</span>
-          </div>
-          <div className={`text-xs font-medium ${isLive ? 'text-green-700' : 'text-amber-700'}`}>
-            {isLive ? 'Waktu nyata' : 'Mode simulasi'}
-          </div>
-        </div>
-
-        {!isLive && (
-          <button
-            type="button"
-            onClick={kembaliKeLive}
-            className="shrink-0 rounded-lg border border-red-600 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-          >
-            Waktu nyata
-          </button>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="flex h-[2rem] w-[2rem] shrink-0 items-center justify-center rounded-full bg-tj-oranye text-white"
+        aria-label={berjalan ? 'Jeda jam' : 'Jalankan jam'}
+      >
+        {berjalan ? <IkonJeda className="h-[1rem] w-[1rem]" /> : <IkonMain className="h-[1rem] w-[1rem]" />}
+      </button>
 
       <input
         type="range"
@@ -57,32 +37,37 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
         step={60}
         value={Math.min(Math.max(simTime, JAM_MULAI), JAM_SELESAI)}
         onChange={(e) => aturJam(Number(e.target.value))}
-        className="mt-3 w-full accent-red-600"
+        className="slider-jam h-[2rem] min-w-0 flex-1"
         aria-label="Geser jam simulasi"
       />
-      <div className="flex justify-between text-[10px] text-gray-400" aria-hidden>
-        <span>05:00</span>
-        <span>23:00</span>
-      </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <span className="text-xs text-gray-500">Kecepatan</span>
+      <div className="flex shrink-0 items-center gap-[0.3rem]">
         {KECEPATAN.map((k) => (
           <button
             key={k}
             type="button"
             onClick={() => aturKecepatan(k)}
             aria-pressed={!isLive && kecepatan === k}
-            className={`rounded border px-2.5 py-1 text-xs font-medium ${
-              !isLive && kecepatan === k
-                ? 'border-gray-900 bg-gray-900 text-white'
-                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+            className={`h-[2rem] min-w-[2.1rem] rounded-lg border-2 border-tj-oranye px-[0.3rem] text-kecil font-bold leading-none ${
+              !isLive && kecepatan === k ? 'bg-tj-oranye text-white' : 'bg-white text-tj-oranye'
             }`}
           >
             {k}×
           </button>
         ))}
       </div>
+
+      <button
+        type="button"
+        onClick={kembaliKeLive}
+        disabled={isLive}
+        aria-pressed={isLive}
+        className={`h-[2rem] shrink-0 whitespace-nowrap rounded-lg px-[0.7rem] text-kecil font-bold leading-none ${
+          isLive ? 'bg-tj-sepi text-white' : 'bg-tj-biru text-white'
+        }`}
+      >
+        {isLive ? '● Waktu nyata' : 'Waktu nyata'}
+      </button>
     </section>
   );
 }

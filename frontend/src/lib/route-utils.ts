@@ -7,6 +7,9 @@ export type Halte = {
   lng: number;
 };
 
+// Halte dari GET /api/rute/halte, dengan koridor yang melayaninya.
+export type HalteOpsi = Halte & { koridor_list: number[] };
+
 export type SegmenDetail = {
   dari_id: string;
   ke_id: string;
@@ -21,6 +24,8 @@ export type DataSource = 'cv_live' | 'generated';
 export type BusRekomendasi = {
   bus_id: string;
   data_source?: DataSource;
+  // 'tj_live' = ETA dari posisi bus asli (MQTT); 'simulasi' = ETA dari jadwal simulasi.
+  eta_sumber?: 'tj_live' | 'simulasi';
   kepadatan: number;
   label_kepadatan: 'Sepi' | 'Sedang' | 'Padat';
   eta_menit: number;
@@ -34,6 +39,8 @@ export type BusRekomendasi = {
   extra_wait_norm?: number;
   estimated_passengers?: number;
   capacity?: number;
+  // Jam (detik) penumpang tiba di halte naik, memperhitungkan transit sebelumnya; eta_menit dihitung dari sini.
+  leg_clock_detik?: number;
   candidate_count?: number;
   considered_candidate_count?: number;
   candidate_debug?: Array<{
@@ -45,7 +52,7 @@ export type BusRekomendasi = {
 };
 
 // Properti tiap bus di GET /api/simulation/positions.
-export type BusPosisi = {
+export type BusPosisiSimulasi = {
   bus_id: string;
   koridor_id: number;
   bearing: number;
@@ -58,7 +65,34 @@ export type BusPosisi = {
   data_source: DataSource;
 };
 
+// Bus asli dari GET /api/live/positions (MQTT TransJakarta). Posisi dan ETA asli; kepadatan
+// hanya perkiraan dari trip simulasi yang setara, atau null untuk koridor di luar simulasi.
+export type BusPosisiAsli = Pick<
+  BusPosisiSimulasi,
+  'bus_id' | 'koridor_id' | 'bearing' | 'next_stop' | 'eta_minutes'
+> & {
+  data_source: 'tj_live';
+  trip_load_factor: number | null;
+  label_kepadatan: BusPosisiSimulasi['label_kepadatan'] | null;
+  estimated_passengers: number | null;
+  capacity: number | null;
+};
+
+export type BusPosisi = BusPosisiSimulasi | BusPosisiAsli;
+
 export type PosisiBusResponse = GeoJSON.FeatureCollection<GeoJSON.Point, BusPosisi>;
+
+export type PosisiBusAsliResponse = GeoJSON.FeatureCollection<GeoJSON.Point, BusPosisiAsli> & {
+  connected: boolean;
+};
+
+// Teks status di bawah jam saat mode waktu nyata.
+export function statusBusAsli(data: PosisiBusAsliResponse | undefined, isError: boolean): string {
+  if (isError) return 'Bus asli tidak dapat dimuat. Pastikan server backend berjalan.';
+  if (!data) return 'Memuat posisi bus asli…';
+  if (!data.connected) return 'Menyambung ke data bus TransJakarta…';
+  return `${data.features.length} bus asli di peta`;
+}
 
 export type NaikItem = {
   tipe: 'naik';
@@ -128,6 +162,8 @@ export type ShapeFeature = GeoJSON.Feature<GeoJSON.LineString, {
 
 type ShapeIndex = Map<string, ShapeFeature[]>;
 
+import { warnaKoridor } from './koridor';
+
 export function normalisasiKepadatanDisplay(kepadatan: number): number {
   if (!Number.isFinite(kepadatan)) return 0;
   return Math.max(0, Math.min(kepadatan, 1));
@@ -136,11 +172,17 @@ export function normalisasiKepadatanDisplay(kepadatan: number): number {
 // Pemetaan kepadatan (0..1) ke warna semafor. Threshold 0.4/0.7 dipilih
 // supaya distribusi merah/kuning/hijau seimbang untuk kepadatan jam sibuk
 // TransJakarta tipikal (mean ~0.5, std ~0.2).
+// Satu-satunya palet kepadatan: teks, bar, cincin bus, dan legenda memakainya. Cukup gelap untuk
+// terbaca di atas peta terang dan teks putih; samakan dengan --color-tj-sepi/-padat di globals.css.
+export const WARNA_KEPADATAN = { sepi: '#15803d', sedang: '#b45309', padat: '#b91c1c' } as const;
+
 export function kepadatanKeWarna(kepadatan: number): string {
-  const value = normalisasiKepadatanDisplay(kepadatan);
-  if (value < 0.4) return '#2ECC71'; // hijau — sepi
-  if (value < 0.7) return '#F39C12'; // kuning — sedang
-  return '#E74C3C'; // merah — padat
+  return WARNA_KEPADATAN[labelKepadatan(kepadatan)];
+}
+
+// Untuk label dari backend ('Sepi' | 'Sedang' | 'Padat').
+export function warnaLabelKepadatan(label: 'Sepi' | 'Sedang' | 'Padat'): string {
+  return WARNA_KEPADATAN[label.toLowerCase() as keyof typeof WARNA_KEPADATAN];
 }
 
 export function labelKepadatan(kepadatan: number): 'sepi' | 'sedang' | 'padat' {
@@ -259,7 +301,7 @@ export function buildRouteGeoJSON(
           coordinates,
         },
         properties: {
-          warna: kepadatanKeWarna(d.kepadatan),
+          warna: warnaKoridor(s.koridor_id).bg,
           kepadatan: normalisasiKepadatanDisplay(d.kepadatan),
           koridor_id: s.koridor_id,
         },
