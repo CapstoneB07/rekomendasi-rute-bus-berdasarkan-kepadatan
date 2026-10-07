@@ -111,6 +111,8 @@ class SimulationContext:
     fallback_jadwal: dict[str, list[dict]]
     crowding_cache: dict[tuple[str | None, str], dict] = field(default_factory=dict)
     live_crowding: LiveCrowding | None = None
+    # (koridor_key, nama time band) -> trip_instance_id terurut; dibangun malas oleh kepadatan_bus_live.
+    trip_band_index: dict[tuple[str, str], list[str]] = field(default_factory=dict)
 
 
 def parse_gtfs_time(value: Any) -> int:
@@ -1975,6 +1977,48 @@ def get_active_positions(
             )
             positions.extend(group[:limit])
     return positions
+
+
+def kepadatan_bus_live(
+    ctx: SimulationContext,
+    bus_id: str,
+    koridor_id: int | str,
+    sim_time: int,
+    tanggal: str | None = None,
+    simulation_run_id: str | None = None,
+) -> dict | None:
+    """Perkiraan kepadatan bus asli: pinjam dari trip simulasi yang setara.
+
+    Kepadatan simulasi hanya bergantung pada koridor, time band keberangkatan, dan
+    seed acak (bukan arah), jadi trip yang setara = koridor sama + time band sama
+    dengan sim_time. Trip dipilih lewat hash stabil dari bus_id: bus yang sama
+    mendapat nilai yang sama sampai time band berganti. None bila koridor tidak
+    ada di simulasi.
+    """
+    koridor_key = str(koridor_id)
+    if not ctx.trip_band_index:
+        index: dict[tuple[str, str], list[str]] = defaultdict(list)
+        for instance in sorted(ctx.instances, key=lambda i: i["trip_instance_id"]):
+            band = _time_band_for_seconds(instance["departure_time"])["name"]
+            index[(instance["koridor_key"], band)].append(instance["trip_instance_id"])
+        ctx.trip_band_index.update(index)
+
+    band = _time_band_for_seconds(sim_time)["name"]
+    kandidat = ctx.trip_band_index.get((koridor_key, band))
+    if not kandidat:
+        return None
+    tid = kandidat[_stable_int_seed(bus_id, koridor_key, band) % len(kandidat)]
+    payload = generate_crowding(ctx, tanggal, simulation_run_id)["trip_loads"].get(tid)
+    if payload is None:
+        return None
+
+    load = display_load_factor(payload["trip_load_factor"])
+    return {
+        "trip_load_factor": round(load, 3),
+        "label_kepadatan": label_kepadatan(load),
+        "estimated_passengers": round(load * BUS_CAPACITY, 2),
+        "capacity": BUS_CAPACITY,
+    }
 
 
 def upcoming_buses_for_halte(

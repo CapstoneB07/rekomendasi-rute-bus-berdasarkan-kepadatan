@@ -1,13 +1,15 @@
 # backend/main.py
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import rute, simulation
+from routers import live, rute, simulation
 from services.dijkstra import load_graph_data
 from services.gtfs_simulation import load_simulation_context, resolve_simulation_run_id
+from services.live_buses import LiveBuses
 from services.live_crowding import LIVE_CV_BUS_ID, LiveCrowding
 from services.supabase_client import get_client
 
@@ -32,6 +34,11 @@ def _load_shapes(sb) -> list:
             break
         offset += 1000
     return rows
+
+
+def _allowed_origins() -> list[str]:
+    raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+    return [o.strip() for o in raw.split(",") if o.strip()]
 
 
 @asynccontextmanager
@@ -72,10 +79,17 @@ async def lifespan(app: FastAPI):
         f"simulation_run_id={resolve_simulation_run_id()}, "
         f"live_cv_bus_id={LIVE_CV_BUS_ID}"
     )
+    # route_code MQTT = nama_pendek koridor statis; hanya bus koridor ini yang ditampilkan.
+    koridor_rows = sb.table("koridor").select("koridor_id, nama_pendek").execute().data
+    live_buses = LiveBuses({str(k["nama_pendek"]): k["koridor_id"] for k in koridor_rows})
+    app.state.live_buses = live_buses
+    live_buses.start()
+
     poller = asyncio.create_task(live_crowding.run()) if live_crowding else None
     try:
         yield
     finally:
+        live_buses.stop()
         if poller:
             poller.cancel()
 
@@ -84,10 +98,11 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_allowed_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(live.router)
 app.include_router(simulation.router)
 app.include_router(rute.router)
