@@ -486,18 +486,29 @@ def _bidirectional_dijkstra_single(
     path_forward: dict[tuple, list[dict]] = {(asal, None, 0): []}
     path_backward: dict[tuple, list[dict]] = {(tujuan, None, 0): []}
     target_terbaik: dict | None = None
+    # Indeks state per node, supaya penggabungan di maybe_update tidak memindai seluruh
+    # path_forward/path_backward setiap kali (kuadratik). Urutan = urutan state pertama kali muncul.
+    forward_by_node: dict[str, list[tuple]] = defaultdict(list)
+    backward_by_node: dict[str, list[tuple]] = defaultdict(list)
+    forward_by_node[asal].append((asal, None, 0))
+    backward_by_node[tujuan].append((tujuan, None, 0))
 
     def maybe_update(node: str) -> None:
         nonlocal target_terbaik
-        f_states = [s for s in path_forward if s[0] == node]
-        b_states = [s for s in path_backward if s[0] == node]
-        for f_state in f_states:
-            for b_state in b_states:
+        for f_state in forward_by_node.get(node, ()):
+            f_cost = best_forward[f_state]
+            for b_state in backward_by_node.get(node, ()):
                 if f_state[2] + b_state[2] > maks_transit:
                     continue
-                full_path = path_forward[f_state] + path_backward[b_state]
-                if any(_edge_block_key(edge) in edge_diblokir for edge in full_path):
+                # Biaya jalur gabungan = jumlah biaya edge (best_* menyimpan biaya itu), jadi
+                # pasangan yang tidak bisa mengalahkan kandidat terbaik dilewati sebelum jalurnya
+                # dibangun. Edge terblokir tidak mungkin ada di sini: tiap edge sudah dicek saat ekspansi.
+                if (
+                    target_terbaik is not None
+                    and f_cost + best_backward[b_state] >= target_terbaik["cost"]
+                ):
                     continue
+                full_path = path_forward[f_state] + path_backward[b_state]
                 kandidat = _metrics_if_valid_path(full_path, maks_transit)
                 if kandidat is None:
                     continue
@@ -516,8 +527,9 @@ def _bidirectional_dijkstra_single(
                 continue
             maybe_update(node)
             for edge in graph.get(node, []):
-                edge_entry = {**edge, "asal": node}
-                if _edge_block_key(edge_entry) in edge_diblokir:
+                if edge_diblokir and (
+                    (node, edge["tipe"], edge["segmen_id"], edge["koridor_id"]) in edge_diblokir
+                ):
                     continue
                 if edge["tipe"] == "transit":
                     if koridor is None or koridor == edge["koridor_id"]:
@@ -538,7 +550,9 @@ def _bidirectional_dijkstra_single(
                 new_state = (new_node, new_koridor, new_transit)
                 if new_cost < best_forward.get(new_state, float("inf")) - 1e-9:
                     best_forward[new_state] = new_cost
-                    new_path = path + [edge_entry]
+                    new_path = path + [{**edge, "asal": node}]
+                    if new_state not in path_forward:
+                        forward_by_node[new_node].append(new_state)
                     path_forward[new_state] = new_path
                     counter += 1
                     heapq.heappush(
@@ -554,7 +568,7 @@ def _bidirectional_dijkstra_single(
                 continue
             maybe_update(node)
             for edge in reverse_graph.get(node, []):
-                if _edge_block_key(edge) in edge_diblokir:
+                if edge_diblokir and _edge_block_key(edge) in edge_diblokir:
                     continue
                 if (
                     edge["tipe"] == "transit"
@@ -571,6 +585,8 @@ def _bidirectional_dijkstra_single(
                 if new_cost < best_backward.get(new_state, float("inf")) - 1e-9:
                     best_backward[new_state] = new_cost
                     new_path = [edge] + path_to_tujuan
+                    if new_state not in path_backward:
+                        backward_by_node[new_node].append(new_state)
                     path_backward[new_state] = new_path
                     counter += 1
                     heapq.heappush(
@@ -578,7 +594,7 @@ def _bidirectional_dijkstra_single(
                         (new_cost, counter, new_node, edge["koridor_id"], new_transit, new_path),
                     )
 
-    meeting_nodes = {s[0] for s in path_forward} & {s[0] for s in path_backward}
+    meeting_nodes = forward_by_node.keys() & backward_by_node.keys()
     for node in meeting_nodes:
         maybe_update(node)
     return target_terbaik
