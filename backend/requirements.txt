@@ -43,3 +43,4 @@ tzdata==2026.2
 uvicorn==0.46.0
 websockets==15.0.1
 yarl==1.25.1
+paho-mqtt==2.1.0

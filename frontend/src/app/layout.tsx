@@ -1,21 +1,33 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Noto_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const notoSans = Noto_Sans({
+  variable: "--font-noto",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
   title: "TransJakarta Lega",
   description: "Rekomendasi rute dan bus TransJakarta yang paling lega.",
+  icons: { apple: "/apple-touch-icon.png" },
+  appleWebApp: {
+    capable: true,
+    title: "TJ Lega",
+    statusBarStyle: "default",
+  },
+};
+
+// Kiosk iPad: tanpa zoom cubit/dobel-ketuk, memenuhi seluruh layar.
+export const viewport: Viewport = {
+  themeColor: "#0f47a1",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -24,11 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+    <html lang="id" className={`${notoSans.variable} h-full antialiased`}>
+      <body className="h-full" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

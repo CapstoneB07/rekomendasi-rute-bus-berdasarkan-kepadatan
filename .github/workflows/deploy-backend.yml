@@ -1,0 +1,49 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Siapkan SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Kirim kode ke VPS
+        # venv dan .env tinggal di server; --delete tidak menyentuh file yang di-exclude.
+        run: |
+          rsync -az --delete \
+            --exclude venv --exclude .env --exclude __pycache__ --exclude .pytest_cache \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            backend/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/tj-backend/
+
+      - name: Install dependency dan restart
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "/opt/tj-backend/venv/bin/pip install -q --no-cache-dir -r /opt/tj-backend/requirements.txt && sudo systemctl restart tj-backend"
+
+      - name: Health check
+        run: |
+          host=$(echo "${{ secrets.VPS_HOST }}" | tr . -)
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "https://$host.nip.io/docs" || true)
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "Backend tidak sehat (HTTP $code)"; exit 1

@@ -1,5 +1,4 @@
-// Utilitas tipe + konstruksi GeoJSON untuk overlay rute Dijkstra di MapLibre.
-// Konsumen: SimulationMap, RoutePanel, RouteCard.
+// Tipe dan GeoJSON overlay rute Dijkstra di MapLibre, dipakai RuteMap dan RuteResult.
 
 export type Halte = {
   halte_id: string;
@@ -7,6 +6,9 @@ export type Halte = {
   lat: number;
   lng: number;
 };
+
+// Halte dari GET /api/rute/halte, dengan koridor yang melayaninya.
+export type HalteOpsi = Halte & { koridor_list: number[] };
 
 export type SegmenDetail = {
   dari_id: string;
@@ -16,8 +18,14 @@ export type SegmenDetail = {
   jarak_meter?: number;
 };
 
+// 'cv_live' = kepadatan dari kamera CV bus fisik; 'generated' = simulasi.
+export type DataSource = 'cv_live' | 'generated';
+
 export type BusRekomendasi = {
   bus_id: string;
+  data_source?: DataSource;
+  // 'tj_live' = ETA dari posisi bus asli (MQTT); 'simulasi' = ETA dari jadwal simulasi.
+  eta_sumber?: 'tj_live' | 'simulasi';
   kepadatan: number;
   label_kepadatan: 'Sepi' | 'Sedang' | 'Padat';
   eta_menit: number;
@@ -31,6 +39,8 @@ export type BusRekomendasi = {
   extra_wait_norm?: number;
   estimated_passengers?: number;
   capacity?: number;
+  // Jam (detik) penumpang tiba di halte naik, memperhitungkan transit sebelumnya; eta_menit dihitung dari sini.
+  leg_clock_detik?: number;
   candidate_count?: number;
   considered_candidate_count?: number;
   candidate_debug?: Array<{
@@ -40,6 +50,49 @@ export type BusRekomendasi = {
     score: number;
   }>;
 };
+
+// Properti tiap bus di GET /api/simulation/positions.
+export type BusPosisiSimulasi = {
+  bus_id: string;
+  koridor_id: number;
+  bearing: number;
+  next_stop: string;
+  eta_minutes: number;
+  trip_load_factor: number;
+  label_kepadatan: 'Sepi' | 'Sedang' | 'Padat';
+  estimated_passengers: number;
+  capacity: number;
+  data_source: DataSource;
+};
+
+// Bus asli dari GET /api/live/positions (MQTT TransJakarta). Posisi dan ETA asli; kepadatan
+// hanya perkiraan dari trip simulasi yang setara, atau null untuk koridor di luar simulasi.
+export type BusPosisiAsli = Pick<
+  BusPosisiSimulasi,
+  'bus_id' | 'koridor_id' | 'bearing' | 'next_stop' | 'eta_minutes'
+> & {
+  data_source: 'tj_live';
+  trip_load_factor: number | null;
+  label_kepadatan: BusPosisiSimulasi['label_kepadatan'] | null;
+  estimated_passengers: number | null;
+  capacity: number | null;
+};
+
+export type BusPosisi = BusPosisiSimulasi | BusPosisiAsli;
+
+export type PosisiBusResponse = GeoJSON.FeatureCollection<GeoJSON.Point, BusPosisi>;
+
+export type PosisiBusAsliResponse = GeoJSON.FeatureCollection<GeoJSON.Point, BusPosisiAsli> & {
+  connected: boolean;
+};
+
+// Teks status di bawah jam saat mode waktu nyata.
+export function statusBusAsli(data: PosisiBusAsliResponse | undefined, isError: boolean): string {
+  if (isError) return 'Bus asli tidak dapat dimuat. Pastikan server backend berjalan.';
+  if (!data) return 'Memuat posisi bus asli…';
+  if (!data.connected) return 'Menyambung ke data bus TransJakarta…';
+  return `${data.features.length} bus asli di peta`;
+}
 
 export type NaikItem = {
   tipe: 'naik';
@@ -102,14 +155,14 @@ export type Rute = {
   segmen: RuteSegmen[];
 };
 
-export type SelectionMode = 'idle' | 'pilih_asal' | 'pilih_tujuan' | 'hasil';
-
 export type ShapeFeature = GeoJSON.Feature<GeoJSON.LineString, {
   koridor_id: number | string;
   shape_id: string;
 }>;
 
 type ShapeIndex = Map<string, ShapeFeature[]>;
+
+import { warnaKoridor } from './koridor';
 
 export function normalisasiKepadatanDisplay(kepadatan: number): number {
   if (!Number.isFinite(kepadatan)) return 0;
@@ -119,11 +172,17 @@ export function normalisasiKepadatanDisplay(kepadatan: number): number {
 // Pemetaan kepadatan (0..1) ke warna semafor. Threshold 0.4/0.7 dipilih
 // supaya distribusi merah/kuning/hijau seimbang untuk kepadatan jam sibuk
 // TransJakarta tipikal (mean ~0.5, std ~0.2).
+// Satu-satunya palet kepadatan: teks, bar, cincin bus, dan legenda memakainya. Cukup gelap untuk
+// terbaca di atas peta terang dan teks putih; samakan dengan --color-tj-sepi/-padat di globals.css.
+export const WARNA_KEPADATAN = { sepi: '#15803d', sedang: '#b45309', padat: '#b91c1c' } as const;
+
 export function kepadatanKeWarna(kepadatan: number): string {
-  const value = normalisasiKepadatanDisplay(kepadatan);
-  if (value < 0.4) return '#2ECC71'; // hijau — sepi
-  if (value < 0.7) return '#F39C12'; // kuning — sedang
-  return '#E74C3C'; // merah — padat
+  return WARNA_KEPADATAN[labelKepadatan(kepadatan)];
+}
+
+// Untuk label dari backend ('Sepi' | 'Sedang' | 'Padat').
+export function warnaLabelKepadatan(label: 'Sepi' | 'Sedang' | 'Padat'): string {
+  return WARNA_KEPADATAN[label.toLowerCase() as keyof typeof WARNA_KEPADATAN];
 }
 
 export function labelKepadatan(kepadatan: number): 'sepi' | 'sedang' | 'padat' {
@@ -242,7 +301,7 @@ export function buildRouteGeoJSON(
           coordinates,
         },
         properties: {
-          warna: kepadatanKeWarna(d.kepadatan),
+          warna: warnaKoridor(s.koridor_id).bg,
           kepadatan: normalisasiKepadatanDisplay(d.kepadatan),
           koridor_id: s.koridor_id,
         },
@@ -250,46 +309,4 @@ export function buildRouteGeoJSON(
     }
   }
   return { type: 'FeatureCollection', features };
-}
-
-// Kumpulkan titik transit dari rute aktif untuk dirender sebagai marker
-// khusus (bentuk berbeda dari halte biasa).
-export function collectTransitPoints(
-  segmen: RuteSegmen[],
-  halteMap: Map<string, Halte>,
-): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
-  for (const s of segmen) {
-    if (s.tipe !== 'transit') continue;
-    const h = halteMap.get(s.transit_di_id);
-    if (!h) continue;
-    features.push({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [h.lng, h.lat] },
-      properties: {
-        nama: h.nama,
-        dari_koridor: s.dari_koridor,
-        ke_koridor: s.ke_koridor,
-      },
-    });
-  }
-  return { type: 'FeatureCollection', features };
-}
-
-// FeatureCollection berisi 1 titik untuk source single-point seperti
-// titik asal / titik tujuan.
-export function titikTunggalGeoJSON(
-  halte: Halte | undefined,
-): GeoJSON.FeatureCollection<GeoJSON.Point> {
-  if (!halte) return { type: 'FeatureCollection', features: [] };
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [halte.lng, halte.lat] },
-        properties: { nama: halte.nama, halte_id: halte.halte_id },
-      },
-    ],
-  };
 }
