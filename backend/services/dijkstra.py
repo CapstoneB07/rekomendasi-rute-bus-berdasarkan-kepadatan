@@ -35,6 +35,7 @@ from typing import Any
 from services.geo import distance_meters
 from services.config import (
     DENSITY_FALLBACK as KEPADATAN_FALLBACK,
+    DIJKSTRA_MAX_BLOCK_RERUNS,
     HALTE_ALIAS_RADIUS_METER as _CONFIG_HALTE_ALIAS_RADIUS_METER,
     MAKS_TRANSIT,
     MAKS_TRANSIT_DEFAULT,
@@ -726,6 +727,13 @@ def dijkstra(
     Pendekatan ini lebih sederhana dari Yen klasik namun cukup untuk PoC
     karena memberikan diversitas rute dengan kompleksitas linear terhadap
     panjang rute pertama.
+
+    Jumlah rerun pemblokiran edge dibatasi `DIJKSTRA_MAX_BLOCK_RERUNS` (lihat
+    `services/config.py`): rerun yang berakhir tanpa rute tidak dapat memutus
+    graf (edge transit self-loop) sehingga biayanya ~1,2 s masing-masing, dan
+    untuk rute #1 yang panjang (mis. 38 edge) totalnya puluhan detik. Rerun
+    yang menemukan alternatif hanya memakan ~0,01-0,02 s, jadi batas ini
+    memangkas bagian yang buntu tanpa mengubah kandidat yang dihasilkan.
     """
     if asal == tujuan:
         raise ValueError("halte_asal dan halte_tujuan tidak boleh sama")
@@ -755,9 +763,10 @@ def dijkstra(
     # Kandidat deviasi: blokir satu segmen rute pertama lalu re-run Dijkstra
     kandidat: list[tuple] = []
     cnt = 0
-    for edge in rute_pertama["path"]:
-        if edge["tipe"] != "segmen":
-            continue
+    edge_segmen = [edge for edge in rute_pertama["path"] if edge["tipe"] == "segmen"]
+    if DIJKSTRA_MAX_BLOCK_RERUNS > 0:
+        edge_segmen = edge_segmen[:DIJKSTRA_MAX_BLOCK_RERUNS]
+    for edge in edge_segmen:
         blokir = {_edge_block_key(edge)}
         alt = _bidirectional_dijkstra_single(
             graph, reverse_graph, asal, tujuan, maks_transit, blokir

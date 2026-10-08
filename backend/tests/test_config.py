@@ -68,3 +68,36 @@ def test_bus_selector_reexports_config_values():
     assert selector.MAX_EXTRA_WAIT_MENIT_DEFAULT == config.MAX_EXTRA_WAIT_MENIT
     assert selector.MAX_ETA_MENIT_DEFAULT == config.MAX_ETA_MENIT
     assert selector.BUS_SCORE_DENSITY_WEIGHT == config.BUS_SCORE_DENSITY_WEIGHT
+
+
+# ---------------------------------------------------------------------------
+# Batas rerun pemblokiran kandidat (masalah #18 — latensi rekomendasi rute)
+# ---------------------------------------------------------------------------
+RERUN_ENV_NAME = "DIJKSTRA_MAX_BLOCK_RERUNS"
+RERUN_PRINT_CODE = "import services.config as c; print(c.DIJKSTRA_MAX_BLOCK_RERUNS)"
+
+
+def _run_rerun_print(overrides: dict[str, str]) -> str:
+    env = {key: value for key, value in os.environ.items() if key != RERUN_ENV_NAME}
+    env.update(overrides)
+    result = subprocess.run(
+        [sys.executable, "-c", RERUN_PRINT_CODE],
+        capture_output=True, text=True, env=env, cwd=BACKEND_DIR,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip()
+
+
+def test_block_rerun_default_membatasi():
+    assert _run_rerun_print({}) == "8"
+
+
+def test_block_rerun_env_override():
+    assert _run_rerun_print({RERUN_ENV_NAME: "3"}) == "3"
+    # 0 = tanpa batas (perilaku lama) harus tetap sah
+    assert _run_rerun_print({RERUN_ENV_NAME: "0"}) == "0"
+
+
+def test_block_rerun_env_invalid_falls_back():
+    assert _run_rerun_print({RERUN_ENV_NAME: "abc"}) == "8"
+    assert _run_rerun_print({RERUN_ENV_NAME: "-5"}) == "8"

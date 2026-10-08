@@ -109,6 +109,43 @@ MAKS_TRANSIT_DEFAULT: int = MAKS_TRANSIT
 
 
 # ---------------------------------------------------------------------------
+# Batas generasi kandidat
+# ---------------------------------------------------------------------------
+# `dijkstra()` membangun kandidat alternatif dengan memblokir satu edge segmen
+# rute #1 lalu menjalankan ulang pencarian, ditambah satu rerun per koridor yang
+# dipakai. Jumlah rerun edge = jumlah edge segmen rute #1, dan itu tidak
+# dibatasi: untuk OD yang rute #1-nya panjang (Harmoni->Kebon Sirih: 38 edge)
+# biayanya puluhan rerun. Yang mahal bukan rerun yang menemukan alternatif,
+# melainkan rerun yang berakhir TANPA rute: edge transit adalah self-loop
+# sehingga memblokir satu segmen tidak pernah memutus graf, dan pencarian harus
+# keluar dari seluruh ruang state sebelum menyerah (~1,2 s per rerun).
+# Diukur 2026-10-08 (Supabase live, jam 08:00 weekday): 38 rerun = 30,5 s,
+# 24 di antaranya buntu. Membatasi ke 8 rerun pertama: 0,049 s dengan kandidat
+# IDENTIK pada 4 OD uji (Harmoni->Kebon Sirih / Kota / Pulogadung / Bundaran HI).
+# Rerun blokir koridor tidak dibatasi karena jumlahnya = jumlah koridor pada
+# rute #1 (kecil dan terbatas oleh MAKS_TRANSIT).
+# 0 = tanpa batas (perilaku lama).
+_ENV_DIJKSTRA_MAX_BLOCK_RERUNS = "DIJKSTRA_MAX_BLOCK_RERUNS"
+DIJKSTRA_MAX_BLOCK_RERUNS_DEFAULT: int = 8
+
+
+def _load_max_block_reruns() -> int:
+    raw = os.getenv(_ENV_DIJKSTRA_MAX_BLOCK_RERUNS, "").strip()
+    if raw:
+        try:
+            value = int(raw)
+            if value >= 0:
+                return value
+        except ValueError:
+            pass
+    return DIJKSTRA_MAX_BLOCK_RERUNS_DEFAULT
+
+
+#: Batas jumlah rerun pemblokiran edge segmen di `dijkstra()` (0 = tanpa batas).
+DIJKSTRA_MAX_BLOCK_RERUNS: int = _load_max_block_reruns()
+
+
+# ---------------------------------------------------------------------------
 # Tunable lapisan bus (Algoritma 2). Env-overridable dengan pola yang sama
 # seperti SCOPED_KORIDOR, supaya sweep konfigurasi bisa dijalankan tanpa
 # mengedit kode. Dibaca sekali saat import: set env SEBELUM proses start.

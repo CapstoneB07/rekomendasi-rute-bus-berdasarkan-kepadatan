@@ -570,3 +570,138 @@ def test_transfer_penalty_in_both_searches():
     assert via_single["transit_count"] == 0
     assert via_bi["cost"] == pytest.approx(1000.0, abs=1e-6)
     assert via_single["cost"] == pytest.approx(1000.0, abs=1e-6)
+
+
+# ----------------------------------------------------------------------
+# Batas rerun pemblokiran (masalah #18 — latensi `POST /api/rute/rekomendasi`)
+# ----------------------------------------------------------------------
+
+def _long_route_graph_data(n_segmen: int) -> dict:
+    """Graf satu koridor dengan rute #1 sepanjang `n_segmen` edge.
+
+    Meniru bentuk rute #1 Harmoni->Kebon Sirih (38 edge segmen dalam satu
+    koridor). Rute #1 hanya punya SATU jalur, jadi setiap rerun pemblokiran
+    berakhir tanpa alternatif — persis kasus yang mahal di produksi.
+    """
+    halte_ids = [f"H{i}" for i in range(n_segmen + 1)]
+    return {
+        "segmen": [
+            {"segmen_id": f"K1_{halte_ids[i]}_{halte_ids[i + 1]}", "koridor_id": 1,
+             "halte_asal": halte_ids[i], "halte_tujuan": halte_ids[i + 1],
+             "urutan": i + 1, "waktu_tempuh_detik": 120}
+            for i in range(n_segmen)
+        ],
+        "kepadatan_bus": [
+            {"bus_id": "B-K1-01", "koridor_id": 1, "jam": 8,
+             "hari_tipe": "weekday", "kepadatan": 0.5},
+        ],
+        "halte": {
+            h: {"halte_id": h, "nama": h, "lat": 0.0, "lng": i * 0.001}
+            for i, h in enumerate(halte_ids)
+        },
+        "koridor_halte": [],
+        "koridor": {1: {"koridor_id": 1, "nama_pendek": "K1", "nama_panjang": "Koridor 1"}},
+        "halte_to_koridor": {h: {1} for h in halte_ids},
+    }
+
+
+def test_block_reruns_dibatasi_untuk_rute_pertama_panjang():
+    """Rerun pemblokiran edge dibatasi `DIJKSTRA_MAX_BLOCK_RERUNS`.
+
+    Bukti produksi 2026-10-08: rute #1 Harmoni->Kebon Sirih punya 38 edge
+    segmen; 24 dari 38 rerun berakhir tanpa rute dan masing-masing ~1,2 s
+    (30,5 s total), sedangkan rerun yang menemukan alternatif hanya
+    ~0,01-0,02 s. Jadi yang dibatasi adalah bagian buntu, bukan kandidat.
+    """
+    from services import dijkstra as dj
+    from services.config import DIJKSTRA_MAX_BLOCK_RERUNS
+
+    assert DIJKSTRA_MAX_BLOCK_RERUNS > 0, "default harus membatasi, bukan 0 (tanpa batas)"
+    n_segmen = DIJKSTRA_MAX_BLOCK_RERUNS + 12
+    data = _long_route_graph_data(n_segmen)
+    graph = build_graph(data, jam=8, hari_tipe="weekday")
+
+    panggilan = {"n": 0}
+    asli = dj._bidirectional_dijkstra_single
+
+    def hitung(*args, **kwargs):
+        panggilan["n"] += 1
+        return asli(*args, **kwargs)
+
+    dj._bidirectional_dijkstra_single = hitung
+    try:
+        routes = dijkstra(graph, "H0", f"H{n_segmen}", k=5)
+    finally:
+        dj._bidirectional_dijkstra_single = asli
+
+    # 1 pencarian utama + maksimum DIJKSTRA_MAX_BLOCK_RERUNS rerun edge
+    # + 1 rerun per koridor yang dipakai rute #1 (di sini hanya koridor 1).
+    assert panggilan["n"] == 1 + DIJKSTRA_MAX_BLOCK_RERUNS + 1, (
+        f"rerun tidak dibatasi: {panggilan['n']} panggilan untuk rute #1 "
+        f"dengan {n_segmen} edge"
+    )
+    assert routes, "rute #1 tetap harus dikembalikan"
+
+
+def test_batas_rerun_tidak_mengubah_kandidat_yang_dihasilkan():
+    """Rute #1 panjang dengan alternatif nyata: batas rerun tetap menemukan
+    alternatif itu, jadi hasilnya tidak berubah dibanding tanpa batas.
+
+    Graf: rute #1 = jalur panjang K1; satu edge di tengahnya punya jalan
+    pintas K2. Rerun yang memblokir edge tsb menemukan jalan pintas itu.
+    """
+    from services import dijkstra as dj
+
+    # Rute #1: H0..H6 lewat K1 (6 edge). Rerun untuk edge pertama (H0->H1)
+    # menemukan alternatif K2: H0->X->H6.
+    data = {
+        "segmen": [
+            {"segmen_id": f"K1_H{i}_H{i+1}", "koridor_id": 1, "halte_asal": f"H{i}",
+             "halte_tujuan": f"H{i+1}", "waktu_tempuh_detik": 120}
+            for i in range(6)
+        ] + [
+            {"segmen_id": "K2_H0_X", "koridor_id": 2, "halte_asal": "H0",
+             "halte_tujuan": "X", "waktu_tempuh_detik": 900},
+            {"segmen_id": "K2_X_H6", "koridor_id": 2, "halte_asal": "X",
+             "halte_tujuan": "H6", "waktu_tempuh_detik": 900},
+        ],
+        "kepadatan_bus": [
+            {"bus_id": "B-K1-01", "koridor_id": 1, "jam": 8, "hari_tipe": "weekday",
+             "kepadatan": 0.5},
+            {"bus_id": "B-K2-01", "koridor_id": 2, "jam": 8, "hari_tipe": "weekday",
+             "kepadatan": 0.5},
+        ],
+        "halte": {
+            h: {"halte_id": h, "nama": h, "lat": 0.0, "lng": i * 0.001}
+            for i, h in enumerate(["H0", "H1", "H2", "H3", "H4", "H5", "H6", "X"])
+        },
+        "koridor_halte": [],
+        "koridor": {
+            1: {"koridor_id": 1, "nama_pendek": "K1", "nama_panjang": "Koridor 1"},
+            2: {"koridor_id": 2, "nama_pendek": "K2", "nama_panjang": "Koridor 2"},
+        },
+        "halte_to_koridor": {
+            "H0": {1, 2}, "H1": {1}, "H2": {1}, "H3": {1}, "H4": {1}, "H5": {1},
+            "H6": {1, 2}, "X": {2},
+        },
+    }
+    graph = build_graph(data, jam=8, hari_tipe="weekday")
+
+    # dengan batas (default 8 > 6 edge, jadi semua edge tetap diuji)
+    hasil_dibatasi = dijkstra(graph, "H0", "H6", k=5)
+    signature_dibatasi = sorted(str(dj._signature_path(r)) for r in hasil_dibatasi)
+    # tanpa batas
+    asli = dj.DIJKSTRA_MAX_BLOCK_RERUNS
+    dj.DIJKSTRA_MAX_BLOCK_RERUNS = 0
+    try:
+        hasil_tanpa_batas = dijkstra(graph, "H0", "H6", k=5)
+    finally:
+        dj.DIJKSTRA_MAX_BLOCK_RERUNS = asli
+    signature_tanpa_batas = sorted(str(dj._signature_path(r)) for r in hasil_tanpa_batas)
+
+    assert signature_dibatasi == signature_tanpa_batas
+    # alternatif koridor 2 harus benar-benar muncul (bukan sekadar sama-sama kosong)
+    assert any(
+        2 in {e["koridor_id"] for e in r["path"] if e["tipe"] == "segmen"}
+        for r in hasil_dibatasi
+    ), "alternatif K2 tidak ditemukan"

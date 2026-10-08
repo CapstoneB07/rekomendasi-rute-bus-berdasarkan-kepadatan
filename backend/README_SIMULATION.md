@@ -479,6 +479,25 @@ tersebut:
    - blokir seluruh edge segmen dari satu koridor yang dipakai rute utama,
      sehingga kombinasi koridor yang benar-benar berbeda bisa muncul.
 
+> **Update 2026-10-08 (masalah #18 — latensi rekomendasi rute):** jumlah rerun
+> "blokir satu segmen" kini dibatasi `DIJKSTRA_MAX_BLOCK_RERUNS` (default 8,
+> `0` = tanpa batas seperti perilaku lama). Alasannya: jumlah rerun = jumlah
+> edge segmen rute #1 dan itu tidak dibatasi, sedangkan rerun yang berakhir
+> **tanpa** rute tidak dapat memutus graf (edge transit adalah self-loop), jadi
+> pencarian harus keluar dari seluruh ruang state sebelum menyerah.
+>
+> Terukur pada Supabase live (jam 08:00 weekday), OD `Harmoni -> Kebon Sirih`:
+>
+> | | sebelum | sesudah |
+> |---|---|---|
+> | rerun blokir segmen | 38 (24 buntu) | 8 |
+> | `_metrics_if_valid_path` | 1.395.157 | 118.658 |
+> | tahap Dijkstra (4 pasangan alias) | 42,8 s | 2,9 s |
+>
+> Kandidat yang dihasilkan **identik** pada 4 OD uji (Harmoni -> Kebon Sirih /
+> Kota / Pulogadung / Bundaran HI). Rerun "blokir koridor" tidak dibatasi
+> karena jumlahnya = jumlah koridor pada rute #1 (dibatasi `MAKS_TRANSIT`).
+
 > **Update 2026-09-19 (branch `polestar-like`, commit `4b57739`):**
 > Primary ranking sekarang sadar kepadatan:
 >
