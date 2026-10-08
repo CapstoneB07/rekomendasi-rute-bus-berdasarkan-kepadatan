@@ -133,7 +133,11 @@ def test_bus_di_atas_batas_eta_default_diabaikan():
 
 
 def test_bus_cepat_bisa_menang_dari_bus_jauh_yang_lebih_sepi():
-    """Skor gabungan mencegah rekomendasi menunggu terlalu lama demi sepi."""
+    """Skor gabungan mencegah rekomendasi menunggu terlalu lama demi sepi.
+
+    `max_extra_wait_menit=20` dipatok eksplisit supaya test tidak bergantung
+    pada env BUS_MAX_EXTRA_WAIT_MENIT.
+    """
     segmen = [{
         "tipe": "naik",
         "koridor_id": 3,
@@ -149,7 +153,10 @@ def test_bus_cepat_bisa_menang_dari_bus_jauh_yang_lebih_sepi():
     }
     realtime = {"BUS-CEPAT": 0.60, "BUS-SEPI-JAUH": 0.09}
 
-    select_bus_per_segmen(segmen, sim_time=5 * 3600, jadwal=jadwal, realtime_kepadatan=realtime)
+    select_bus_per_segmen(
+        segmen, sim_time=5 * 3600, jadwal=jadwal,
+        realtime_kepadatan=realtime, max_extra_wait_menit=20,
+    )
 
     rek = segmen[0]["bus_rekomendasi"]
     assert rek["bus_id"] == "BUS-CEPAT"
@@ -182,8 +189,15 @@ def test_bus_lebih_sepi_dalam_tambahan_tunggu_wajar_bisa_menang():
     assert rek["extra_wait_menit"] == 10
 
 
-def test_bus_berikutnya_langsung_dipilih_jika_kepadatan_aman():
-    """Kalau bus tercepat <= threshold aman 0.35, tidak perlu menunggu lagi."""
+def test_bus_berikutnya_langsung_dipilih_jika_kepadatan_aman(monkeypatch):
+    """Kalau bus tercepat <= threshold aman 0.35, tidak perlu menunggu lagi.
+
+    Threshold dipatok eksplisit supaya test tidak bergantung pada env
+    BUS_SAFE_NEXT_DENSITY_THRESHOLD.
+    """
+    monkeypatch.setattr(
+        "services.bus_selector.SAFE_NEXT_BUS_DENSITY_THRESHOLD", 0.35
+    )
     segmen = [{
         "tipe": "naik",
         "koridor_id": 3,
@@ -205,6 +219,37 @@ def test_bus_berikutnya_langsung_dipilih_jika_kepadatan_aman():
     assert rek["bus_id"] == "BUS-CEPAT-AMAN"
     assert rek["eta_menit"] == 2
     assert rek["selection_reason"] == "next_bus_safe_density"
+
+
+def test_safe_threshold_nol_optimasi_walau_bus_tercepat_sudah_aman(monkeypatch):
+    """Dengan threshold 0.0 (env BUS_SAFE_NEXT_DENSITY_THRESHOLD=0), selector
+    tetap memilih bus yang lebih sepi walau bus tercepat sudah 'aman'."""
+    monkeypatch.setattr(
+        "services.bus_selector.SAFE_NEXT_BUS_DENSITY_THRESHOLD", 0.0
+    )
+    segmen = [{
+        "tipe": "naik",
+        "koridor_id": 3,
+        "naik_di_id": "PESAKIH",
+    }]
+    jadwal = {
+        "BUS-CEPAT-AMAN": [
+            {"halte_id": "PESAKIH", "koridor_id": 3, "waktu_tiba_detik": 9 * 3600 + 2 * 60},
+        ],
+        "BUS-LEBIH-SEPI": [
+            {"halte_id": "PESAKIH", "koridor_id": 3, "waktu_tiba_detik": 9 * 3600 + 12 * 60},
+        ],
+    }
+    realtime = {"BUS-CEPAT-AMAN": 0.35, "BUS-LEBIH-SEPI": 0.10}
+
+    select_bus_per_segmen(
+        segmen, sim_time=9 * 3600, jadwal=jadwal,
+        realtime_kepadatan=realtime, max_extra_wait_menit=20,
+    )
+
+    rek = segmen[0]["bus_rekomendasi"]
+    assert rek["bus_id"] == "BUS-LEBIH-SEPI"
+    assert rek["selection_reason"] == "bus_score"
 
 
 def test_jam_sibuk_selector_melihat_beberapa_bus_berikutnya():

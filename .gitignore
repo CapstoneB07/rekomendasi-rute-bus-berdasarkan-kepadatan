@@ -8,6 +8,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 backend/.env*
+!backend/.env.example
 backend/*.pyc
 
 # Next.js
@@ -39,3 +40,6 @@ monte-carlo-result.json
 received_images/
 received_images_latency/
 dataset_test/
+
+# Throwaway probe/verification scripts (leading underscore = not a deliverable)
+backend/scripts/_*.py

@@ -40,7 +40,10 @@ from services.gtfs_simulation import (
 MC_DEFAULT_REPLICATIONS = 100
 MC_POISSON_SCALE_FACTOR = 25
 # Below this, a density change is treated as noise rather than a real win/loss.
-DENSITY_IMPROVEMENT_TOLERANCE = 0.01
+DENSITY_IMPROVEMENT_TOLERANCE = 0.0
+# Dicatat: nilai ini dipakai jalur Monte Carlo untuk klasifikasi run "menang".
+# Metrik sukses skenario (services/success_metric.py) memakai ambang yang sama,
+# sesuai pembacaan literal c251 Eq 4.24 ("kepadatan lebih rendah" = selisih > 0).
 MC_SEGMENT_POISSON_LAMBDA = 1.0
 
 

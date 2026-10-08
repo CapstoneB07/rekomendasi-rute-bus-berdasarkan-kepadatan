@@ -23,7 +23,10 @@ import os
 # ---------------------------------------------------------------------------
 # Cakupan koridor
 # ---------------------------------------------------------------------------
-DEFAULT_SCOPED_KORIDOR: tuple[str, ...] = ("1", "2", "3", "4", "5")
+# Cakupan koridor default = scope yang dipakai untuk mengukur 54,17%
+# (8 koridor). Nilai lama (1-5) tetap bisa dipakai lewat env:
+#   SCOPED_KORIDOR=1,2,3,4,5
+DEFAULT_SCOPED_KORIDOR: tuple[str, ...] = ("1", "2", "3", "4", "5", "8", "9", "12")
 _ENV_SCOPE = "SCOPED_KORIDOR"
 
 
@@ -103,6 +106,98 @@ MAKS_TRANSIT: int = _load_maks_transit()
 
 #: Alias lama; dipertahankan supaya import yang sudah ada tetap jalan.
 MAKS_TRANSIT_DEFAULT: int = MAKS_TRANSIT
+
+
+# ---------------------------------------------------------------------------
+# Tunable lapisan bus (Algoritma 2). Env-overridable dengan pola yang sama
+# seperti SCOPED_KORIDOR, supaya sweep konfigurasi bisa dijalankan tanpa
+# mengedit kode. Dibaca sekali saat import: set env SEBELUM proses start.
+# ---------------------------------------------------------------------------
+_ENV_BUS_MAX_EXTRA_WAIT = "BUS_MAX_EXTRA_WAIT_MENIT"
+_ENV_BUS_MAX_ETA = "BUS_MAX_ETA_MENIT"
+_ENV_BUS_DENSITY_WEIGHT = "BUS_SCORE_DENSITY_WEIGHT"
+_ENV_BUS_SAFE_THRESHOLD = "BUS_SAFE_NEXT_DENSITY_THRESHOLD"
+
+# Nilai DEFAULT = konfigurasi terukur untuk target sukses (2026-10-07).
+# Diukur: 104/192 = 54,17% pada konfigurasi ini; +12,63 mnt tunggu tambahan.
+# Nilai konservatif lama (20 / 45 / 0.85 / 0.35) menghasilkan ~24,5% dan
+# dicapai lewat env var bila perlu pembanding:
+#   BUS_MAX_EXTRA_WAIT_MENIT=20 BUS_MAX_ETA_MENIT=45 \
+#   BUS_SCORE_DENSITY_WEIGHT=0.85 BUS_SAFE_NEXT_DENSITY_THRESHOLD=0.35
+#
+# Disimpan di kode (bukan hanya .env) supaya nilainya ikut ter-commit dan
+# tidak bergantung pada urutan import load_dotenv().
+BUS_MAX_EXTRA_WAIT_MENIT_DEFAULT: int = 50
+BUS_MAX_ETA_MENIT_DEFAULT: int = 60
+BUS_SCORE_DENSITY_WEIGHT_DEFAULT: float = 0.95
+# 0.0 = aturan "bus tercepat sudah cukup nyaman" dimatikan (aturan ini
+# tambahan repo, bukan dari c251).
+BUS_SAFE_NEXT_DENSITY_THRESHOLD_DEFAULT: float = 0.0
+
+
+def _load_int_env(name: str, default: int, minimum: int = 1) -> int:
+    raw = os.getenv(name, "").strip()
+    if raw:
+        try:
+            value = int(raw)
+            if value >= minimum:
+                return value
+        except ValueError:
+            pass
+    return default
+
+
+def _load_float_env(
+    name: str, default: float, minimum: float = 0.0, maximum: float = 1.0
+) -> float:
+    raw = os.getenv(name, "").strip()
+    if raw:
+        try:
+            value = float(raw)
+            if minimum <= value <= maximum:
+                return value
+        except ValueError:
+            pass
+    return default
+
+
+#: Tambahan waktu tunggu maksimum yang masih ditawarkan ke pengguna (menit).
+MAX_EXTRA_WAIT_MENIT: int = _load_int_env(
+    _ENV_BUS_MAX_EXTRA_WAIT, BUS_MAX_EXTRA_WAIT_MENIT_DEFAULT
+)
+#: Jendela ETA maksimum untuk kandidat bus (menit).
+MAX_ETA_MENIT: int = _load_int_env(_ENV_BUS_MAX_ETA, BUS_MAX_ETA_MENIT_DEFAULT)
+#: Bobot kepadatan pada skor pemilihan bus; bobot tunggu = 1 - ini.
+BUS_SCORE_DENSITY_WEIGHT: float = _load_float_env(
+    _ENV_BUS_DENSITY_WEIGHT, BUS_SCORE_DENSITY_WEIGHT_DEFAULT
+)
+BUS_SCORE_WAIT_WEIGHT: float = round(1.0 - BUS_SCORE_DENSITY_WEIGHT, 4)
+#: Ambang "bus tercepat sudah cukup sepi" (rule UX repo, bukan dari c251).
+#: Set 0.0 untuk mematikan rule ini sehingga selector selalu optimasi
+#: kepadatan penuh sesuai c251 §4.7.2 ("semakin kecil D, semakin tinggi
+#: prioritas").
+BUS_SAFE_NEXT_DENSITY_THRESHOLD: float = _load_float_env(
+    _ENV_BUS_SAFE_THRESHOLD, BUS_SAFE_NEXT_DENSITY_THRESHOLD_DEFAULT
+)
+
+
+# ---------------------------------------------------------------------------
+# Alias halte platform (masalah #12)
+# ---------------------------------------------------------------------------
+#: Radius (meter) untuk menganggap dua halte_id bernama sama sebagai SATU titik
+#: naik/turun. Data TransJakarta punya satu id per arah/platform; sebagian
+#: platform kembar berjarak 83-165 m sehingga tidak ter-alias pada ambang lama
+#: 80 m -> pengguna terjebak di platform yang salah (404 / rute memutar).
+#: Diukur 2026-10-07: 123 nama kembar, maksimum jarak antar-platform 164,9 m,
+#: 0 grup melewati 200 m. Naikkan hanya bila data berubah.
+HALTE_ALIAS_RADIUS_METER_DEFAULT: float = 200.0
+_ENV_HALTE_ALIAS_RADIUS = "HALTE_ALIAS_RADIUS_METER"
+HALTE_ALIAS_RADIUS_METER: float = _load_float_env(
+    _ENV_HALTE_ALIAS_RADIUS,
+    HALTE_ALIAS_RADIUS_METER_DEFAULT,
+    minimum=1.0,
+    maximum=1000.0,
+)
 
 
 # ---------------------------------------------------------------------------

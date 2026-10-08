@@ -14,15 +14,21 @@ bus_selector tidak perlu tahu topologi graf. State tidak dibagi.
 from collections import defaultdict
 from typing import Any, Callable
 
-from services.config import BUS_CAPACITY
+from services.config import (
+    BUS_CAPACITY,
+    BUS_SAFE_NEXT_DENSITY_THRESHOLD,
+    BUS_SCORE_DENSITY_WEIGHT,
+    BUS_SCORE_WAIT_WEIGHT,
+    MAX_ETA_MENIT,
+    MAX_EXTRA_WAIT_MENIT,
+)
 
 KEPADATAN_DECIMAL = 2  # presisi bulatan untuk grouping kepadatan setara
-MAX_ETA_MENIT_DEFAULT = 45
+# Nama lama dipertahankan agar importer (monte_carlo, routers/rute) tidak putus.
+MAX_ETA_MENIT_DEFAULT = MAX_ETA_MENIT
 MAX_ETA_DETIK_DEFAULT = MAX_ETA_MENIT_DEFAULT * 60
-MAX_EXTRA_WAIT_MENIT_DEFAULT = 20
-SAFE_NEXT_BUS_DENSITY_THRESHOLD = 0.35
-BUS_SCORE_DENSITY_WEIGHT = 0.85
-BUS_SCORE_WAIT_WEIGHT = 0.15
+MAX_EXTRA_WAIT_MENIT_DEFAULT = MAX_EXTRA_WAIT_MENIT
+SAFE_NEXT_BUS_DENSITY_THRESHOLD = BUS_SAFE_NEXT_DENSITY_THRESHOLD
 TRANSFER_WALK_PENALTY_DETIK = 0  # tunable: waktu jalan antar platform saat transfer
 
 
@@ -337,6 +343,10 @@ def select_bus_per_segmen(
             "bus_id": terbaik["bus_id"],
             "data_source": "cv_live" if terbaik["bus_id"] == live_bus_id else "generated",
             "kepadatan": round(terbaik["kepadatan"], 3),
+            # Nilai mentah sebelum pembulatan. Dipakai konsumen yang butuh
+            # perbandingan presisi (metrik sukses) agar pembulatan 3 desimal
+            # tidak menciptakan delta palsu antar bus.
+            "kepadatan_raw": float(terbaik["kepadatan"]),
             "label_kepadatan": _label_kepadatan(terbaik["kepadatan"]),
             "kategori_kepadatan": _kategori_kepadatan(terbaik["kepadatan"]),
             "eta_menit": terbaik["eta_menit"],
