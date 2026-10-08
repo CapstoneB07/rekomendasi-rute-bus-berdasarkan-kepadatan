@@ -38,7 +38,7 @@ def _load_shapes(sb) -> list:
 
 def _allowed_origins() -> list[str]:
     raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
-    return [o.strip() for o in raw.split(",") if o.strip()]
+    return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
 
 
 @asynccontextmanager
