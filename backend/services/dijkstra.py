@@ -35,6 +35,7 @@ from typing import Any
 from services.geo import distance_meters
 from services.config import (
     DENSITY_FALLBACK as KEPADATAN_FALLBACK,
+    HALTE_ALIAS_RADIUS_METER as _CONFIG_HALTE_ALIAS_RADIUS_METER,
     MAKS_TRANSIT,
     MAKS_TRANSIT_DEFAULT,
     SCOPED_KORIDOR,
@@ -49,7 +50,9 @@ PRIMARY_WEIGHT_DENSITY: float = 0.20
 # Penalti transfer (detik) pada edge "transit" (A1, masalah #1). Mengacu pada
 # Garcia-Martinez et al. (2018): pure transfer penalty 15.2-17.7 EIVM ≈ 900 s.
 TRANSFER_PENALTY_DETIK: float = 900.0
-HALTE_ALIAS_RADIUS_METER: float = 80.0
+# Sumber tunggal: services/config.py (masalah #12). Nilai lama 80,0 tidak
+# menutup 8 pasangan platform kembar berjarak 83-165 m.
+HALTE_ALIAS_RADIUS_METER: float = _CONFIG_HALTE_ALIAS_RADIUS_METER
 
 
 # ----------------------------------------------------------------------

@@ -168,6 +168,25 @@ BUS_SAFE_NEXT_DENSITY_THRESHOLD: float = _load_float_env(
 
 
 # ---------------------------------------------------------------------------
+# Alias halte platform (masalah #12)
+# ---------------------------------------------------------------------------
+#: Radius (meter) untuk menganggap dua halte_id bernama sama sebagai SATU titik
+#: naik/turun. Data TransJakarta punya satu id per arah/platform; sebagian
+#: platform kembar berjarak 83-165 m sehingga tidak ter-alias pada ambang lama
+#: 80 m -> pengguna terjebak di platform yang salah (404 / rute memutar).
+#: Diukur 2026-10-07: 123 nama kembar, maksimum jarak antar-platform 164,9 m,
+#: 0 grup melewati 200 m. Naikkan hanya bila data berubah.
+HALTE_ALIAS_RADIUS_METER_DEFAULT: float = 200.0
+_ENV_HALTE_ALIAS_RADIUS = "HALTE_ALIAS_RADIUS_METER"
+HALTE_ALIAS_RADIUS_METER: float = _load_float_env(
+    _ENV_HALTE_ALIAS_RADIUS,
+    HALTE_ALIAS_RADIUS_METER_DEFAULT,
+    minimum=1.0,
+    maximum=1000.0,
+)
+
+
+# ---------------------------------------------------------------------------
 # Kapasitas & fallback kepadatan
 # ---------------------------------------------------------------------------
 # Kapasitas per bus diseragamkan (80 penumpang). BRT TransJakarta mengoperasikan

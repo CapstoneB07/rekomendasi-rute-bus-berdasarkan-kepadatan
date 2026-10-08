@@ -31,11 +31,15 @@ from services.gtfs_simulation import (
 from services.live_buses import bangun_jadwal_live
 from services.geo import distance_meters
 from services.supabase_client import get_client
+from services.config import HALTE_ALIAS_RADIUS_METER as _HALTE_ALIAS_RADIUS_METER
 
 router = APIRouter(prefix="/api/rute")
 
 WIB = ZoneInfo("Asia/Jakarta")
-HALTE_ALIAS_RADIUS_METER = 80.0
+# Sumber tunggal: services/config.py (masalah #12). Dipertahankan sebagai nama
+# modul supaya pemanggil/probe lama yang membaca routers.rute.HALTE_ALIAS_RADIUS_METER
+# tetap jalan.
+HALTE_ALIAS_RADIUS_METER = _HALTE_ALIAS_RADIUS_METER
 
 
 def _jam_sekarang_wib() -> int:
@@ -120,7 +124,11 @@ def _dijkstra_with_halte_aliases(
             if not routes:
                 continue
             candidate_key = (
-                routes[0].get("primary_score", 0.0),
+                # Dibulatkan supaya derau float (1e-16) tidak menentukan pilihan
+                # sebelum waktu dibandingkan. Kasus nyata: Kota Bambu G00436->G00437
+                # (85,7 mnt) kalah dari G00437->G00436 (171,6 mnt) hanya karena
+                # primary_score 0.09968000000000002 < 0.09968000000000003.
+                round(float(routes[0].get("primary_score", 0.0) or 0.0), 6),
                 routes[0].get("total_waktu_detik", 0),
                 routes[0].get("total_jarak_meter", 0.0),
             )
