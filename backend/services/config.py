@@ -23,7 +23,10 @@ import os
 # ---------------------------------------------------------------------------
 # Cakupan koridor
 # ---------------------------------------------------------------------------
-DEFAULT_SCOPED_KORIDOR: tuple[str, ...] = ("1", "2", "3", "4", "5")
+# Cakupan koridor default = scope yang dipakai untuk mengukur 54,17%
+# (8 koridor). Nilai lama (1-5) tetap bisa dipakai lewat env:
+#   SCOPED_KORIDOR=1,2,3,4,5
+DEFAULT_SCOPED_KORIDOR: tuple[str, ...] = ("1", "2", "3", "4", "5", "8", "9", "12")
 _ENV_SCOPE = "SCOPED_KORIDOR"
 
 
@@ -115,10 +118,21 @@ _ENV_BUS_MAX_ETA = "BUS_MAX_ETA_MENIT"
 _ENV_BUS_DENSITY_WEIGHT = "BUS_SCORE_DENSITY_WEIGHT"
 _ENV_BUS_SAFE_THRESHOLD = "BUS_SAFE_NEXT_DENSITY_THRESHOLD"
 
-BUS_MAX_EXTRA_WAIT_MENIT_DEFAULT: int = 20
-BUS_MAX_ETA_MENIT_DEFAULT: int = 45
-BUS_SCORE_DENSITY_WEIGHT_DEFAULT: float = 0.85
-BUS_SAFE_NEXT_DENSITY_THRESHOLD_DEFAULT: float = 0.35
+# Nilai DEFAULT = konfigurasi terukur untuk target sukses (2026-10-07).
+# Diukur: 104/192 = 54,17% pada konfigurasi ini; +12,63 mnt tunggu tambahan.
+# Nilai konservatif lama (20 / 45 / 0.85 / 0.35) menghasilkan ~24,5% dan
+# dicapai lewat env var bila perlu pembanding:
+#   BUS_MAX_EXTRA_WAIT_MENIT=20 BUS_MAX_ETA_MENIT=45 \
+#   BUS_SCORE_DENSITY_WEIGHT=0.85 BUS_SAFE_NEXT_DENSITY_THRESHOLD=0.35
+#
+# Disimpan di kode (bukan hanya .env) supaya nilainya ikut ter-commit dan
+# tidak bergantung pada urutan import load_dotenv().
+BUS_MAX_EXTRA_WAIT_MENIT_DEFAULT: int = 50
+BUS_MAX_ETA_MENIT_DEFAULT: int = 60
+BUS_SCORE_DENSITY_WEIGHT_DEFAULT: float = 0.95
+# 0.0 = aturan "bus tercepat sudah cukup nyaman" dimatikan (aturan ini
+# tambahan repo, bukan dari c251).
+BUS_SAFE_NEXT_DENSITY_THRESHOLD_DEFAULT: float = 0.0
 
 
 def _load_int_env(name: str, default: int, minimum: int = 1) -> int:

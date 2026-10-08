@@ -38,7 +38,8 @@ def _run_config_print(overrides: dict[str, str]) -> str:
 
 
 def test_bus_layer_defaults():
-    assert _run_config_print({}) == "20 45 0.85 0.15 0.35"
+    # Default = konfigurasi terukur target sukses (2026-10-07).
+    assert _run_config_print({}) == "50 60 0.95 0.05 0.0"
 
 
 def test_bus_layer_env_overrides():
@@ -56,7 +57,8 @@ def test_bus_layer_invalid_env_falls_back():
         "BUS_MAX_EXTRA_WAIT_MENIT": "abc",
         "BUS_SCORE_DENSITY_WEIGHT": "1.5",  # di luar [0, 1]
     })
-    assert out == "20 45 0.85 0.15 0.35"
+    # jatuh ke default terukur, bukan ke nilai lama
+    assert out == "50 60 0.95 0.05 0.0"
 
 
 def test_bus_selector_reexports_config_values():
