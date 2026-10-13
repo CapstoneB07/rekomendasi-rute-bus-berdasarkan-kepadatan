@@ -155,6 +155,10 @@ def _dijkstra_with_halte_aliases(
 # POST /api/rute/rekomendasi
 # ----------------------------------------------------------------------
 
+# sim_time = detik dalam satu hari (00:00:00-23:59:59); tidak melewati tengah malam.
+MAX_SIM_TIME_DETIK = 86399
+
+
 class RuteRequest(BaseModel):
     halte_asal: str
     halte_tujuan: str
@@ -162,7 +166,7 @@ class RuteRequest(BaseModel):
     hari_tipe: Literal["weekday", "weekend"] | None = None
     # sim_time (detik dalam hari) dipakai oleh bus_selector untuk hitung ETA
     # bus dan filter bus yang sudah lewat. Optional; fallback ke jam*3600.
-    sim_time: int | None = Field(default=None, ge=0)
+    sim_time: int | None = Field(default=None, ge=0, le=MAX_SIM_TIME_DETIK)
     tanggal: str | None = None
     simulation_run_id: str | None = None
     # True = mode waktu nyata: bus, ETA, dan jam diambil dari posisi bus asli (MQTT), bukan simulasi.
@@ -178,7 +182,7 @@ class RoutingScenario(BaseModel):
 class MonteCarloRequest(BaseModel):
     jam: int | None = Field(default=None, ge=0, le=23)
     hari_tipe: Literal["weekday", "weekend"] | None = None
-    sim_time: int | None = Field(default=None, ge=0)
+    sim_time: int | None = Field(default=None, ge=0, le=MAX_SIM_TIME_DETIK)
     tanggal: str | None = None
     simulation_run_id: str | None = None
     master_seed: int | str | None = None
