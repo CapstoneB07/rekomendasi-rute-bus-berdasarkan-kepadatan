@@ -1,5 +1,6 @@
 # backend/main.py
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -12,6 +13,9 @@ from services.gtfs_simulation import load_simulation_context, resolve_simulation
 from services.live_buses import LiveBuses
 from services.live_crowding import LIVE_CV_BUS_ID, LiveCrowding
 from services.supabase_client import get_client
+
+# Handler root agar logger aplikasi (INFO/DEBUG) tampil; atur dengan LOG_LEVEL.
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 
 
 def _load_shapes(sb) -> list:
