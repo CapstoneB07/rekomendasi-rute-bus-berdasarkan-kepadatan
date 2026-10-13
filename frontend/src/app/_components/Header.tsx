@@ -4,23 +4,22 @@
 
 import { MODE_DEMO } from '@/lib/api';
 import { formatJam } from '@/lib/koridor';
-import type { WaktuSimulasi } from '@/lib/use-waktu-simulasi';
+import type { JamHalaman } from '@/lib/use-waktu-simulasi';
 
 import { IkonCaretBawah } from './ikon';
-import { WaktuKontrol } from './WaktuKontrol';
 
 type Props = {
   namaHalte: string;
   onUbahHalte: () => void;
   // Daftar halte sudah dimuat; sebelum itu pemilih halte belum bisa dibuka.
   halteSiap: boolean;
-  waktu: WaktuSimulasi;
+  waktu: JamHalaman;
   tanggal: string;
 };
 
-// Baris atas: halte kiosk, logo, tanggal dan jam. Mode demo menambah ganti halte dan bar mode simulasi.
+// Baris atas: halte kiosk, logo, tanggal dan jam. Mode demo menambah ganti halte; jam simulasi diatur operator di /operator.
 export function Header({ namaHalte, onUbahHalte, halteSiap, waktu, tanggal }: Props) {
-  const simulasi = MODE_DEMO && !waktu.isLive;
+  const simulasi = !waktu.isLive;
   return (
     <header className="shrink-0 space-y-[0.2rem] px-[1.4rem]">
       <div className="grid h-[3.6rem] grid-cols-[1fr_auto_1fr] items-center gap-[0.8rem]">
@@ -59,8 +58,6 @@ export function Header({ namaHalte, onUbahHalte, halteSiap, waktu, tanggal }: Pr
           </div>
         </div>
       </div>
-
-      {MODE_DEMO && <WaktuKontrol waktu={waktu} />}
     </header>
   );
 }

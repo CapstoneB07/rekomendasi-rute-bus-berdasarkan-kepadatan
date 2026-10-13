@@ -10,14 +10,14 @@ import { API_BASE } from '@/lib/api';
 import { formatJam } from '@/lib/koridor';
 import { statusBusAsli, type HalteOpsi } from '@/lib/route-utils';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
-import { useWaktuSimulasi } from '@/lib/use-waktu-simulasi';
+import { useWaktuOperator } from '@/lib/use-waktu-simulasi';
 
 // MapLibre butuh `window`, jadi hanya dirender di browser.
 const RuteMap = dynamic(() => import('../_components/RuteMap').then((m) => m.RuteMap), { ssr: false });
 
 // Halaman operator: peta penuh dengan bus simulasi/asli, kontrol jam, dan pemilih lokasi halte.
 export default function Operator() {
-  const waktu = useWaktuSimulasi();
+  const waktu = useWaktuOperator();
   const { simTime, isLive } = waktu;
   const { posisiBus, busAsli, busAsliError } = usePosisiBus(simTime, isLive);
   const [pemilihTerbuka, setPemilihTerbuka] = useState(false);
