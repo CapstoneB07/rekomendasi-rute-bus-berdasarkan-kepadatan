@@ -254,7 +254,7 @@ def test_rekomendasi_uses_seeded_monte_carlo_snapshot(monkeypatch):
         request,
     )
 
-    assert captured["request_seed_parts"] == ("A", "C", 8, "weekday", 8 * 3600, "run-1")
+    assert captured["request_seed_parts"] == (8, "weekday", 8 * 3600, "run-1")
     assert captured["tanggal"] == "2026-05-01"
     assert captured["sim_time"] == 8 * 3600
     assert isinstance(result, list)
@@ -472,3 +472,60 @@ def test_bus_level_monte_carlo_reports_per_replication_fields():
         "extra_wait_menit",
     ):
         assert key in first
+
+# ----------------------------------------------------------------------
+# Cache replikasi snapshot rekomendasi (issue #11)
+# ----------------------------------------------------------------------
+
+def _pantau_replikasi(monkeypatch):
+    import services.monte_carlo as mc
+
+    mc._recommendation_replication_cache.clear()
+    panggilan: list[tuple] = []
+
+    def palsu(ctx, tanggal, replication_index, master_seed, *args, **kwargs):
+        panggilan.append((tanggal, master_seed))
+        return {"trip_loads": {}, "segment_loads": {}}
+
+    monkeypatch.setattr(mc, "simulate_load_factor_replication", palsu)
+    monkeypatch.setattr(mc, "_active_segment_snapshot_for_replication", lambda *a, **k: {})
+    monkeypatch.setattr(mc, "_daily_mean_snapshot_for_replication", lambda *a, **k: {})
+    monkeypatch.setattr(mc, "_realtime_trip_load_snapshot", lambda *a, **k: {})
+    return mc, panggilan
+
+
+def test_snapshot_seed_sama_hanya_mensimulasikan_sekali(monkeypatch):
+    mc, panggilan = _pantau_replikasi(monkeypatch)
+    ctx = object()
+
+    a = mc.build_recommendation_crowding_snapshot(
+        ctx, "2026-05-01", 28800, request_seed_parts=(8, "weekday", 28800, "run-1")
+    )
+    b = mc.build_recommendation_crowding_snapshot(
+        ctx, "2026-05-01", 28800, request_seed_parts=(8, "weekday", 28800, "run-1")
+    )
+
+    assert len(panggilan) == 1
+    assert a["master_seed"] == b["master_seed"]
+    assert a["replication"] is b["replication"]
+
+
+def test_snapshot_seed_beda_atau_ctx_beda_tidak_berbagi_cache(monkeypatch):
+    mc, panggilan = _pantau_replikasi(monkeypatch)
+    ctx1, ctx2 = object(), object()
+
+    mc.build_recommendation_crowding_snapshot(ctx1, None, 28800, request_seed_parts=(8,))
+    mc.build_recommendation_crowding_snapshot(ctx1, None, 28860, request_seed_parts=(8,))
+    mc.build_recommendation_crowding_snapshot(ctx2, None, 28800, request_seed_parts=(8,))
+
+    assert len(panggilan) == 3
+
+
+def test_cache_replikasi_dibatasi_ukurannya(monkeypatch):
+    mc, panggilan = _pantau_replikasi(monkeypatch)
+    ctx = object()
+
+    for i in range(mc._RECOMMENDATION_REPLICATION_CACHE_SIZE + 5):
+        mc.build_recommendation_crowding_snapshot(ctx, None, i, request_seed_parts=())
+
+    assert len(mc._recommendation_replication_cache) == mc._RECOMMENDATION_REPLICATION_CACHE_SIZE

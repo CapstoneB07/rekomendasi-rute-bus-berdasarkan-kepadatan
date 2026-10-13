@@ -69,6 +69,10 @@ def _jadwal_dan_kepadatan_live(request: Request, halte_ids: set[str], detik: int
     return jadwal, kepadatan
 
 
+# Lebar bucket waktu snapshot kepadatan (detik).
+SNAPSHOT_BUCKET_DETIK = 60
+
+
 def _hari_tipe_sekarang() -> str:
     # Senin-Jumat (0-4) = weekday; Sabtu-Minggu (5-6) = weekend
     return "weekday" if datetime.now(WIB).weekday() < 5 else "weekend"
@@ -251,16 +255,19 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
     daily_mean_by_koridor = None
     realtime_kepadatan = None
     if simulation_context is not None and simulation_context.instances:
+        # Kepadatan adalah kondisi bersama pada satu waktu, bukan fungsi dari
+        # siapa yang bertanya: seed tidak memuat halte asal/tujuan, dan waktu
+        # dibulatkan ke menit, sehingga snapshot dipakai bersama lewat cache
+        # (services/monte_carlo.py) oleh semua request di bucket yang sama.
+        sim_time_bucket = sim_time - sim_time % SNAPSHOT_BUCKET_DETIK
         crowding_snapshot = build_recommendation_crowding_snapshot(
             simulation_context,
             tanggal=req.tanggal,
-            sim_time=sim_time,
+            sim_time=sim_time_bucket,
             request_seed_parts=(
-                req.halte_asal,
-                req.halte_tujuan,
                 jam,
                 hari_tipe,
-                sim_time,
+                sim_time_bucket,
                 req.simulation_run_id,
             ),
         )
