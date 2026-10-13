@@ -1,5 +1,6 @@
 """Router rekomendasi rute TransJakarta untuk kios halte."""
 
+import logging
 from datetime import datetime
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -34,6 +35,7 @@ from services.supabase_client import get_client
 from services.config import HALTE_ALIAS_RADIUS_METER as _HALTE_ALIAS_RADIUS_METER
 
 router = APIRouter(prefix="/api/rute")
+logger = logging.getLogger(__name__)
 
 WIB = ZoneInfo("Asia/Jakarta")
 # Sumber tunggal: services/config.py (masalah #12). Dipertahankan sebagai nama
@@ -299,10 +301,10 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
         )
 
     if resolved_asal != req.halte_asal or resolved_tujuan != req.halte_tujuan:
-        print(
-            "[rute_rekomendasi] halte_alias_resolved "
-            f"asal_request={req.halte_asal} asal_graph={resolved_asal} "
-            f"tujuan_request={req.halte_tujuan} tujuan_graph={resolved_tujuan}"
+        logger.debug(
+            "rute_rekomendasi halte_alias_resolved asal_request=%s asal_graph=%s "
+            "tujuan_request=%s tujuan_graph=%s",
+            req.halte_asal, resolved_asal, req.halte_tujuan, resolved_tujuan,
         )
 
     if realtime_kepadatan is None:
@@ -318,9 +320,8 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
             live_id: display_load_factor(live_payload["trip_load_factor"]),
         }
 
-    debug_items_pre = []
-    for idx, r in enumerate(rute_list, start=1):
-        debug_items_pre.append(
+    if logger.isEnabledFor(logging.DEBUG):
+        debug_items_pre = [
             "pre_rank={rank} primary={primary:.4f} waktu={waktu}m jarak={jarak:.1f}m "
             "transfer={transfer} edge_kepadatan={kepadatan:.3f}".format(
                 rank=idx,
@@ -330,12 +331,12 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
                 kepadatan=float(r.get("rata_kepadatan", 0.0)),
                 transfer=r.get("transit_count", 0),
             )
+            for idx, r in enumerate(rute_list, start=1)
+        ]
+        logger.debug(
+            "rute_rekomendasi asal=%s tujuan=%s kandidat=%d | %s",
+            req.halte_asal, req.halte_tujuan, len(rute_list), " | ".join(debug_items_pre),
         )
-    print(
-        "[rute_rekomendasi] "
-        f"asal={req.halte_asal} tujuan={req.halte_tujuan} "
-        f"kandidat={len(rute_list)} | " + " | ".join(debug_items_pre)
-    )
 
     if req.live:
         jadwal_pilih, kepadatan_pilih = _jadwal_dan_kepadatan_live(
@@ -359,9 +360,8 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
 
     hasil = rerank_routes(hasil)
 
-    debug_items_final = []
-    for idx, r in enumerate(hasil, start=1):
-        debug_items_final.append(
+    if logger.isEnabledFor(logging.DEBUG):
+        debug_items_final = [
             "rank={rank} density_norm={density_norm:.3f} primary={primary:.4f} "
             "waktu={waktu}m jarak={jarak:.1f}m transfer={transfer} "
             "kepadatan={kepadatan:.3f} source={source}".format(
@@ -374,12 +374,12 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
                 transfer=r.get("jumlah_transit", 0),
                 source=r.get("density_source", "unknown"),
             )
+            for idx, r in enumerate(hasil, start=1)
+        ]
+        logger.debug(
+            "rute_rekomendasi_final asal=%s tujuan=%s kandidat=%d | %s",
+            req.halte_asal, req.halte_tujuan, len(hasil), " | ".join(debug_items_final),
         )
-    print(
-        "[rute_rekomendasi_final] "
-        f"asal={req.halte_asal} tujuan={req.halte_tujuan} "
-        f"kandidat={len(hasil)} | " + " | ".join(debug_items_final)
-    )
     return hasil
 
 

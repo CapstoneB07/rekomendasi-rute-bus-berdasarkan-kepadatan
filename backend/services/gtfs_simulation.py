@@ -9,6 +9,7 @@ last stop arrival.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import random
 import uuid
@@ -27,6 +28,11 @@ from services.config import (
     normalize_koridor_id as _normalize_koridor_id,
 )
 from services.live_crowding import LiveCrowding
+
+logger = logging.getLogger(__name__)
+
+# Audit spasial memuat ribuan baris saat startup; aktif hanya bila diminta.
+GTFS_SPATIAL_AUDIT = os.getenv("GTFS_SPATIAL_AUDIT", "").lower() in ("1", "true", "yes")
 
 # Bus fisik ber-CV hanya satu; ia mewakili satu trip instance di koridor/arah ini.
 LIVE_BUS_KORIDOR = os.getenv("LIVE_BUS_KORIDOR", "1") or "1"
@@ -572,7 +578,7 @@ def _print_spatial_spacing_audit(instances: list[dict]) -> None:
 
             close_progress_count = sum(1 for gap in progress_gaps if gap < 1.0)
             close_departure_count = sum(1 for gap in departure_gaps if gap < 120)
-            print(
+            logger.info(
                 "[gtfs_spatial_audit] spacing_summary "
                 f"time={label} "
                 f"route_id={route_id} "
@@ -591,7 +597,7 @@ def _print_spatial_spacing_audit(instances: list[dict]) -> None:
             for pair in sorted(closest_pairs, key=lambda p: (p["progress_gap"], p["departure_gap"]))[:5]:
                 a = pair["a"]
                 b = pair["b"]
-                print(
+                logger.info(
                     "[gtfs_spatial_audit] closest_pair "
                     f"time={label} "
                     f"route_id={route_id} "
@@ -1089,7 +1095,7 @@ def _print_pattern_overlap_audit(patterns: list[dict], instances: list[dict]) ->
 
     for (route_id, direction_id), group in sorted(patterns_by_direction.items()):
         trip_ids = [p["trip_id"] for p in group]
-        print(
+        logger.info(
             "[gtfs_spatial_audit] active_trip_id_patterns "
             f"route_id={route_id} "
             f"direction_id={direction_id} "
@@ -1110,7 +1116,7 @@ def _print_pattern_overlap_audit(patterns: list[dict], instances: list[dict]) ->
                     label: _active_count_for_pattern(b, instances, sim_time)
                     for label, sim_time in AUDIT_SAMPLE_TIMES.items()
                 }
-                print(
+                logger.info(
                     "[gtfs_spatial_audit] overlapping_patterns "
                     f"route_id={route_id} "
                     f"direction_id={direction_id} "
@@ -1242,8 +1248,9 @@ def _print_generation_summary(
                 f"estimated_active_instances={estimated_active:.2f}"
             )
 
-    _print_spatial_spacing_audit(instances)
-    _print_pattern_overlap_audit(patterns, instances)
+    if GTFS_SPATIAL_AUDIT:
+        _print_spatial_spacing_audit(instances)
+        _print_pattern_overlap_audit(patterns, instances)
 
 
 def _generate_instances(
