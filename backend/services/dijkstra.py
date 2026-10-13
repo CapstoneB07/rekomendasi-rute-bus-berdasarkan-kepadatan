@@ -464,6 +464,20 @@ def _metrics_if_valid_path(path: list[dict], maks_transit: int) -> dict | None:
     }
 
 
+def _can_follow(edge: dict, nxt: dict) -> bool:
+    """Apakah `nxt` boleh langsung menyusul `edge` dalam satu path valid.
+
+    Aturan yang sama dengan `_metrics_if_valid_path`/`_dijkstra_single`: segmen
+    harus satu koridor dengan koridor aktif, transit harus pindah ke koridor
+    lain dan tidak boleh beruntun.
+    """
+    if edge["tipe"] == "transit":
+        return nxt["tipe"] == "segmen" and nxt["koridor_id"] == edge["koridor_id"]
+    if nxt["tipe"] == "transit":
+        return nxt["koridor_id"] != edge["koridor_id"]
+    return nxt["koridor_id"] == edge["koridor_id"]
+
+
 def _bidirectional_dijkstra_single(
     graph: dict[str, list[dict]],
     reverse_graph: dict[str, list[dict]],
@@ -504,6 +518,16 @@ def _bidirectional_dijkstra_single(
             for b_state in backward_by_node.get(node, ()):
                 if f_state[2] + b_state[2] > maks_transit:
                     continue
+                f_path = path_forward[f_state]
+                b_path = path_backward[b_state]
+                if f_path:
+                    if b_path:
+                        if not _can_follow(f_path[-1], b_path[0]):
+                            continue
+                    elif f_path[-1]["tipe"] == "transit":
+                        continue
+                elif not b_path or b_path[0]["tipe"] == "transit":
+                    continue
                 # Biaya jalur gabungan = jumlah biaya edge (best_* menyimpan biaya itu), jadi
                 # pasangan yang tidak bisa mengalahkan kandidat terbaik dilewati sebelum jalurnya
                 # dibangun. Edge terblokir tidak mungkin ada di sini: tiap edge sudah dicek saat ekspansi.
@@ -512,7 +536,7 @@ def _bidirectional_dijkstra_single(
                     and f_cost + best_backward[b_state] >= target_terbaik["cost"]
                 ):
                     continue
-                full_path = path_forward[f_state] + path_backward[b_state]
+                full_path = f_path + b_path
                 kandidat = _metrics_if_valid_path(full_path, maks_transit)
                 if kandidat is None:
                     continue
@@ -574,11 +598,10 @@ def _bidirectional_dijkstra_single(
             for edge in reverse_graph.get(node, []):
                 if edge_diblokir and _edge_block_key(edge) in edge_diblokir:
                     continue
-                if (
-                    edge["tipe"] == "transit"
-                    and path_to_tujuan
-                    and path_to_tujuan[0].get("tipe") == "transit"
-                ):
+                if path_to_tujuan:
+                    if not _can_follow(edge, path_to_tujuan[0]):
+                        continue
+                elif edge["tipe"] == "transit":
                     continue
                 new_node = edge["asal"]
                 new_transit = transit + (1 if edge["tipe"] == "transit" else 0)
