@@ -163,11 +163,13 @@ type Props = {
   bus: PosisiBusResponse | undefined;
   // Bila diisi, hanya jalur koridor dan bus dari koridor-koridor ini yang digambar.
   koridorFilter?: number[];
+  // Tanpa rute: peta diarahkan ke halte ini dan menandainya (pemilih lokasi halaman operator).
+  fokus?: Halte;
 };
 
 const LAYER_BUS = ['bus-ring', 'bus-dots', 'bus-arrow'] as const;
 
-export function RuteMap({ rute, halteMap, bus, koridorFilter }: Props) {
+export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
@@ -411,7 +413,16 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter }: Props) {
 
     const garis = rute ? buildRouteGeoJSON(rute.segmen, halteMap, shapes) : EMPTY_LINES;
     (map.getSource('rute') as GeoJSONSource).setData(garis);
-    if (!rute) return;
+    if (!rute) {
+      if (fokus) {
+        const lngLat: [number, number] = [fokus.lng, fokus.lat];
+        markersRef.current.push(
+          new maplibregl.Marker({ element: buatPenanda(WARNA_NAIK, fokus.nama) }).setLngLat(lngLat).addTo(map),
+        );
+        map.flyTo({ center: lngLat, zoom: 15, duration: 600 });
+      }
+      return;
+    }
 
     const bounds = new maplibregl.LngLatBounds();
     garis.features.forEach((f) => f.geometry.coordinates.forEach((c) => bounds.extend(c as [number, number])));
@@ -427,7 +438,7 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter }: Props) {
     }
 
     if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: { top: 70, bottom: 70, left: 70, right: 70 }, maxZoom: 15, duration: 600 });
-  }, [ready, rute, halteMap, shapes]);
+  }, [ready, rute, halteMap, shapes, fokus]);
 
   return (
     <div className="relative h-full w-full">

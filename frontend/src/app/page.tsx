@@ -17,12 +17,11 @@ import {
   statusBusAsli,
   type Halte,
   type HalteOpsi,
-  type PosisiBusAsliResponse,
-  type PosisiBusResponse,
   type Rute,
 } from '@/lib/route-utils';
 import { useIdleReset } from '@/lib/use-idle-reset';
 import { useOnline } from '@/lib/use-online';
+import { usePosisiBus } from '@/lib/use-posisi-bus';
 import { useWaktuSimulasi } from '@/lib/use-waktu-simulasi';
 
 // MapLibre butuh `window`, jadi hanya dirender di browser.
@@ -33,11 +32,6 @@ const RuteMap = dynamic(() => import('./_components/RuteMap').then((m) => m.Rute
 const REFRESH_MS = 30_000;
 // Rute dihitung ulang tiap 5 menit jam simulasi karena Dijkstra mahal; ETA memakai jam saat fetch.
 const RUTE_BUCKET_DETIK = 300;
-// Posisi bus diminta tiap 5 detik simulasi, ditunda 300 ms setelah jam berhenti berubah.
-const POSISI_BUCKET_DETIK = 5;
-const POSISI_DEBOUNCE_MS = 300;
-// Posisi bus asli (mode waktu nyata) diambil dari backend tiap 5 detik.
-const BUS_ASLI_REFRESH_MS = 5_000;
 // Kiosk umum: kembali ke beranda bila tidak disentuh selama ini.
 const IDLE_RESET_MS = 60_000;
 // Peringatan tampil selama jendela ini sebelum reset.
@@ -67,39 +61,7 @@ export default function Home() {
     () => '',
   );
 
-  // ---- Posisi bus pada jam simulasi ----
-  const [posisiWaktu, setPosisiWaktu] = useState<number | null>(null);
-  useEffect(() => {
-    const id = setTimeout(
-      () => setPosisiWaktu(Math.floor(simTime / POSISI_BUCKET_DETIK) * POSISI_BUCKET_DETIK),
-      POSISI_DEBOUNCE_MS,
-    );
-    return () => clearTimeout(id);
-  }, [simTime]);
-
-  const { data: posisiBus } = useQuery<PosisiBusResponse>({
-    queryKey: ['posisi-bus', posisiWaktu],
-    queryFn: async () => {
-      const r = await fetch(`${API_BASE}/api/simulation/positions?sim_time=${posisiWaktu}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    },
-    enabled: !isLive && posisiWaktu !== null,
-    placeholderData: (prev) => prev,
-  });
-
-  // ---- Posisi bus asli (mode waktu nyata) ----
-  const { data: busAsli, isError: busAsliError } = useQuery<PosisiBusAsliResponse>({
-    queryKey: ['posisi-bus-asli'],
-    queryFn: async () => {
-      const r = await fetch(`${API_BASE}/api/live/positions`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    },
-    enabled: isLive,
-    refetchInterval: BUS_ASLI_REFRESH_MS,
-    placeholderData: (prev) => prev,
-  });
+  const { posisiBus, busAsli, busAsliError } = usePosisiBus(simTime, isLive);
 
   const { data: halteList, isError: halteError, refetch: muatUlangHalte } = useQuery<HalteOpsi[]>({
     queryKey: ['halte-user'],
