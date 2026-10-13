@@ -705,3 +705,75 @@ def test_batas_rerun_tidak_mengubah_kandidat_yang_dihasilkan():
         2 in {e["koridor_id"] for e in r["path"] if e["tipe"] == "segmen"}
         for r in hasil_dibatasi
     ), "alternatif K2 tidak ditemukan"
+
+
+# ----------------------------------------------------------------------
+# Pencarian dua arah: aturan koridor/transit ditegakkan saat ekspansi
+# ----------------------------------------------------------------------
+
+def _edge(tipe: str, koridor_id: int) -> dict:
+    return {"tipe": tipe, "koridor_id": koridor_id}
+
+
+@pytest.mark.parametrize(
+    "edge, nxt, boleh",
+    [
+        (_edge("segmen", 1), _edge("segmen", 1), True),
+        (_edge("segmen", 1), _edge("segmen", 2), False),   # ganti koridor tanpa transit
+        (_edge("segmen", 1), _edge("transit", 2), True),
+        (_edge("segmen", 1), _edge("transit", 1), False),  # transit ke koridor yang sama
+        (_edge("transit", 2), _edge("segmen", 2), True),
+        (_edge("transit", 2), _edge("segmen", 1), False),  # transit lalu naik koridor lain
+        (_edge("transit", 2), _edge("transit", 1), False), # transit beruntun
+    ],
+)
+def test_can_follow(edge, nxt, boleh):
+    from services.dijkstra import _can_follow
+
+    assert _can_follow(edge, nxt) is boleh
+
+
+def test_bidirectional_tidak_membangun_path_tak_valid(monkeypatch):
+    """Ekspansi mundur tidak boleh menghasilkan path yang lalu ditolak validasi.
+
+    B dilayani K1 dan K2. Jalur A->B (K1) lalu B->D->C (K2) tanpa transit
+    tampak murah, tetapi tidak valid; pencarian harus memilih K1 langsung dan
+    tidak pernah memanggil validasi penuh untuk path yang tak valid.
+    """
+    import services.dijkstra as dj
+
+    def seg(sid, k, a, b, w):
+        return {"segmen_id": sid, "koridor_id": k, "halte_asal": a,
+                "halte_tujuan": b, "waktu_tempuh_detik": w}
+
+    data = {
+        "segmen": [
+            seg("K1_A_B", 1, "A", "B", 100), seg("K1_B_C", 1, "B", "C", 100),
+            seg("K2_B_D", 2, "B", "D", 10), seg("K2_D_C", 2, "D", "C", 10),
+        ],
+        "kepadatan_bus": [],
+        "halte": {h: {"halte_id": h, "nama": h, "lat": 0.0, "lng": i * 0.001}
+                  for i, h in enumerate("ABCD")},
+        "koridor_halte": [],
+        "koridor": {},
+        "halte_to_koridor": {"A": {1}, "B": {1, 2}, "C": {1, 2}, "D": {2}},
+    }
+    graph = build_graph(data, jam=8, hari_tipe="weekday")
+
+    hasil_validasi: list[bool] = []
+    asli = dj._metrics_if_valid_path
+
+    def pantau(path, maks_transit):
+        r = asli(path, maks_transit)
+        hasil_validasi.append(r is not None)
+        return r
+
+    monkeypatch.setattr(dj, "_metrics_if_valid_path", pantau)
+    rute = dj._bidirectional_dijkstra_single(
+        graph, dj._build_reverse_graph(graph), "A", "C", 1, set()
+    )
+
+    assert rute is not None
+    assert [e["koridor_id"] for e in rute["path"]] == [1, 1]
+    assert rute["cost"] == pytest.approx(200.0)
+    assert all(hasil_validasi)
