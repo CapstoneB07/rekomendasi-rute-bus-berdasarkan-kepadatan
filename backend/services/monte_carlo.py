@@ -8,8 +8,9 @@ services/gtfs_simulation.py; this module is the stochastic experiment path.
 from __future__ import annotations
 
 import math
+import threading
 import random
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from itertools import combinations
 from statistics import mean, median, stdev
 from typing import Any
@@ -667,6 +668,38 @@ def _boarding_trip_route_weights(
     return result
 
 
+# Replikasi (undian Poisson seluruh trip, ~1 s) murni fungsi dari
+# (ctx, tanggal, master_seed) dan ctx statis selama proses hidup, jadi cukup
+# dihitung sekali per seed. Bagian turunan snapshot (~5 ms) tetap dihitung per
+# request. Entri tidak kedaluwarsa karena kuncinya sudah memuat bucket waktu;
+# ukuran dibatasi LRU agar pemakaian berulang dengan banyak seed (skrip
+# evaluasi) tidak menumpuk memori.
+_RECOMMENDATION_REPLICATION_CACHE_SIZE = 16
+_recommendation_replication_cache: OrderedDict[tuple, tuple[SimulationContext, dict]] = (
+    OrderedDict()
+)
+_recommendation_replication_lock = threading.Lock()
+
+
+def _cached_recommendation_replication(
+    ctx: SimulationContext, tanggal: str | None, master_seed: str
+) -> dict:
+    key = (id(ctx), tanggal, master_seed)
+    # Lock dipegang selama komputasi: request lain dengan seed sama menunggu
+    # hasilnya alih-alih menghitung ulang.
+    with _recommendation_replication_lock:
+        entry = _recommendation_replication_cache.get(key)
+        # `is ctx` melindungi dari id() yang dipakai ulang setelah ctx di-GC.
+        if entry is not None and entry[0] is ctx:
+            _recommendation_replication_cache.move_to_end(key)
+            return entry[1]
+        replication = simulate_load_factor_replication(ctx, tanggal, 0, master_seed)
+        _recommendation_replication_cache[key] = (ctx, replication)
+        while len(_recommendation_replication_cache) > _RECOMMENDATION_REPLICATION_CACHE_SIZE:
+            _recommendation_replication_cache.popitem(last=False)
+        return replication
+
+
 def build_recommendation_crowding_snapshot(
     ctx: SimulationContext,
     tanggal: str | None = None,
@@ -676,7 +709,7 @@ def build_recommendation_crowding_snapshot(
     """Build a single seeded Monte Carlo crowding snapshot for route recommendation."""
     seed_parts = ("rute_rekomendasi", tanggal, sim_time, *request_seed_parts)
     master_seed = build_request_master_seed(*seed_parts)
-    replication = simulate_load_factor_replication(ctx, tanggal, 0, master_seed)
+    replication = _cached_recommendation_replication(ctx, tanggal, master_seed)
     trip_loads = replication["trip_loads"]
     return {
         "master_seed": master_seed,
