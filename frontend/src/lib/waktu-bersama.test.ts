@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bacaKeadaanWaktu, hitungSimTime, JAM_MULAI, JAM_SELESAI, type KeadaanWaktu } from './use-waktu-simulasi';
+import { hitungSimTime, JAM_MULAI, JAM_SELESAI, type KeadaanWaktu } from './use-waktu-simulasi';
 
 const dasar: KeadaanWaktu = { isLive: false, isPlaying: true, kecepatan: 10, simTime: 8 * 3600, ts: 1_000_000 };
 
@@ -15,17 +15,12 @@ describe('hitungSimTime', () => {
     const k = { ...dasar, simTime: JAM_SELESAI - 5, kecepatan: 1 };
     expect(hitungSimTime(k, k.ts + 10_000)).toBe(JAM_MULAI + 5);
   });
+  it('selisih jam perangkat dengan server dikoreksi lewat parameter waktu', () => {
+    const selisih = 5_000; // jam perangkat tertinggal 5 detik dari server
+    expect(hitungSimTime(dasar, dasar.ts + 30_000 - 0 + selisih)).toBe(8 * 3600 + 350);
+  });
   it('live memakai jam nyata WIB', () => {
     const t = Date.UTC(2026, 0, 5, 1, 0, 0); // 08.00 WIB
     expect(hitungSimTime({ ...dasar, isLive: true }, t)).toBe(8 * 3600);
-  });
-});
-
-describe('bacaKeadaanWaktu', () => {
-  it('membaca keadaan valid', () => {
-    expect(bacaKeadaanWaktu(JSON.stringify(dasar))).toEqual(dasar);
-  });
-  it.each([null, '', 'bukan json', '{"isLive":1}'])('jatuh ke live untuk %j', (mentah) => {
-    expect(bacaKeadaanWaktu(mentah).isLive).toBe(true);
   });
 });

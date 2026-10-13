@@ -73,6 +73,7 @@ export default function Operator() {
           className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border border-tj-garis bg-white/95 px-[0.6rem] py-[0.15rem] text-kecil text-tj-teks shadow"
         >
           {halteError ? 'Gagal memuat daftar halte. Pastikan server backend berjalan.' : status}
+          {waktu.tersinkron === false && ' · Jam belum terkirim ke halaman user'}
         </p>
       </main>
 

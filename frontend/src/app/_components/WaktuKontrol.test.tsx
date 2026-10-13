@@ -12,6 +12,7 @@ function buatWaktu(ubah: Partial<WaktuSimulasi> = {}): WaktuSimulasi {
     isLive: false,
     isPlaying: true,
     kecepatan: 1,
+    tersinkron: true,
     aturJam: vi.fn(),
     togglePlay: vi.fn(),
     aturKecepatan: vi.fn(),
