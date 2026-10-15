@@ -1,8 +1,9 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
+from services.camera_frames import BusTidakDikenal, FrameBasi, frame_terbaru
 from services.gtfs_simulation import kepadatan_bus_live
 
 router = APIRouter(prefix="/api/live")
@@ -49,3 +50,18 @@ def get_live_positions(request: Request):
             },
         })
     return {"type": "FeatureCollection", "connected": live.connected, "features": features}
+
+
+@router.get("/camera/{bus_id}")
+def get_live_camera(bus_id: str, request: Request):
+    """Frame kamera terbaru bus + bounding box deteksi (URL bertanda tangan, berumur pendek).
+
+    404 bila bus belum pernah mengirim frame; 410 bila frame terakhir sudah
+    melewati LIVE_CV_TTL_SECONDS.
+    """
+    try:
+        return frame_terbaru(request.app.state.supabase, bus_id)
+    except BusTidakDikenal:
+        raise HTTPException(status_code=404, detail="Bus tidak dikenal")
+    except FrameBasi:
+        raise HTTPException(status_code=410, detail="Frame kamera basi")
