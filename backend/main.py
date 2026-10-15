@@ -67,6 +67,7 @@ async def lifespan(app: FastAPI):
     )
     jadwal = simulation_context.jadwal
 
+    app.state.supabase = sb
     app.state.jadwal = jadwal
     app.state.shapes = shapes
     app.state.halte = halte
