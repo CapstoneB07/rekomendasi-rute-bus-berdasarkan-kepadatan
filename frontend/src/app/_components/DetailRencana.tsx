@@ -1,17 +1,18 @@
 'use client';
 
+import { useState } from 'react';
+
 import { formatJam } from '@/lib/koridor';
 import { warnaLabelKepadatan, type NaikItem, type Rute } from '@/lib/route-utils';
+import { buatTiket, jamLeg, type Tiket } from '@/lib/tiket';
 
 import { LencanaKoridor } from './DaftarRencana';
 import { IkonCetak, IkonPanahKiri } from './ikon';
+import { TiketCetak } from './TiketCetak';
 
 function KartuNaik({ item, simTime }: { item: NaikItem; simTime: number }) {
   const rek = item.bus_rekomendasi;
-  // leg_clock_detik = jam saat penumpang tiba di halte naik (sudah memperhitungkan transit sebelumnya).
-  const dasar = rek?.leg_clock_detik ?? simTime;
-  const naik = rek ? dasar + rek.eta_menit * 60 : null;
-  const turun = naik !== null ? naik + item.waktu_menit * 60 : null;
+  const { naik, turun } = jamLeg(item, simTime);
   const label = rek?.label_kepadatan;
 
   return (
@@ -62,12 +63,16 @@ function KartuNaik({ item, simTime }: { item: NaikItem; simTime: number }) {
 
 type Props = {
   rute: Rute;
+  asal: string;
   tujuan: string;
   simTime: number;
   onKembali: () => void;
 };
 
-export function DetailRencana({ rute, tujuan, simTime, onKembali }: Props) {
+export function DetailRencana({ rute, asal, tujuan, simTime, onKembali }: Props) {
+  // Tiket dibentuk sekali saat tombol ditekan supaya nomor dan jamnya tetap selama pratinjau.
+  const [tiket, setTiket] = useState<Tiket | null>(null);
+
   return (
     <div className="layar-masuk flex h-full min-h-0 flex-col gap-[0.5rem] pb-[0.4rem]">
       <div className="flex items-center gap-[0.8rem]">
@@ -95,16 +100,16 @@ export function DetailRencana({ rute, tujuan, simTime, onKembali }: Props) {
         )}
       </div>
 
-      {/* Isi cetak belum ditentukan, jadi tombol dinonaktifkan dulu. */}
       <button
         type="button"
-        disabled
-        title="Belum tersedia"
-        className="flex h-[2.8rem] w-full shrink-0 items-center justify-center gap-[0.6rem] rounded-xl bg-tj-biru text-isi font-bold text-white opacity-50"
+        onClick={() => setTiket(buatTiket(rute, { asal, tujuan, simTime, dicetak: new Date() }))}
+        className="flex h-[2.8rem] w-full shrink-0 items-center justify-center gap-[0.6rem] rounded-xl bg-tj-biru text-isi font-bold text-white"
       >
         <IkonCetak className="h-[1.4rem] w-[1.4rem]" />
         Cetak Informasi
       </button>
+
+      {tiket && <TiketCetak tiket={tiket} onTutup={() => setTiket(null)} />}
     </div>
   );
 }

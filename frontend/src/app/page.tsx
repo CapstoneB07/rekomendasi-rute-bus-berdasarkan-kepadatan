@@ -263,6 +263,7 @@ export default function Home() {
           {layar === 'detail' && ruteAktif && (
             <DetailRencana
               rute={ruteAktif}
+              asal={namaAsal}
               tujuan={namaTujuan ?? '…'}
               simTime={simTime}
               onKembali={() => setLayar('daftar')}

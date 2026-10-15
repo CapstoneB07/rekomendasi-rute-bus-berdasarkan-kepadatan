@@ -139,3 +139,82 @@ input:focus-visible {
   padding: 0.6rem 0.9rem;
   border-radius: 0.7rem;
 }
+
+/* Tiket cetak. Ukuran dalam em supaya pratinjau layar (ikut skala rem kiosk) dan struk
+   cetak (pt) memakai tata letak yang sama. */
+.tiket {
+  width: 24em;
+  max-height: 80%;
+  overflow-y: auto;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 1em 1.2em;
+  background: #ffffff;
+  color: #000000;
+  font-variant-numeric: tabular-nums;
+}
+.tiket-kepala {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.tiket-kepala b {
+  font-size: 1.3em;
+}
+.tiket-garis {
+  margin: 0.5em 0;
+  border-top: 1px dashed #000000;
+}
+.tiket-baris {
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+}
+.tiket-baris b {
+  text-align: right;
+}
+.tiket-langkah {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.tiket-transit {
+  font-style: italic;
+}
+.tiket-kaki {
+  text-align: center;
+  font-size: 0.9em;
+}
+
+/* Struk thermal 80 mm (area cetak ~72 mm; muat juga di 58 mm karena lebar mengikuti halaman).
+   Hanya tiket yang dicetak: seluruh UI kiosk adalah saudara .area-cetak di <body>. */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+  html,
+  body {
+    height: auto;
+    overflow: visible;
+    background: #ffffff;
+  }
+  body > *:not(.area-cetak),
+  .tiket-aksi {
+    display: none !important;
+  }
+  .area-cetak {
+    position: static;
+    display: block;
+    padding: 0;
+    background: none;
+  }
+  .tiket {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    font-size: 9pt;
+  }
+}
