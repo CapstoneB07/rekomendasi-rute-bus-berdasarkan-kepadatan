@@ -6,7 +6,8 @@ Simulasi & rekomendasi rute TransJakarta dengan kepadatan (load factor) berbasis
 
 - `backend/` — FastAPI, simulasi GTFS, Dijkstra k-shortest paths, bus selector, Monte Carlo.
 - `frontend/` — Next.js + MapLibre (peta, panel rute, kontrol simulasi).
-- `script/` — skrip pelatihan/pendeteksian penumpang (YOLO).
+
+Modul deteksi penumpang (YOLO) ada di repo terpisah [`kepadatan-bus-cv`](https://github.com/CapstoneB07/kepadatan-bus-cv).
 
 ## Dokumentasi Utama
 

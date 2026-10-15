@@ -31,6 +31,8 @@ backend/result/
 # Server logs
 uvicorn.err
 uvicorn.out
+next.err
+next.out
 *.log
 
 # Monte Carlo raw experiment dumps
