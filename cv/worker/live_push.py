@@ -1,8 +1,8 @@
-"""Kirim headcount ke tabel Supabase `kepadatan_live` untuk backend transjakarta-app.
+"""Kirim headcount ke tabel Supabase `kepadatan_live` untuk backend aplikasi.
 
 Satu baris per bus fisik (upsert). Backend memolling baris ini dan memakainya
-sebagai kepadatan satu bus; lihat backend/sql/kepadatan_live.sql di repo
-transjakarta-app untuk skema tabelnya.
+sebagai kepadatan satu bus; lihat backend/sql/kepadatan_live.sql di root
+monorepo untuk skema tabelnya.
 
 Hitungan YOLO per frame berfluktuasi, jadi yang dikirim adalah median dari
 beberapa frame terakhir, paling sering sekali per PUSH_INTERVAL_SECONDS.

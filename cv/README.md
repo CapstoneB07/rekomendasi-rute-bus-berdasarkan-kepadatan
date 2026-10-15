@@ -1,9 +1,12 @@
 # bus-density-cv
 
 Penghitung penumpang bus TransJakarta berbasis computer vision untuk proyek
-capstone *bus density routing*. Repo ini terpisah dari aplikasi
-(`transjakarta-app`: backend FastAPI + frontend Next.js) karena dependensinya
-berat (torch, ultralytics, OpenCV) dan berjalan di mesin yang berbeda.
+capstone *bus density routing*. Folder ini bagian dari monorepo yang sama dengan
+`backend/` (FastAPI) dan `frontend/` (Next.js), tetapi dependensinya terpisah
+(`cv/requirements.txt`: torch, ultralytics, OpenCV) karena berat dan berjalan di
+mesin yang berbeda. Sebelumnya folder ini repo tersendiri,
+[`kepadatan-bus-cv`](https://github.com/CapstoneB07/kepadatan-bus-cv) (sudah
+diarsipkan); riwayat commit-nya ikut dibawa ke sini.
 
 ## Alur data
 
@@ -29,7 +32,7 @@ ESP32-S3 CAM --(MQTT, JPEG biner)--> HiveMQ --> worker/mqtt_subscriber.py
 ### Pengiriman ke backend
 
 `worker/live_push.py` meng-upsert `{bus_id, jumlah_penumpang}` ke tabel Supabase
-`kepadatan_live` (skema: `backend/sql/kepadatan_live.sql` di `transjakarta-app`).
+`kepadatan_live` (skema: [`backend/sql/kepadatan_live.sql`](../backend/sql/kepadatan_live.sql)).
 Backend memolling baris itu dan memakainya sebagai kepadatan satu bus; bila
 pembacaan lebih tua dari TTL backend, bus kembali memakai data simulasi.
 
@@ -57,6 +60,7 @@ Butuh Python 3.10+, Redis di `localhost:6379`, dan [Git LFS](https://git-lfs.com
 teks pointer).
 
 ```bash
+cd cv
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 pip install -r requirements.txt

@@ -2,6 +2,9 @@ name: CI
 
 on:
   pull_request:
+    # Worker CV punya dependensi sendiri dan tidak diuji di sini.
+    paths-ignore:
+      - "cv/**"
   workflow_dispatch:
 
 concurrency:
