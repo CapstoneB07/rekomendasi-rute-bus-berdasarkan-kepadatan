@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 
+import { PanelKamera } from '../_components/PanelKamera';
 import { PilihHalte } from '../_components/PilihHalte';
 import { WaktuKontrol } from '../_components/WaktuKontrol';
 import { API_BASE } from '@/lib/api';
@@ -15,7 +16,7 @@ import { useWaktuSimulasi } from '@/lib/use-waktu-simulasi';
 // MapLibre butuh `window`, jadi hanya dirender di browser.
 const RuteMap = dynamic(() => import('../_components/RuteMap').then((m) => m.RuteMap), { ssr: false });
 
-// Halaman operator: peta penuh dengan bus simulasi/asli, kontrol jam, dan pemilih lokasi halte.
+// Halaman operator: peta penuh dengan bus simulasi/asli, kontrol jam, pemilih lokasi halte, dan kamera bus.
 export default function Operator() {
   const waktu = useWaktuSimulasi();
   const { simTime, isLive } = waktu;
@@ -74,6 +75,9 @@ export default function Operator() {
         >
           {halteError ? 'Gagal memuat daftar halte. Pastikan server backend berjalan.' : status}
         </p>
+        <div className="absolute right-[0.6rem] top-[0.6rem] z-10">
+          <PanelKamera />
+        </div>
       </main>
 
       {pemilihTerbuka && halteList && (

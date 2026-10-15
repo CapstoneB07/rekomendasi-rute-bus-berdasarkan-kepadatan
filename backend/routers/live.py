@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from services.camera_frames import BusTidakDikenal, FrameBasi, frame_terbaru
 from services.gtfs_simulation import kepadatan_bus_live
+from services.live_crowding import LIVE_CV_BUS_ID
 
 router = APIRouter(prefix="/api/live")
 
@@ -50,6 +51,14 @@ def get_live_positions(request: Request):
             },
         })
     return {"type": "FeatureCollection", "connected": live.connected, "features": features}
+
+
+@router.get("/camera")
+def get_live_camera_cv(request: Request):
+    """Frame kamera bus fisik yang dikonfigurasi (LIVE_CV_BUS_ID), untuk halaman operator."""
+    if not LIVE_CV_BUS_ID:
+        raise HTTPException(status_code=404, detail="Kamera bus belum dikonfigurasi")
+    return get_live_camera(LIVE_CV_BUS_ID, request)
 
 
 @router.get("/camera/{bus_id}")
