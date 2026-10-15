@@ -67,3 +67,16 @@ def test_camera_frame_basi():
 def test_camera_bus_tidak_dikenal():
     res = _client({"CV-1": _row(10)}).get("/api/live/camera/XX-9")
     assert res.status_code == 404
+
+
+def test_camera_bus_terkonfigurasi(monkeypatch):
+    monkeypatch.setattr(live, "LIVE_CV_BUS_ID", "CV-1")
+    res = _client({"CV-1": _row(10)}).get("/api/live/camera")
+    assert res.status_code == 200
+    assert res.json()["bus_id"] == "CV-1"
+
+
+def test_camera_bus_belum_dikonfigurasi(monkeypatch):
+    monkeypatch.setattr(live, "LIVE_CV_BUS_ID", None)
+    res = _client({"CV-1": _row(10)}).get("/api/live/camera")
+    assert res.status_code == 404
