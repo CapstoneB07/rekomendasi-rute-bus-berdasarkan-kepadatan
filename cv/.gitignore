@@ -1,0 +1,17 @@
+# Python
+.venv/
+venv/
+.env
+__pycache__/
+*.py[cod]
+
+# Data runtime / dataset (besar, dibuat ulang oleh worker atau skrip)
+worker/received_images/
+experiments/dataset_test/
+experiments/dataset_cleaned/
+experiments/raw_dataset/
+head.v1i.yolo26/
+runs/
+received_images_latency/
+
+.DS_Store
