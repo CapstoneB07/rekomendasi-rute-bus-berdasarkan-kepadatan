@@ -22,7 +22,7 @@ import {
 import { useIdleReset } from '@/lib/use-idle-reset';
 import { useOnline } from '@/lib/use-online';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
-import { useWaktuSimulasi } from '@/lib/use-waktu-simulasi';
+import { useWaktuIkut } from '@/lib/use-waktu-simulasi';
 
 // MapLibre butuh `window`, jadi hanya dirender di browser.
 const RuteMap = dynamic(() => import('./_components/RuteMap').then((m) => m.RuteMap), {
@@ -48,7 +48,7 @@ export default function Home() {
   const [tujuanId, setTujuanId] = useState<string | null>(null);
   const [aktifIdx, setAktifIdx] = useState(0);
 
-  const waktu = useWaktuSimulasi();
+  const waktu = useWaktuIkut();
   const { simTime, isLive } = waktu;
   const simTimeRef = useRef(simTime);
   useEffect(() => {

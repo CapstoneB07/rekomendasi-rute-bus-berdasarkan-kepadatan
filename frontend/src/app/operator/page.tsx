@@ -11,14 +11,14 @@ import { API_BASE } from '@/lib/api';
 import { formatJam } from '@/lib/koridor';
 import { statusBusAsli, type HalteOpsi } from '@/lib/route-utils';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
-import { useWaktuSimulasi } from '@/lib/use-waktu-simulasi';
+import { useWaktuOperator } from '@/lib/use-waktu-simulasi';
 
 // MapLibre butuh `window`, jadi hanya dirender di browser.
 const RuteMap = dynamic(() => import('../_components/RuteMap').then((m) => m.RuteMap), { ssr: false });
 
 // Halaman operator: peta penuh dengan bus simulasi/asli, kontrol jam, pemilih lokasi halte, dan kamera bus.
 export default function Operator() {
-  const waktu = useWaktuSimulasi();
+  const waktu = useWaktuOperator();
   const { simTime, isLive } = waktu;
   const { posisiBus, busAsli, busAsliError } = usePosisiBus(simTime, isLive);
   const [pemilihTerbuka, setPemilihTerbuka] = useState(false);
@@ -74,6 +74,7 @@ export default function Operator() {
           className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border border-tj-garis bg-white/95 px-[0.6rem] py-[0.15rem] text-kecil text-tj-teks shadow"
         >
           {halteError ? 'Gagal memuat daftar halte. Pastikan server backend berjalan.' : status}
+          {waktu.tersinkron === false && ' · Jam belum terkirim ke halaman user'}
         </p>
         <div className="absolute right-[0.6rem] top-[0.6rem] z-10">
           <PanelKamera />
