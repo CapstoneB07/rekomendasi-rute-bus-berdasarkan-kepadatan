@@ -50,7 +50,7 @@ def get_live_positions(request: Request):
                 **(kepadatan or KEPADATAN_KOSONG),
             },
         })
-    return {"type": "FeatureCollection", "connected": live.connected, "features": features}
+    return {"type": "FeatureCollection", "status": live.status, "features": features}
 
 
 @router.get("/camera")

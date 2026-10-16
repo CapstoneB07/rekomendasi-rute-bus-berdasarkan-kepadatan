@@ -1,5 +1,9 @@
 import json
 
+import paho.mqtt.client as mqtt
+from paho.mqtt.reasoncodes import ReasonCode
+
+from services import live_buses
 from services.live_buses import LiveBuses, bangun_jadwal_live, parse_pesan, topik_langganan
 
 KORIDOR = {"1": 1, "9": 9}
@@ -122,3 +126,59 @@ def test_topik_langganan_per_route_code():
         "/mobile_armada/+/9/#",
         "/mobile_armada/+/JAK.01/#",
     ]
+
+
+class _ClientPalsu:
+    """Pengganti paho Client: mencatat argumen dan menyimpan callback tanpa membuka jaringan."""
+
+    def __init__(self, *_args, **kwargs):
+        self.kwargs = kwargs
+        self.langganan = []
+
+    def __getattr__(self, _nama):
+        return lambda *a, **k: None
+
+    def subscribe(self, topik):
+        self.langganan = topik
+
+
+def _mulai(monkeypatch) -> tuple[LiveBuses, _ClientPalsu]:
+    monkeypatch.setattr(mqtt, "Client", _ClientPalsu)
+    live = LiveBuses(KORIDOR)
+    live.start()
+    return live, live._client
+
+
+def _rc(nama: str) -> ReasonCode:
+    return ReasonCode(mqtt.PacketTypes.CONNACK, nama)
+
+
+def test_client_id_berawalan_mqttjs_agar_tidak_ditolak_broker(monkeypatch):
+    _, client = _mulai(monkeypatch)
+    assert client.kwargs["client_id"].startswith("mqttjs_")
+
+
+def test_status_tersambung_lalu_terputus(monkeypatch):
+    live, client = _mulai(monkeypatch)
+    assert live.status == live_buses.MENYAMBUNG
+
+    client.on_connect(client, None, None, _rc("Success"))
+    assert live.status == live_buses.TERSAMBUNG
+    assert client.langganan == [("/mobile_armada/+/1/#", 0), ("/mobile_armada/+/9/#", 0)]
+
+    client.on_disconnect(client, None, None, _rc("Unspecified error"))
+    assert live.status == live_buses.TERPUTUS
+
+
+def test_status_ditolak_bertahan_setelah_disconnect(monkeypatch):
+    live, client = _mulai(monkeypatch)
+    client.on_connect(client, None, None, _rc("Not authorized"))
+    client.on_disconnect(client, None, None, _rc("Unspecified error"))
+    assert live.status == live_buses.DITOLAK
+    assert client.langganan == []
+
+
+def test_status_terputus_saat_broker_tidak_terjangkau(monkeypatch):
+    live, client = _mulai(monkeypatch)
+    client.on_connect_fail(client, None)
+    assert live.status == live_buses.TERPUTUS

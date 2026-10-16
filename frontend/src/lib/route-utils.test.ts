@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { statusBusAsli, type PosisiBusAsliResponse } from './route-utils';
+import { statusBusAsli, type PosisiBusAsliResponse, type StatusBroker } from './route-utils';
 
-const respons = (connected: boolean, n: number): PosisiBusAsliResponse => ({
+const respons = (status: StatusBroker, n: number): PosisiBusAsliResponse => ({
   type: 'FeatureCollection',
-  connected,
+  status,
   features: Array.from({ length: n }, () => ({
     type: 'Feature',
     geometry: { type: 'Point', coordinates: [106.8, -6.2] },
@@ -25,7 +25,7 @@ const respons = (connected: boolean, n: number): PosisiBusAsliResponse => ({
 
 describe('statusBusAsli', () => {
   it('error menang atas data lama', () => {
-    expect(statusBusAsli(respons(true, 3), true)).toMatch(/tidak dapat dimuat/);
+    expect(statusBusAsli(respons('tersambung', 3), true)).toMatch(/tidak dapat dimuat/);
   });
 
   it('belum ada data = memuat', () => {
@@ -33,10 +33,18 @@ describe('statusBusAsli', () => {
   });
 
   it('broker belum tersambung', () => {
-    expect(statusBusAsli(respons(false, 0), false)).toMatch(/Menyambung/);
+    expect(statusBusAsli(respons('menyambung', 0), false)).toMatch(/Menyambung/);
+  });
+
+  it('broker menolak koneksi = bus asli tidak tersedia', () => {
+    expect(statusBusAsli(respons('ditolak', 0), false)).toMatch(/menolak koneksi/);
+  });
+
+  it('koneksi broker terputus = mencoba lagi', () => {
+    expect(statusBusAsli(respons('terputus', 0), false)).toMatch(/terputus/);
   });
 
   it('menampilkan jumlah bus', () => {
-    expect(statusBusAsli(respons(true, 42), false)).toBe('42 bus asli di peta');
+    expect(statusBusAsli(respons('tersambung', 42), false)).toBe('42 bus asli di peta');
   });
 });

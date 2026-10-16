@@ -82,15 +82,24 @@ export type BusPosisi = BusPosisiSimulasi | BusPosisiAsli;
 
 export type PosisiBusResponse = GeoJSON.FeatureCollection<GeoJSON.Point, BusPosisi>;
 
+// Status koneksi backend ke broker MQTT TransJakarta (lihat backend/services/live_buses.py).
+export type StatusBroker = 'menyambung' | 'tersambung' | 'ditolak' | 'terputus';
+
 export type PosisiBusAsliResponse = GeoJSON.FeatureCollection<GeoJSON.Point, BusPosisiAsli> & {
-  connected: boolean;
+  status: StatusBroker;
+};
+
+const TEKS_STATUS_BROKER: Record<Exclude<StatusBroker, 'tersambung'>, string> = {
+  menyambung: 'Menyambung ke data bus TransJakarta…',
+  ditolak: 'Data bus TransJakarta menolak koneksi; bus asli tidak tersedia.',
+  terputus: 'Koneksi ke data bus TransJakarta terputus, mencoba lagi…',
 };
 
 // Teks status di bawah jam saat mode waktu nyata.
 export function statusBusAsli(data: PosisiBusAsliResponse | undefined, isError: boolean): string {
   if (isError) return 'Bus asli tidak dapat dimuat. Pastikan server backend berjalan.';
   if (!data) return 'Memuat posisi bus asli…';
-  if (!data.connected) return 'Menyambung ke data bus TransJakarta…';
+  if (data.status !== 'tersambung') return TEKS_STATUS_BROKER[data.status] ?? TEKS_STATUS_BROKER.menyambung;
   return `${data.features.length} bus asli di peta`;
 }
 
