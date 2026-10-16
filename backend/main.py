@@ -85,16 +85,14 @@ async def lifespan(app: FastAPI):
         f"live_cv_bus_id={LIVE_CV_BUS_ID}"
     )
     # route_code MQTT = nama_pendek koridor statis; hanya bus koridor ini yang ditampilkan.
+    # Diisi browser relay lewat PUT /api/live/buses (IP VPS diblokir broker TJ).
     koridor_rows = sb.table("koridor").select("koridor_id, nama_pendek").execute().data
-    live_buses = LiveBuses({str(k["nama_pendek"]): k["koridor_id"] for k in koridor_rows})
-    app.state.live_buses = live_buses
-    live_buses.start()
+    app.state.live_buses = LiveBuses({str(k["nama_pendek"]): k["koridor_id"] for k in koridor_rows})
 
     poller = asyncio.create_task(live_crowding.run()) if live_crowding else None
     try:
         yield
     finally:
-        live_buses.stop()
         if poller:
             poller.cancel()
 

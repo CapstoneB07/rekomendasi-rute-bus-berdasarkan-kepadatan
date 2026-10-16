@@ -22,6 +22,7 @@ import {
 import { useIdleReset } from '@/lib/use-idle-reset';
 import { useOnline } from '@/lib/use-online';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
+import { useRelayBusTj } from '@/lib/relay-bus-tj';
 import { useWaktuIkut } from '@/lib/use-waktu-simulasi';
 
 // MapLibre butuh `window`, jadi hanya dirender di browser.
@@ -61,6 +62,8 @@ export default function Home() {
     () => '',
   );
 
+  // Browser ini ikut meneruskan bus asli TJ ke backend (IP VPS diblokir broker).
+  useRelayBusTj();
   const { posisiBus, busAsli, busAsliError } = usePosisiBus(simTime, isLive);
 
   const { data: halteList, isError: halteError, refetch: muatUlangHalte } = useQuery<HalteOpsi[]>({

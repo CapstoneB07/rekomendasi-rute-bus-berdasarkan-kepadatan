@@ -1,15 +1,14 @@
-import json
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-import paho.mqtt.client as mqtt
-from paho.mqtt.reasoncodes import ReasonCode
-
+from routers import live as live_router
 from services import live_buses
-from services.live_buses import LiveBuses, bangun_jadwal_live, parse_pesan, topik_langganan
+from services.live_buses import LiveBuses, bangun_jadwal_live, parse_pesan
 
 KORIDOR = {"1": 1, "9": 9}
 
 
-def _payload(**override) -> bytes:
+def _payload(**override) -> dict:
     data = {
         "latitude": -6.2379,
         "longitude": 106.8267,
@@ -22,7 +21,7 @@ def _payload(**override) -> bytes:
         "stops": [{"name": "Transvision", "stop_id": "B05802P", "parent_stop_id": "P1", "eta": 2}],
     }
     data.update(override)
-    return json.dumps(data).encode()
+    return data
 
 
 def test_parse_pesan_bus_koridor_dikenal():
@@ -45,8 +44,7 @@ def test_parse_pesan_route_tidak_dikenal_diabaikan():
 
 
 def test_parse_pesan_rusak_diabaikan():
-    assert parse_pesan(b"bukan json", KORIDOR) is None
-    assert parse_pesan(json.dumps({"route_code": "1"}).encode(), KORIDOR) is None
+    assert parse_pesan({"route_code": "1"}, KORIDOR) is None
     assert parse_pesan(_payload(latitude=None), KORIDOR) is None
 
 
@@ -54,13 +52,24 @@ def test_parse_pesan_tanpa_stops_next_stop_kosong():
     assert parse_pesan(_payload(stops=[]), KORIDOR)["next_stop"] == ""
 
 
+def test_parse_pesan_halte_tanpa_eta_dilewati_bukan_membuang_bus():
+    bus = parse_pesan(
+        _payload(stops=[
+            {"name": "Sedang disinggahi", "stop_id": "G0", "parent_stop_id": None},
+            {"name": "Berikutnya", "stop_id": "G1", "parent_stop_id": None, "eta": 3},
+        ]),
+        KORIDOR,
+    )
+    assert bus["next_stop"] == "Berikutnya"
+    assert bus["stops"] == [{"stop_id": "G1", "parent_stop_id": None, "eta": 3}]
+
+
 def test_snapshot_membuang_bus_basi_dan_menyimpan_pesan_terakhir():
     now = [0.0]
     live = LiveBuses(KORIDOR, max_age=120, clock=lambda: now[0])
-    live.terima(_payload(bus_body_no="A", latitude=-6.1))
+    live.terima_relay("tersambung", [_payload(bus_body_no="A", latitude=-6.1)])
     now[0] = 100
-    live.terima(_payload(bus_body_no="B"))
-    live.terima(_payload(bus_body_no="A", latitude=-6.3))  # menimpa pesan lama bus A
+    live.terima_relay("tersambung", [_payload(bus_body_no="B"), _payload(bus_body_no="A", latitude=-6.3)])
 
     assert {b["bus_id"]: b["lat"] for b in live.snapshot()} == {"A": -6.3, "B": -6.2379}
 
@@ -120,65 +129,65 @@ def test_select_bus_per_segmen_memakai_eta_dan_kepadatan_bus_live():
     assert rek["candidate_count"] == 2  # LEWAT sudah melewati G1, TANPA-DATA tanpa kepadatan
 
 
-def test_topik_langganan_per_route_code():
-    assert topik_langganan({"9", "1", "JAK.01"}) == [
-        "/mobile_armada/+/1/#",
-        "/mobile_armada/+/9/#",
-        "/mobile_armada/+/JAK.01/#",
-    ]
-
-
-class _ClientPalsu:
-    """Pengganti paho Client: mencatat argumen dan menyimpan callback tanpa membuka jaringan."""
-
-    def __init__(self, *_args, **kwargs):
-        self.kwargs = kwargs
-        self.langganan = []
-
-    def __getattr__(self, _nama):
-        return lambda *a, **k: None
-
-    def subscribe(self, topik):
-        self.langganan = topik
-
-
-def _mulai(monkeypatch) -> tuple[LiveBuses, _ClientPalsu]:
-    monkeypatch.setattr(mqtt, "Client", _ClientPalsu)
-    live = LiveBuses(KORIDOR)
-    live.start()
-    return live, live._client
-
-
-def _rc(nama: str) -> ReasonCode:
-    return ReasonCode(mqtt.PacketTypes.CONNACK, nama)
-
-
-def test_client_id_berawalan_mqttjs_agar_tidak_ditolak_broker(monkeypatch):
-    _, client = _mulai(monkeypatch)
-    assert client.kwargs["client_id"].startswith("mqttjs_")
-
-
-def test_status_tersambung_lalu_terputus(monkeypatch):
-    live, client = _mulai(monkeypatch)
+def test_status_menyambung_sebelum_ada_relay_lalu_terputus_saat_relay_basi():
+    now = [0.0]
+    live = LiveBuses(KORIDOR, relay_basi=30, clock=lambda: now[0])
     assert live.status == live_buses.MENYAMBUNG
 
-    client.on_connect(client, None, None, _rc("Success"))
+    live.terima_relay("tersambung", [])
     assert live.status == live_buses.TERSAMBUNG
-    assert client.langganan == [("/mobile_armada/+/1/#", 0), ("/mobile_armada/+/9/#", 0)]
 
-    client.on_disconnect(client, None, None, _rc("Unspecified error"))
+    now[0] = 31  # tidak ada browser relay yang mengirim lagi
     assert live.status == live_buses.TERPUTUS
 
 
-def test_status_ditolak_bertahan_setelah_disconnect(monkeypatch):
-    live, client = _mulai(monkeypatch)
-    client.on_connect(client, None, None, _rc("Not authorized"))
-    client.on_disconnect(client, None, None, _rc("Unspecified error"))
+def test_status_relay_tersambung_menang_atas_relay_lain_yang_gagal():
+    now = [0.0]
+    live = LiveBuses(KORIDOR, relay_basi=30, clock=lambda: now[0])
+    live.terima_relay("tersambung", [])
+    now[0] = 5
+    live.terima_relay("ditolak", [])
+    assert live.status == live_buses.TERSAMBUNG
+
+    now[0] = 40  # relay yang tersambung sudah basi, yang ditolak belum
+    live.terima_relay("ditolak", [])
     assert live.status == live_buses.DITOLAK
-    assert client.langganan == []
 
 
-def test_status_terputus_saat_broker_tidak_terjangkau(monkeypatch):
-    live, client = _mulai(monkeypatch)
-    client.on_connect_fail(client, None)
-    assert live.status == live_buses.TERPUTUS
+def _client() -> tuple[TestClient, LiveBuses]:
+    app = FastAPI()
+    app.include_router(live_router.router)
+    app.state.live_buses = LiveBuses(KORIDOR)
+    app.state.simulation_context = None
+    return TestClient(app), app.state.live_buses
+
+
+def test_api_koridor_mengembalikan_route_code_untuk_dilanggan():
+    client, _ = _client()
+    assert client.get("/api/live/koridor").json() == {"route_codes": ["1", "9"]}
+
+
+def test_api_relay_lalu_positions_menampilkan_bus_dan_status():
+    client, _ = _client()
+    r = client.put("/api/live/buses", json={
+        "status": "tersambung",
+        "buses": [
+            _payload(),
+            _payload(bus_body_no="TANPA-GPS", latitude=0, longitude=0),  # ditolak sendiri
+            _payload(bus_body_no="LUAR", route_code="JAK.27"),  # valid, koridor tidak dipakai
+            "bukan objek",
+        ],
+    })
+    assert r.status_code == 200
+    assert r.json() == {"diterima": 1, "ditolak": 2}
+
+    posisi = client.get("/api/live/positions").json()
+    assert posisi["status"] == "tersambung"
+    assert [f["properties"]["bus_id"] for f in posisi["features"]] == ["TJ-826"]
+
+
+def test_api_relay_menolak_status_tidak_dikenal_dan_laporan_terlalu_besar():
+    client, _ = _client()
+    assert client.put("/api/live/buses", json={"status": "bebas", "buses": []}).status_code == 422
+    besar = {"status": "tersambung", "buses": [_payload()] * 2001}
+    assert client.put("/api/live/buses", json=besar).status_code == 422

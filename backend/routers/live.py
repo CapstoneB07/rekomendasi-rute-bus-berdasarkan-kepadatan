@@ -1,7 +1,9 @@
 from datetime import datetime
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field, ValidationError
 
 from services.camera_frames import BusTidakDikenal, FrameBasi, frame_terbaru
 from services.gtfs_simulation import kepadatan_bus_live
@@ -16,6 +18,62 @@ KEPADATAN_KOSONG = {
     "estimated_passengers": None,
     "capacity": None,
 }
+
+
+Teks = Field(max_length=200)
+
+
+class HalteRelay(BaseModel):
+    name: str = Teks
+    stop_id: str = Teks
+    parent_stop_id: str | None = Field(default=None, max_length=200)
+    # Halte yang sedang/sudah disinggahi tidak punya eta.
+    eta: int | None = Field(default=None, ge=0, le=24 * 60)
+
+
+class PesanBusRelay(BaseModel):
+    """Subset pesan MQTT /mobile_armada yang dipakai backend; field lain diabaikan."""
+
+    route_code: str = Teks
+    bus_body_no: str = Teks
+    trip_id: str | None = Field(default=None, max_length=200)
+    # Kotak luas sekitar Jabodetabek; koordinat di luar ini bukan bus TransJakarta.
+    latitude: float = Field(ge=-7.0, le=-5.8)
+    longitude: float = Field(ge=106.2, le=107.4)
+    bearing: int | None = Field(default=None, ge=0, le=360)
+    eta: int | None = Field(default=None, ge=0, le=24 * 60)
+    stops: list[HalteRelay] = Field(default_factory=list, max_length=200)
+
+
+class LaporanRelay(BaseModel):
+    status: Literal["tersambung", "ditolak", "terputus"]
+    # Divalidasi per bus (PesanBusRelay): satu pesan rusak, mis. bus tanpa GPS di (0, 0),
+    # tidak boleh membuat bus lain dalam laporan yang sama ikut ditolak.
+    buses: list[Any] = Field(default_factory=list, max_length=2000)
+
+
+@router.get("/koridor")
+def get_route_codes(request: Request):
+    """route_code MQTT yang perlu dilanggan browser relay (koridor yang ada di data statis)."""
+    return {"route_codes": request.app.state.live_buses.route_codes}
+
+
+@router.put("/buses")
+def put_live_buses(request: Request, body: LaporanRelay):
+    """Laporan browser relay: status koneksinya ke broker TJ dan pesan bus terbaru.
+
+    Backend tidak bisa berlangganan sendiri karena IP VPS diblokir broker; lihat
+    services/live_buses.py. Endpoint ini terbuka tanpa login seperti PUT /api/waktu,
+    jadi isinya divalidasi ketat (tipe, rentang, batas jumlah).
+    """
+    valid = []
+    for pesan in body.buses:
+        try:
+            valid.append(PesanBusRelay.model_validate(pesan).model_dump())
+        except ValidationError:
+            continue
+    diterima = request.app.state.live_buses.terima_relay(body.status, valid)
+    return {"diterima": diterima, "ditolak": len(body.buses) - len(valid)}
 
 
 @router.get("/positions")
