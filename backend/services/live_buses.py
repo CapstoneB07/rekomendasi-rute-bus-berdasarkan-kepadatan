@@ -1,5 +1,9 @@
 """Posisi bus real-time dari MQTT TransJakarta (broker anonim, hanya baca).
 
+Broker hanya menerima client ID berawalan `mqttjs_` (format mqtt.js milik web resmi; lihat
+github.com/BroNils/open-tj); client ID lain, termasuk bawaan paho yang kosong, ditolak
+"Not authorized".
+
 Payload MQTT tidak membawa kepadatan (`passengers_status` selalu kosong), jadi bus
 live hanya punya posisi, arah, dan ETA halte berikutnya.
 """
@@ -8,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import ssl
 import threading
 import time
@@ -21,6 +26,12 @@ MQTT_PATH = "/mqtt"
 MQTT_TOPIC_PREFIX = "/mobile_armada"
 # Tiap bus mengirim pesan kira-kira tiap 30 detik; lewat batas ini dianggap sudah tidak aktif.
 MAX_AGE_DETIK = 120.0
+
+# Status koneksi broker yang dikirim ke frontend.
+MENYAMBUNG = "menyambung"
+TERSAMBUNG = "tersambung"
+DITOLAK = "ditolak"  # broker menjawab tapi menolak (mis. client ID tidak diizinkan)
+TERPUTUS = "terputus"  # koneksi gagal/putus di jaringan; paho terus mencoba lagi
 
 
 def topik_langganan(route_codes) -> list[str]:
@@ -104,12 +115,12 @@ class LiveBuses:
         self._clock = clock
         self._lock = threading.Lock()
         self._buses: dict[str, tuple[float, dict]] = {}
-        self._connected = False
+        self._status = MENYAMBUNG
         self._client = None
 
     @property
-    def connected(self) -> bool:
-        return self._connected
+    def status(self) -> str:
+        return self._status
 
     def terima(self, payload: bytes) -> None:
         bus = parse_pesan(payload, self._route_to_koridor)
@@ -129,25 +140,36 @@ class LiveBuses:
         import paho.mqtt.client as mqtt
 
         client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2, transport="websockets", protocol=mqtt.MQTTv311
+            mqtt.CallbackAPIVersion.VERSION2,
+            client_id=f"mqttjs_{secrets.token_hex(4)}",
+            transport="websockets",
+            protocol=mqtt.MQTTv311,
         )
         client.ws_set_options(path=MQTT_PATH)
         client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
         client.reconnect_delay_set(min_delay=1, max_delay=30)
 
         def on_connect(c, _userdata, _flags, reason_code, _props=None):
-            self._connected = not reason_code.is_failure
-            if self._connected:
-                c.subscribe([(topik, 0) for topik in topik_langganan(self._route_to_koridor)])
+            if reason_code.is_failure:
+                self._status = DITOLAK
+                logger.error("MQTT TransJakarta menolak koneksi: %s", reason_code)
             else:
-                logger.warning("MQTT TransJakarta menolak koneksi: %s", reason_code)
+                self._status = TERSAMBUNG
+                c.subscribe([(topik, 0) for topik in topik_langganan(self._route_to_koridor)])
 
         def on_disconnect(_c, _userdata, _flags, reason_code, _props=None):
-            self._connected = False
+            # Penolakan di on_connect juga diikuti disconnect; alasan penolakan tetap dipertahankan.
+            if self._status != DITOLAK:
+                self._status = TERPUTUS
             logger.warning("MQTT TransJakarta terputus: %s", reason_code)
+
+        def on_connect_fail(_c, _userdata):
+            self._status = TERPUTUS
+            logger.warning("MQTT TransJakarta tidak terjangkau, mencoba lagi")
 
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
+        client.on_connect_fail = on_connect_fail
         client.on_message = lambda _c, _u, msg: self.terima(msg.payload)
         # connect_async: server tetap start walau broker tidak terjangkau; paho mencoba lagi sendiri.
         client.connect_async(MQTT_HOST, MQTT_PORT)
@@ -159,4 +181,4 @@ class LiveBuses:
             self._client.loop_stop()
             self._client.disconnect()
             self._client = None
-        self._connected = False
+        self._status = MENYAMBUNG

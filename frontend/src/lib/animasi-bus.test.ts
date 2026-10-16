@@ -11,7 +11,7 @@ import type { PosisiBusAsliResponse } from './route-utils';
 
 const data = (...bus: Array<[string, number, number]>): PosisiBusAsliResponse => ({
   type: 'FeatureCollection',
-  connected: true,
+  status: 'tersambung',
   features: bus.map(([id, lng, lat]) => ({
     type: 'Feature',
     geometry: { type: 'Point', coordinates: [lng, lat] },
