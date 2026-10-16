@@ -342,13 +342,15 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
             req.halte_asal, req.halte_tujuan, len(rute_list), " | ".join(debug_items_pre),
         )
 
+    jadwal_pilih, kepadatan_pilih, eta_sumber = jadwal, realtime_kepadatan, "simulasi"
     if req.live:
-        jadwal_pilih, kepadatan_pilih = _jadwal_dan_kepadatan_live(
+        jadwal_live, kepadatan_live = _jadwal_dan_kepadatan_live(
             request, set(halte_master), sim_time
         )
-        live_id = None
-    else:
-        jadwal_pilih, kepadatan_pilih = jadwal, realtime_kepadatan
+        # Tanpa bus asli (tidak ada browser relay aktif), ETA dari jadwal simulasi jam sekarang.
+        if jadwal_live:
+            jadwal_pilih, kepadatan_pilih, eta_sumber = jadwal_live, kepadatan_live, "tj_live"
+            live_id = None
 
     hasil = []
     for r in rute_list:
@@ -359,7 +361,7 @@ def rekomendasi(req: RuteRequest, request: Request) -> list[dict]:
         for item in formatted["segmen"]:
             rek = item.get("bus_rekomendasi")
             if rek is not None:
-                rek["eta_sumber"] = "tj_live" if req.live else "simulasi"
+                rek["eta_sumber"] = eta_sumber
         hasil.append(apply_selected_bus_density(formatted))
 
     hasil = rerank_routes(hasil)

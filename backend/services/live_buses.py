@@ -1,8 +1,9 @@
-"""Posisi bus real-time dari MQTT TransJakarta (broker anonim, hanya baca).
+"""Posisi bus real-time TransJakarta, diteruskan (relay) oleh browser kiosk/operator.
 
-Broker hanya menerima client ID berawalan `mqttjs_` (format mqtt.js milik web resmi; lihat
-github.com/BroNils/open-tj); client ID lain, termasuk bawaan paho yang kosong, ditolak
-"Not authorized".
+Broker MQTT TransJakarta (wss://mqtt.tj.co.id:8084/mqtt, anonim) memblokir IP VPS, jadi
+backend tidak berlangganan sendiri. Browser yang memakai IP biasa berlangganan lewat
+mqtt.js (frontend/src/lib/relay-bus-tj.ts) lalu mengirim pesan bus ke PUT /api/live/buses.
+Broker hanya menerima client ID berawalan `mqttjs_` (lihat github.com/BroNils/open-tj).
 
 Payload MQTT tidak membawa kepadatan (`passengers_status` selalu kosong), jadi bus
 live hanya punya posisi, arah, dan ETA halte berikutnya.
@@ -10,47 +11,30 @@ live hanya punya posisi, arah, dan ETA halte berikutnya.
 
 from __future__ import annotations
 
-import json
-import logging
-import secrets
-import ssl
 import threading
 import time
 from typing import Callable
 
-logger = logging.getLogger(__name__)
-
-MQTT_HOST = "mqtt.tj.co.id"
-MQTT_PORT = 8084
-MQTT_PATH = "/mqtt"
-MQTT_TOPIC_PREFIX = "/mobile_armada"
 # Tiap bus mengirim pesan kira-kira tiap 30 detik; lewat batas ini dianggap sudah tidak aktif.
 MAX_AGE_DETIK = 120.0
+# Browser relay mengirim tiap ±5 detik; tanpa kiriman selama ini, relay dianggap mati.
+RELAY_BASI_DETIK = 30.0
 
-# Status koneksi broker yang dikirim ke frontend.
+# Status koneksi broker (dilaporkan relay) yang dikirim ke frontend.
 MENYAMBUNG = "menyambung"
 TERSAMBUNG = "tersambung"
 DITOLAK = "ditolak"  # broker menjawab tapi menolak (mis. client ID tidak diizinkan)
-TERPUTUS = "terputus"  # koneksi gagal/putus di jaringan; paho terus mencoba lagi
+TERPUTUS = "terputus"  # koneksi relay ke broker putus, atau tidak ada relay yang aktif
 
 
-def topik_langganan(route_codes) -> list[str]:
-    """Topik broker per route_code: /mobile_armada/<koridor>/<route_code>/<trip>/<bus>.
-
-    Berlangganan hanya ke koridor yang dipakai membuat broker yang menyaring (±3% dari
-    seluruh trafik), bukan proses ini yang mem-parse JSON ribuan bus yang tidak terpakai.
-    """
-    return [f"{MQTT_TOPIC_PREFIX}/+/{kode}/#" for kode in sorted(route_codes)]
-
-
-def parse_pesan(payload: bytes, route_to_koridor: dict[str, int]) -> dict | None:
-    """Ubah satu payload MQTT jadi record bus, atau None bila bukan bus koridor yang dikenal."""
+def parse_pesan(data: dict, route_to_koridor: dict[str, int]) -> dict | None:
+    """Ubah satu pesan bus MQTT jadi record bus, atau None bila bukan bus koridor yang dikenal."""
     try:
-        data = json.loads(payload)
         koridor_id = route_to_koridor.get(str(data["route_code"]))
         if koridor_id is None:
             return None
-        stops = data.get("stops") or []
+        # Halte tanpa eta sudah/sedang disinggahi; yang tersisa adalah halte berikutnya.
+        stops = [stop for stop in data.get("stops") or [] if stop.get("eta") is not None]
         return {
             "bus_id": str(data["bus_body_no"]),
             "koridor_id": koridor_id,
@@ -102,32 +86,49 @@ def bangun_jadwal_live(
 
 
 class LiveBuses:
-    """Menyimpan pesan terakhir tiap bus; subscriber MQTT jalan di thread paho."""
+    """Menyimpan pesan terakhir tiap bus dan status broker yang dilaporkan browser relay."""
 
     def __init__(
         self,
         route_to_koridor: dict[str, int],
         max_age: float = MAX_AGE_DETIK,
+        relay_basi: float = RELAY_BASI_DETIK,
         clock: Callable[[], float] = time.monotonic,
     ):
         self._route_to_koridor = route_to_koridor
         self._max_age = max_age
+        self._relay_basi = relay_basi
         self._clock = clock
         self._lock = threading.Lock()
         self._buses: dict[str, tuple[float, dict]] = {}
-        self._status = MENYAMBUNG
-        self._client = None
+        # Waktu laporan terakhir per status; relay yang tersambung menang atas relay lain yang gagal.
+        self._laporan: dict[str, float] = {}
+
+    @property
+    def route_codes(self) -> list[str]:
+        return sorted(self._route_to_koridor)
 
     @property
     def status(self) -> str:
-        return self._status
+        if not self._laporan:
+            return MENYAMBUNG
+        batas = self._clock() - self._relay_basi
+        segar = {s: t for s, t in self._laporan.items() if t >= batas}
+        if not segar:
+            return TERPUTUS
+        if TERSAMBUNG in segar:
+            return TERSAMBUNG
+        return max(segar, key=segar.get)
 
-    def terima(self, payload: bytes) -> None:
-        bus = parse_pesan(payload, self._route_to_koridor)
-        if bus is None:
-            return
+    def terima_relay(self, status: str, pesan: list[dict]) -> int:
+        """Simpan laporan satu browser relay; kembalikan jumlah bus koridor dikenal yang diterima."""
+        sekarang = self._clock()
+        buses = [b for b in (parse_pesan(p, self._route_to_koridor) for p in pesan) if b is not None]
         with self._lock:
-            self._buses[bus["bus_id"]] = (self._clock(), bus)
+            self._laporan[status] = sekarang
+            for bus in buses:
+                self._buses[bus["bus_id"]] = (sekarang, bus)
+        return len(buses)
 
     def snapshot(self) -> list[dict]:
         """Bus yang pesannya masih segar; yang basi dibuang dari memori."""
@@ -135,50 +136,3 @@ class LiveBuses:
         with self._lock:
             self._buses = {k: v for k, v in self._buses.items() if v[0] >= batas}
             return [bus for _, bus in self._buses.values()]
-
-    def start(self) -> None:
-        import paho.mqtt.client as mqtt
-
-        client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"mqttjs_{secrets.token_hex(4)}",
-            transport="websockets",
-            protocol=mqtt.MQTTv311,
-        )
-        client.ws_set_options(path=MQTT_PATH)
-        client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
-        client.reconnect_delay_set(min_delay=1, max_delay=30)
-
-        def on_connect(c, _userdata, _flags, reason_code, _props=None):
-            if reason_code.is_failure:
-                self._status = DITOLAK
-                logger.error("MQTT TransJakarta menolak koneksi: %s", reason_code)
-            else:
-                self._status = TERSAMBUNG
-                c.subscribe([(topik, 0) for topik in topik_langganan(self._route_to_koridor)])
-
-        def on_disconnect(_c, _userdata, _flags, reason_code, _props=None):
-            # Penolakan di on_connect juga diikuti disconnect; alasan penolakan tetap dipertahankan.
-            if self._status != DITOLAK:
-                self._status = TERPUTUS
-            logger.warning("MQTT TransJakarta terputus: %s", reason_code)
-
-        def on_connect_fail(_c, _userdata):
-            self._status = TERPUTUS
-            logger.warning("MQTT TransJakarta tidak terjangkau, mencoba lagi")
-
-        client.on_connect = on_connect
-        client.on_disconnect = on_disconnect
-        client.on_connect_fail = on_connect_fail
-        client.on_message = lambda _c, _u, msg: self.terima(msg.payload)
-        # connect_async: server tetap start walau broker tidak terjangkau; paho mencoba lagi sendiri.
-        client.connect_async(MQTT_HOST, MQTT_PORT)
-        client.loop_start()
-        self._client = client
-
-    def stop(self) -> None:
-        if self._client is not None:
-            self._client.loop_stop()
-            self._client.disconnect()
-            self._client = None
-        self._status = MENYAMBUNG
