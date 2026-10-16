@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 
 import { PanelKamera } from '../_components/PanelKamera';
+import { PanelKameraMqtt } from '../_components/PanelKameraMqtt';
 import { PilihHalte } from '../_components/PilihHalte';
 import { WaktuKontrol } from '../_components/WaktuKontrol';
 import { API_BASE } from '@/lib/api';
@@ -79,7 +80,8 @@ export default function Operator() {
           {halteError ? 'Gagal memuat daftar halte. Pastikan server backend berjalan.' : status}
           {waktu.tersinkron === false && ' · Jam belum terkirim ke halaman user'}
         </p>
-        <div className="absolute right-[0.6rem] top-[0.6rem] z-10">
+        <div className="absolute right-[0.6rem] top-[0.6rem] z-10 flex max-h-[calc(100%-1.2rem)] flex-col gap-[0.6rem] overflow-y-auto">
+          <PanelKameraMqtt />
           <PanelKamera />
         </div>
       </main>
