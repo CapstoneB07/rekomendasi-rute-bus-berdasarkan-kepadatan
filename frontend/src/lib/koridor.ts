@@ -15,13 +15,13 @@ export function warnaKoridor(id: number | string | null | undefined): { bg: stri
   return WARNA_KORIDOR[String(id)] ?? WARNA_KORIDOR_LAIN;
 }
 
-// Ekspresi MapLibre `match` dari koridor_id (angka atau string) ke warna latar koridor.
-export function ekspresiWarnaKoridor(): unknown[] {
+// Ekspresi MapLibre `match` dari koridor_id (angka atau string) ke warna latar atau teks koridor.
+export function ekspresiWarnaKoridor(bagian: 'bg' | 'teks' = 'bg'): unknown[] {
   return [
     'match',
     ['to-string', ['get', 'koridor_id']],
-    ...Object.entries(WARNA_KORIDOR).flatMap(([id, w]) => [id, w.bg]),
-    WARNA_KORIDOR_LAIN.bg,
+    ...Object.entries(WARNA_KORIDOR).flatMap(([id, w]) => [id, w[bagian]]),
+    WARNA_KORIDOR_LAIN[bagian],
   ];
 }
 

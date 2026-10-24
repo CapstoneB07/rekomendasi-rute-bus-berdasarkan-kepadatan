@@ -44,27 +44,43 @@ const FRAME_BUS_MS = 33;
 const WARNA_LIVE = '#2563eb';
 const TRANSPARAN = 'rgba(0,0,0,0)';
 const WARNA_KORIDOR_EKSPRESI = ekspresiWarnaKoridor() as unknown as ExpressionSpecification;
+const WARNA_TEKS_KORIDOR_EKSPRESI = ekspresiWarnaKoridor('teks') as unknown as ExpressionSpecification;
 
-// Panah putih berbingkai gelap yang menghadap utara; diputar layer 'bus-arrow' sesuai bearing bus.
-function buatGambarPanah(): ImageData {
-  const ukuran = 48;
+// Ukuran titik bus mengikuti zoom: titik kecil saat kota terlihat utuh, membesar menjadi
+// lencana bernomor koridor saat zoom dekat (gaya peta bus langsung).
+const ZOOM_PANAH = 13;
+const ZOOM_LABEL = 15;
+const JARI_TITIK: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 10, 3.5, 12, 5, 14, 7, 15, 9, 17, 12];
+// Kepadatan sebagai cahaya lembut di sekeliling titik; jarinya selalu sedikit lebih besar dari titik.
+const JARI_HALO: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 10, 7, 12, 9, 14, 12, 15, 14, 17, 18];
+// Gambar moncong memakai jari titik JARI_GAMBAR px (setelah pixelRatio), jadi skala = jari titik / JARI_GAMBAR.
+const JARI_GAMBAR = 10;
+const SKALA_MONCONG: ExpressionSpecification = [
+  'interpolate', ['linear'], ['zoom'], ZOOM_PANAH, 5.5 / JARI_GAMBAR, 14, 7 / JARI_GAMBAR, 15, 9 / JARI_GAMBAR, 17, 12 / JARI_GAMBAR,
+];
+
+// Moncong kecil di tepi titik yang menghadap utara; diputar layer 'bus-arrow' sesuai bearing bus.
+function buatGambarMoncong(): { data: ImageData; pixelRatio: number } {
+  const pixelRatio = 2;
+  const ukuran = 96;
+  const tengah = ukuran / 2;
+  const jari = JARI_GAMBAR * pixelRatio;
   const canvas = document.createElement('canvas');
   canvas.width = ukuran;
   canvas.height = ukuran;
   const ctx = canvas.getContext('2d')!;
   ctx.beginPath();
-  ctx.moveTo(24, 6);
-  ctx.lineTo(39, 38);
-  ctx.lineTo(24, 30);
-  ctx.lineTo(9, 38);
+  ctx.moveTo(tengah, tengah - jari - 18);
+  ctx.lineTo(tengah + 11, tengah - jari + 2);
+  ctx.lineTo(tengah - 11, tengah - jari + 2);
   ctx.closePath();
   ctx.fillStyle = '#ffffff';
   ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(17,24,39,0.85)';
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(17,24,39,0.75)';
   ctx.lineJoin = 'round';
   ctx.stroke();
-  return ctx.getImageData(0, 0, ukuran, ukuran);
+  return { data: ctx.getImageData(0, 0, ukuran, ukuran), pixelRatio };
 }
 const WARNA_NAIK = '#111827';
 const WARNA_TRANSIT = '#d97706';
@@ -167,7 +183,7 @@ type Props = {
   fokus?: Halte;
 };
 
-const LAYER_BUS = ['bus-ring', 'bus-dots', 'bus-arrow'] as const;
+const LAYER_BUS = ['bus-ring', 'bus-arrow', 'bus-dots', 'bus-label'] as const;
 
 export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -249,20 +265,21 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
         paint: { 'line-color': ['get', 'warna'], 'line-width': 9 },
       });
 
-      // Bus di atas semua garis: titik = warna koridor, cincin = kepadatan (tanpa cincin bila tidak ada data),
-      // panah putih = arah jalan.
-      map.addImage('panah', buatGambarPanah());
+      // Bus di atas semua garis: titik warna koridor berbingkai putih, cahaya = kepadatan (tanpa cahaya bila
+      // tidak ada data), moncong = arah jalan (zoom sedang), nomor koridor di dalam titik (zoom dekat).
+      const { data: moncong, pixelRatio } = buatGambarMoncong();
+      map.addImage('moncong', moncong, { pixelRatio });
       map.addSource('bus', { type: 'geojson', data: EMPTY_POINTS });
       map.addLayer({
         id: 'bus-ring',
         type: 'circle',
         source: 'bus',
         paint: {
-          'circle-radius': 17,
-          'circle-opacity': 0,
-          'circle-stroke-width': 5,
-          // null -> -1 -> di bawah ambang pertama -> tanpa cincin.
-          'circle-stroke-color': [
+          'circle-radius': JARI_HALO,
+          'circle-blur': 0.15,
+          'circle-opacity': 0.5,
+          // null -> -1 -> di bawah ambang pertama -> tanpa cahaya.
+          'circle-color': [
             'step',
             ['coalesce', ['get', 'trip_load_factor'], -1],
             TRANSPARAN,
@@ -276,28 +293,43 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
         },
       });
       map.addLayer({
-        id: 'bus-dots',
-        type: 'circle',
-        source: 'bus',
-        paint: {
-          'circle-radius': 12,
-          'circle-color': WARNA_KORIDOR_EKSPRESI,
-          'circle-stroke-color': '#111827',
-          'circle-stroke-width': 2.5,
-        },
-      });
-      map.addLayer({
         id: 'bus-arrow',
         type: 'symbol',
         source: 'bus',
+        minzoom: ZOOM_PANAH,
         layout: {
-          'icon-image': 'panah',
-          'icon-size': 0.36,
+          'icon-image': 'moncong',
+          'icon-size': SKALA_MONCONG,
           'icon-rotate': ['coalesce', ['get', 'bearing'], 0],
           'icon-rotation-alignment': 'map',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
         },
+      });
+      map.addLayer({
+        id: 'bus-dots',
+        type: 'circle',
+        source: 'bus',
+        paint: {
+          'circle-radius': JARI_TITIK,
+          'circle-color': WARNA_KORIDOR_EKSPRESI,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 2],
+        },
+      });
+      map.addLayer({
+        id: 'bus-label',
+        type: 'symbol',
+        source: 'bus',
+        minzoom: ZOOM_LABEL,
+        layout: {
+          'text-field': ['to-string', ['get', 'koridor_id']],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], ZOOM_LABEL, 10, 17, 13],
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        paint: { 'text-color': WARNA_TEKS_KORIDOR_EKSPRESI },
       });
       map.on('click', 'bus-dots', (e) => {
         const f = e.features?.[0];
@@ -446,12 +478,12 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
       {petaGagal && (
         <p
           role="status"
-          className="pointer-events-none absolute inset-x-[1rem] top-1/2 z-10 mx-auto w-fit -translate-y-1/2 rounded-xl border border-tj-garis bg-white px-[1rem] py-[0.4rem] text-center text-isi font-bold text-tj-padat shadow"
+          className="pointer-events-none absolute inset-x-[1rem] top-1/2 z-10 mx-auto w-fit -translate-y-1/2 rounded-xl border bg-background px-[1rem] py-[0.4rem] text-center text-isi font-bold text-destructive shadow-md"
         >
           Peta belum dapat dimuat. Periksa koneksi internet.
         </p>
       )}
-      <ul className="absolute bottom-[0.6rem] left-[0.6rem] z-10 flex items-center gap-x-[0.8rem] rounded-xl border border-tj-garis bg-white/95 px-[0.7rem] py-[0.25rem] text-kecil text-tj-teks shadow">
+      <ul className="absolute bottom-[0.6rem] left-[0.6rem] z-10 flex items-center gap-x-[0.8rem] rounded-lg border bg-background/95 px-[0.7rem] py-[0.25rem] text-kecil shadow-sm">
         <li className="font-bold">Kepadatan:</li>
         {[
           ['Sepi', kepadatanKeWarna(0)],
@@ -459,7 +491,11 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
           ['Padat', kepadatanKeWarna(1)],
         ].map(([teks, warna]) => (
           <li key={teks} className="flex items-center gap-[0.3rem]">
-            <span className="h-[0.9rem] w-[0.9rem] rounded-full border-[3px]" style={{ borderColor: warna }} />
+            {/* Titik dengan cahaya kepadatan, sama seperti layer bus-ring di peta. */}
+            <span
+              className="size-[0.6rem] rounded-full border border-white bg-muted-foreground"
+              style={{ boxShadow: `0 0 0.15rem 0.2rem color-mix(in srgb, ${warna} 60%, transparent)` }}
+            />
             {teks}
           </li>
         ))}
