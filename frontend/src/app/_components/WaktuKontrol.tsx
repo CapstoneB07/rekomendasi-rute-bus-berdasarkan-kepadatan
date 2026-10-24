@@ -7,6 +7,9 @@ import {
   type WaktuSimulasi,
 } from '@/lib/use-waktu-simulasi';
 
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
 import { IkonJeda, IkonMain } from './ikon';
 
 // Bar kontrol simulasi untuk demo, memanjang di bawah baris atas header. Jam besar ada di header.
@@ -17,18 +20,18 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
   return (
     <section
       aria-label="Mode simulasi"
-      className="flex h-[2.5rem] items-center gap-[0.6rem] rounded-2xl border-2 border-tj-oranye bg-orange-50 px-[0.7rem]"
+      className="flex h-[2.6rem] items-center gap-[0.6rem] rounded-xl border bg-card px-[0.7rem] shadow-sm"
     >
       <span className="whitespace-nowrap text-kecil font-bold text-tj-oranye">Mode simulasi</span>
 
-      <button
-        type="button"
+      <Button
+        ukuran="icon"
         onClick={togglePlay}
-        className="flex h-[2rem] w-[2rem] shrink-0 items-center justify-center rounded-full bg-tj-oranye text-white"
+        className="rounded-full bg-tj-oranye hover:bg-tj-oranye/90"
         aria-label={berjalan ? 'Jeda jam' : 'Jalankan jam'}
       >
         {berjalan ? <IkonJeda className="h-[1rem] w-[1rem]" /> : <IkonMain className="h-[1rem] w-[1rem]" />}
-      </button>
+      </Button>
 
       <input
         type="range"
@@ -41,33 +44,34 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
         aria-label="Geser jam simulasi"
       />
 
-      <div className="flex shrink-0 items-center gap-[0.3rem]">
+      {/* Grup toggle ala shadcn/ui. */}
+      <div className="flex shrink-0 items-center gap-[0.15rem] rounded-lg bg-muted p-[0.15rem]">
         {KECEPATAN.map((k) => (
           <button
             key={k}
             type="button"
             onClick={() => aturKecepatan(k)}
             aria-pressed={!isLive && kecepatan === k}
-            className={`h-[2rem] min-w-[2.1rem] rounded-lg border-2 border-tj-oranye px-[0.3rem] text-kecil font-bold leading-none ${
-              !isLive && kecepatan === k ? 'bg-tj-oranye text-white' : 'bg-white text-tj-oranye'
-            }`}
+            className={cn(
+              'h-[1.8rem] min-w-[2.1rem] rounded-md px-[0.3rem] text-kecil font-medium leading-none text-muted-foreground',
+              !isLive && kecepatan === k && 'bg-background font-bold text-tj-oranye shadow-sm',
+            )}
           >
             {k}×
           </button>
         ))}
       </div>
 
-      <button
-        type="button"
+      <Button
+        ukuran="sm"
+        varian={isLive ? 'default' : 'outline'}
         onClick={kembaliKeLive}
         disabled={isLive}
         aria-pressed={isLive}
-        className={`h-[2rem] shrink-0 whitespace-nowrap rounded-lg px-[0.7rem] text-kecil font-bold leading-none ${
-          isLive ? 'bg-tj-sepi text-white' : 'bg-tj-biru text-white'
-        }`}
+        className={cn('font-bold', isLive && 'bg-tj-sepi disabled:opacity-100')}
       >
         {isLive ? '● Waktu nyata' : 'Waktu nyata'}
-      </button>
+      </Button>
     </section>
   );
 }

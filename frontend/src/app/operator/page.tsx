@@ -8,6 +8,8 @@ import { PanelKamera } from '../_components/PanelKamera';
 import { PanelKameraMqtt } from '../_components/PanelKameraMqtt';
 import { PilihHalte } from '../_components/PilihHalte';
 import { WaktuKontrol } from '../_components/WaktuKontrol';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/api';
 import { formatJam } from '@/lib/koridor';
 import { statusBusAsli, type HalteOpsi } from '@/lib/route-utils';
@@ -46,36 +48,29 @@ export default function Operator() {
     : `${posisiBus?.features.length ?? 0} bus simulasi aktif pukul ${formatJam(simTime)}`;
 
   return (
-    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-white">
-      <header className="flex shrink-0 flex-wrap items-center gap-[0.8rem] px-[1.4rem] py-[0.5rem]">
-        <h1 className="text-besar font-bold text-tj-biru">Operator</h1>
-        <span
-          className={`rounded-lg px-[0.6rem] py-[0.1rem] text-kecil font-bold text-white ${
-            isLive ? 'bg-tj-sepi' : 'bg-tj-oranye'
-          }`}
-        >
+    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-background">
+      <header className="flex shrink-0 flex-wrap items-center gap-[0.8rem] border-b px-[1.4rem] py-[0.5rem]">
+        <h1 className="text-besar font-bold tracking-tight">Operator</h1>
+        <Badge varian={isLive ? 'sukses' : 'peringatan'} className="font-bold">
           {isLive ? 'LIVE' : 'SIMULASI'}
+        </Badge>
+        <span className={`text-jam font-bold tabular-nums ${isLive ? 'text-primary' : 'text-tj-oranye'}`}>
+          {formatJam(simTime)}
         </span>
-        <span className="text-jam font-medium tabular-nums text-tj-biru">{formatJam(simTime)}</span>
-        <button
-          type="button"
-          onClick={() => setPemilihTerbuka(true)}
-          disabled={!halteList}
-          className="ml-auto h-[2.4rem] rounded-xl border-2 border-tj-biru px-[0.9rem] text-kecil font-bold text-tj-biru disabled:opacity-50"
-        >
+        <Button varian="outline" onClick={() => setPemilihTerbuka(true)} disabled={!halteList} className="ml-auto text-kecil">
           Lokasi: {halte?.nama ?? 'Pilih halte'}
-        </button>
+        </Button>
       </header>
 
-      <div className="shrink-0 px-[1.4rem]">
+      <div className="shrink-0 px-[1.4rem] pt-[0.6rem]">
         <WaktuKontrol waktu={waktu} />
       </div>
 
-      <main className="relative m-[1.4rem] mt-[0.5rem] min-h-0 flex-1 overflow-hidden rounded-2xl bg-gray-100">
+      <main className="relative m-[1.4rem] mt-[0.6rem] min-h-0 flex-1 overflow-hidden rounded-xl border bg-muted shadow-sm">
         <RuteMap rute={undefined} halteMap={halteMap} bus={bus} fokus={halte} />
         <p
           role="status"
-          className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border border-tj-garis bg-white/95 px-[0.6rem] py-[0.15rem] text-kecil text-tj-teks shadow"
+          className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border bg-background/95 px-[0.6rem] py-[0.15rem] text-kecil shadow-sm"
         >
           {halteError ? 'Gagal memuat daftar halte. Pastikan server backend berjalan.' : status}
           {waktu.tersinkron === false && ' · Jam belum terkirim ke halaman user'}

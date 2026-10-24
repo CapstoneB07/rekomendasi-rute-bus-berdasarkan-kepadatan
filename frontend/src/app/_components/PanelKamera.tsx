@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { API_BASE, GalatApi } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { skalaBbox, statusKamera, type Bbox, type FrameKameraResponse } from '@/lib/kamera';
 
 // Frame baru diminta tiap 5 detik, sama seperti posisi bus asli.
@@ -77,34 +79,30 @@ export function PanelKamera() {
   const status = statusKamera(data, error);
 
   return (
-    <section
-      aria-label="Kamera bus"
-      className="w-[20rem] overflow-hidden rounded-xl border border-tj-garis bg-white/95 shadow"
-    >
-      <header className="flex items-center gap-[0.5rem] px-[0.6rem] py-[0.2rem] text-kecil">
-        <span className="font-bold text-tj-biru">Kamera{data && status === 'aktif' ? ` ${data.bus_id}` : ''}</span>
-        <span
-          className={`ml-auto rounded-md px-[0.4rem] text-[0.7rem] font-bold text-white ${
-            status === 'aktif' ? 'bg-tj-sepi' : status === 'memuat' ? 'bg-gray-400' : 'bg-tj-padat'
-          }`}
+    <Card role="region" aria-label="Kamera bus" className="w-[20rem] overflow-hidden bg-card/95">
+      <header className="flex items-center gap-[0.5rem] border-b px-[0.7rem] py-[0.3rem] text-kecil">
+        <span className="font-bold">Kamera{data && status === 'aktif' ? ` ${data.bus_id}` : ''}</span>
+        <Badge
+          varian={status === 'aktif' ? 'sukses' : status === 'memuat' ? 'secondary' : 'destructive'}
+          className="ml-auto text-[0.7rem] font-bold leading-[1.2rem]"
         >
           {status === 'aktif' ? 'AKTIF' : status === 'basi' ? 'BASI' : status === 'memuat' ? '…' : 'OFFLINE'}
-        </span>
+        </Badge>
       </header>
       {status !== 'aktif' ? (
-        <p role="status" className="px-[0.6rem] py-[0.4rem] text-kecil text-tj-teks">
+        <p role="status" className="px-[0.7rem] py-[0.4rem] text-kecil text-muted-foreground">
           {PESAN[status]}
         </p>
       ) : (
         data && (
           <>
             <FrameKamera src={data.frame_url} bboxes={data.bboxes} />
-            <p role="status" className="px-[0.6rem] py-[0.2rem] text-kecil text-tj-teks">
+            <p role="status" className="px-[0.7rem] py-[0.2rem] text-kecil text-muted-foreground">
               {data.bboxes.length} deteksi · {JAM_WIB.format(new Date(data.updated_at))}
             </p>
           </>
         )
       )}
-    </section>
+    </Card>
   );
 }
