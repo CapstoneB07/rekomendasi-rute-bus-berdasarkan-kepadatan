@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 
 import type { Tiket } from '@/lib/tiket';
 
+import { Button } from '@/components/ui/button';
+
 import { IkonCetak } from './ikon';
 
 function Baris({ label, nilai }: { label: string; nilai: string }) {
@@ -30,9 +32,9 @@ export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => vo
       role="dialog"
       aria-modal="true"
       aria-label="Tiket perjalanan"
-      className="area-cetak fixed inset-0 z-[50] flex flex-col items-center justify-center gap-[1rem] bg-black/60 p-[1rem]"
+      className="area-cetak fixed inset-0 z-[50] flex flex-col items-center justify-center gap-[1rem] bg-black/50 p-[1rem] backdrop-blur-sm"
     >
-      <article className="tiket">
+      <article className="tiket rounded-lg shadow-lg">
         <header className="tiket-kepala">
           <b>TransJakarta Lega</b>
           <span>Tiket Rencana Perjalanan</span>
@@ -71,22 +73,13 @@ export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => vo
       </article>
 
       <div className="tiket-aksi flex w-full max-w-[24rem] gap-[0.8rem]">
-        <button
-          type="button"
-          onClick={onTutup}
-          className="h-[2.8rem] flex-1 rounded-xl border-2 border-white text-isi font-bold text-white"
-        >
+        <Button varian="outline" ukuran="lg" onClick={onTutup} className="flex-1">
           Tutup
-        </button>
-        <button
-          type="button"
-          autoFocus
-          onClick={() => window.print()}
-          className="flex h-[2.8rem] flex-1 items-center justify-center gap-[0.6rem] rounded-xl bg-tj-biru text-isi font-bold text-white"
-        >
+        </Button>
+        <Button ukuran="lg" autoFocus onClick={() => window.print()} className="flex-1 font-bold">
           <IkonCetak className="h-[1.4rem] w-[1.4rem]" />
           Cetak
-        </button>
+        </Button>
       </div>
     </div>,
     document.body,

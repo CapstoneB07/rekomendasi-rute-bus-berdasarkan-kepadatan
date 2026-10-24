@@ -5,6 +5,9 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { daftarKelompok, filterKelompok, halaman, KELOMPOK_UTAMA } from '@/lib/pilih-halte';
 import type { HalteOpsi } from '@/lib/route-utils';
 
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
 import { IkonChevronKanan, IkonPanahKiri } from './ikon';
 
 const PER_HALAMAN = 12; // 4 kolom x 3 baris
@@ -64,21 +67,22 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
       aria-label={judul}
       tabIndex={-1}
       onKeyDown={saatTombol}
-      className="layar-masuk fixed inset-0 z-50 flex flex-col gap-[0.6rem] bg-white px-[1.6rem] pb-[1rem] pt-[0.8rem] outline-none"
+      className="layar-masuk fixed inset-0 z-50 flex flex-col gap-[0.7rem] bg-background px-[1.6rem] pb-[1rem] pt-[0.8rem] outline-none"
     >
       <div className="flex items-center gap-[1rem]">
-        <button
-          type="button"
-          onClick={onTutup}
-          className="flex h-[2.8rem] items-center gap-[0.5rem] rounded-xl border-2 border-tj-biru px-[1rem] text-isi font-bold text-tj-biru"
-        >
+        <Button varian="outline" ukuran="lg" onClick={onTutup}>
           <IkonPanahKiri className="h-[1.3rem] w-[1.3rem]" />
           Kembali
-        </button>
-        <h2 className="text-judul font-bold text-tj-biru">{judul}</h2>
+        </Button>
+        <h2 className="text-judul font-bold tracking-tight">{judul}</h2>
       </div>
 
-      <div role="tablist" aria-label="Kelompok halte" className="flex flex-wrap gap-[0.4rem]">
+      {/* Tab ala shadcn/ui: wadah abu-abu, tab aktif terangkat putih. */}
+      <div
+        role="tablist"
+        aria-label="Kelompok halte"
+        className="flex flex-wrap gap-[0.2rem] self-start rounded-xl bg-muted p-[0.25rem]"
+      >
         {kelompokAda.map((k) => (
           <button
             key={k}
@@ -89,11 +93,10 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
               setKelompok(k);
               setIdx(0);
             }}
-            className={`h-[2.4rem] min-w-[2.4rem] rounded-lg border-2 px-[0.6rem] text-isi font-bold ${
-              k === kelompok
-                ? 'border-tj-biru bg-tj-biru text-white'
-                : 'border-tj-garis bg-white text-tj-biru'
-            }`}
+            className={cn(
+              'h-[2.3rem] min-w-[2.3rem] rounded-lg px-[0.6rem] text-isi font-medium text-muted-foreground',
+              k === kelompok && 'bg-background font-bold text-foreground shadow-sm',
+            )}
           >
             {k === KELOMPOK_UTAMA ? '★ Utama' : k}
           </button>
@@ -110,13 +113,14 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
               type="button"
               disabled={nonaktif}
               onClick={() => onPilih(h.halte_id)}
-              className={`flex min-h-0 flex-col items-center justify-center rounded-xl border-2 px-[0.6rem] text-center text-isi font-bold leading-tight ${
+              className={cn(
+                'flex min-h-0 flex-col items-center justify-center rounded-xl border px-[0.6rem] text-center text-isi font-bold leading-tight shadow-xs',
                 nonaktif
-                  ? 'border-tj-garis bg-gray-100 text-gray-600'
+                  ? 'border-dashed bg-muted text-muted-foreground shadow-none'
                   : terpilih
-                    ? 'border-tj-biru bg-tj-biru text-white'
-                    : 'border-tj-garis bg-tj-biru-muda text-tj-biru'
-              }`}
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'bg-card hover:bg-accent hover:text-accent-foreground',
+              )}
             >
               <span className="line-clamp-2">{h.nama}</span>
               {nonaktif && nonaktifAlasan && <span className="text-kecil font-medium">{nonaktifAlasan}</span>}
@@ -126,27 +130,29 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-[1rem]">
-        <button
-          type="button"
+        <Button
+          varian="outline"
+          ukuran="lg"
           disabled={idxAman === 0}
           onClick={() => setIdx(idxAman - 1)}
-          className="flex h-[2.8rem] items-center gap-[0.5rem] justify-self-start rounded-xl bg-tj-biru px-[1.4rem] text-isi font-bold text-white disabled:opacity-30"
+          className="justify-self-start px-[1.4rem]"
         >
           <IkonChevronKanan className="h-[1.2rem] w-[1.2rem] rotate-180" />
           Sebelumnya
-        </button>
-        <span className="text-isi text-tj-teks">
+        </Button>
+        <span className="text-isi text-muted-foreground">
           Halaman {idxAman + 1} dari {jumlah}
         </span>
-        <button
-          type="button"
+        <Button
+          varian="outline"
+          ukuran="lg"
           disabled={idxAman >= jumlah - 1}
           onClick={() => setIdx(idxAman + 1)}
-          className="flex h-[2.8rem] items-center gap-[0.5rem] justify-self-end rounded-xl bg-tj-biru px-[1.4rem] text-isi font-bold text-white disabled:opacity-30"
+          className="justify-self-end px-[1.4rem]"
         >
           Berikutnya
           <IkonChevronKanan className="h-[1.2rem] w-[1.2rem]" />
-        </button>
+        </Button>
       </div>
     </div>
   );

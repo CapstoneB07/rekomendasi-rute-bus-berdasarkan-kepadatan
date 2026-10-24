@@ -1,6 +1,8 @@
 'use client';
 
-import { IkonCari, IkonLokasi } from './ikon';
+import { Button } from '@/components/ui/button';
+
+import { IkonCaretBawah, IkonCari, IkonLokasi } from './ikon';
 
 type Props = {
   namaTujuan: string | null;
@@ -15,8 +17,8 @@ export function Beranda({ namaTujuan, halteSiap, bisaCari, onPilihTujuan, onCari
   return (
     <div className="layar-masuk flex h-full flex-col items-center justify-center gap-[1.2rem] pb-[1.5rem] text-center">
       <div>
-        <h1 className="text-judul font-bold text-tj-biru">Cari Rute Bus yang Nyaman</h1>
-        <p className="mx-auto mt-[0.5rem] max-w-[28rem] text-besar leading-snug text-tj-teks">
+        <h1 className="text-judul font-bold tracking-tight">Cari Rute Bus yang Nyaman</h1>
+        <p className="mx-auto mt-[0.5rem] max-w-[28rem] text-besar leading-snug text-muted-foreground">
           Pilih perjalanan dengan informasi kepadatan bus secara langsung.
         </p>
       </div>
@@ -27,28 +29,26 @@ export function Beranda({ namaTujuan, halteSiap, bisaCari, onPilihTujuan, onCari
           onClick={onPilihTujuan}
           disabled={!halteSiap}
           aria-label={namaTujuan ? `Tujuan: ${namaTujuan}. Sentuh untuk mengganti` : 'Pilih tujuan'}
-          className="flex w-full items-center gap-[0.9rem] rounded-2xl border-[3px] border-tj-biru bg-white px-[1.1rem] py-[0.6rem] text-left shadow-sm disabled:opacity-60"
+          className="flex w-full items-center gap-[0.9rem] rounded-xl border border-input bg-background px-[1.1rem] py-[0.6rem] text-left shadow-xs hover:bg-accent disabled:opacity-50"
         >
-          <IkonLokasi className="h-[2rem] w-[2rem] shrink-0 text-tj-oranye" />
-          <span className="min-w-0">
-            <span className="block text-kecil font-bold leading-tight text-tj-oranye">Ke:</span>
+          <span className="flex size-[2.6rem] shrink-0 items-center justify-center rounded-lg bg-tj-oranye/10">
+            <IkonLokasi className="h-[1.6rem] w-[1.6rem] text-tj-oranye" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-kecil font-medium leading-tight text-muted-foreground">Ke:</span>
             <span
-              className={`block truncate text-besar font-bold leading-tight ${namaTujuan ? 'text-tj-teks' : 'text-gray-600'}`}
+              className={`block truncate text-besar font-bold leading-tight ${namaTujuan ? '' : 'font-medium text-muted-foreground'}`}
             >
               {namaTujuan ?? (halteSiap ? 'Sentuh untuk memilih tujuan…' : 'Memuat daftar halte…')}
             </span>
           </span>
+          <IkonCaretBawah className="h-[1.3rem] w-[1.3rem] shrink-0 text-muted-foreground" />
         </button>
 
-        <button
-          type="button"
-          onClick={onCari}
-          disabled={!bisaCari}
-          className="flex h-[3.4rem] w-full items-center justify-center gap-[0.7rem] rounded-2xl bg-tj-biru text-besar font-bold text-white disabled:bg-gray-200 disabled:text-gray-600"
-        >
+        <Button onClick={onCari} disabled={!bisaCari} className="h-[3.4rem] w-full rounded-xl text-besar font-bold">
           <IkonCari className="h-[1.6rem] w-[1.6rem]" />
           Cari Rute
-        </button>
+        </Button>
       </div>
     </div>
   );

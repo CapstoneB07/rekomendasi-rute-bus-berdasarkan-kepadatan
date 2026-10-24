@@ -11,6 +11,7 @@ import { Footer } from './_components/Footer';
 import { Header } from './_components/Header';
 import { PeringatanIdle } from './_components/PeringatanIdle';
 import { PilihHalte } from './_components/PilihHalte';
+import { Button } from '@/components/ui/button';
 import { API_BASE, GalatApi, galatRute, waktuWib } from '@/lib/api';
 import { formatTanggal } from '@/lib/koridor';
 import {
@@ -196,7 +197,7 @@ export default function Home() {
   const statusLive = isLive && tampilPeta ? statusBusAsli(busAsliTampil, busAsliError) : null;
 
   return (
-    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-white">
+    <div className="flex h-dvh w-screen flex-col overflow-hidden bg-background">
       <Header
         namaHalte={namaAsal}
         onUbahHalte={() => setPemilih('asal')}
@@ -207,10 +208,11 @@ export default function Home() {
 
       <main className="grid min-h-0 flex-1 grid-cols-[45fr_55fr] grid-rows-[minmax(0,1fr)] gap-x-[1rem] px-[1.4rem]">
         {/* Peta tetap terpasang (hanya disembunyikan di beranda) supaya tidak dimuat ulang tiap pindah layar.
-            Di beranda panel menutupi kedua kolom; peta yang tak terlihat tidak menangkap sentuhan. */}
+            Di beranda panel menutupi kedua kolom; peta yang tak terlihat tidak menangkap sentuhan.
+            Atribusi MapLibre memaksa visibility: visible sendiri, jadi ikut disembunyikan dengan !important. */}
         <div
-          className={`relative col-start-2 row-start-1 mb-[0.4rem] min-h-0 min-w-0 overflow-hidden rounded-2xl bg-gray-100 ${
-            tampilPeta ? '' : 'invisible'
+          className={`relative col-start-2 row-start-1 my-[0.4rem] min-h-0 min-w-0 overflow-hidden rounded-xl border bg-muted shadow-sm ${
+            tampilPeta ? '' : 'invisible [&_.maplibregl-ctrl-attrib]:invisible!'
           }`}
         >
           <RuteMap
@@ -222,7 +224,7 @@ export default function Home() {
           {statusLive && (
             <p
               role="status"
-              className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border border-tj-garis bg-white/95 px-[0.6rem] py-[0.15rem] text-kecil text-tj-teks shadow"
+              className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border bg-background/95 px-[0.6rem] py-[0.15rem] text-kecil shadow-sm"
             >
               {statusLive}
             </p>
@@ -230,7 +232,7 @@ export default function Home() {
         </div>
 
         <section
-          className={`row-start-1 min-h-0 min-w-0 ${
+          className={`row-start-1 min-h-0 min-w-0 pt-[0.4rem] ${
             layar === 'beranda' ? 'col-span-2 col-start-1' : 'col-start-1'
           }`}
         >
@@ -280,16 +282,12 @@ export default function Home() {
       {halteError && (
         <div
           role="alert"
-          className="fixed inset-x-0 bottom-[2.4rem] z-40 mx-auto flex w-fit items-center gap-[0.8rem] rounded-xl bg-tj-padat px-[1rem] py-[0.3rem] text-kecil text-white"
+          className="fixed inset-x-0 bottom-[2.6rem] z-40 mx-auto flex w-fit items-center gap-[0.8rem] rounded-xl border border-destructive/40 bg-background px-[1rem] py-[0.4rem] text-kecil font-medium text-destructive shadow-lg"
         >
           Gagal memuat daftar halte. Pastikan server backend berjalan.
-          <button
-            type="button"
-            onClick={() => void muatUlangHalte()}
-            className="h-[2rem] rounded-lg bg-white px-[0.8rem] font-bold text-tj-padat"
-          >
+          <Button ukuran="sm" varian="destructive" onClick={() => void muatUlangHalte()} className="font-bold">
             Coba lagi
-          </button>
+          </Button>
         </div>
       )}
 
@@ -308,7 +306,7 @@ export default function Home() {
       {sisaIdleDetik !== null && <PeringatanIdle sisaDetik={sisaIdleDetik} />}
 
       {/* Kiosk hanya dirancang lanskap. */}
-      <div className="fixed inset-0 z-[60] hidden items-center justify-center bg-tj-biru p-[2rem] text-center text-judul font-bold text-white [@media(orientation:portrait)]:flex">
+      <div className="fixed inset-0 z-[60] hidden items-center justify-center bg-primary p-[2rem] text-center text-judul font-bold text-primary-foreground [@media(orientation:portrait)]:flex">
         Putar iPad ke posisi mendatar
       </div>
     </div>

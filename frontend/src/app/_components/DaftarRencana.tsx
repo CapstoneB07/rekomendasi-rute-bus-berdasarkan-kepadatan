@@ -14,6 +14,11 @@ import {
   type Rute,
 } from '@/lib/route-utils';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
 import { IkonBus, IkonChevronKanan, IkonPanahKiri } from './ikon';
 
 const PER_HALAMAN = 2;
@@ -23,7 +28,7 @@ export function LencanaKoridor({ koridorId, className = '' }: { koridorId: numbe
   const w = warnaKoridor(koridorId);
   return (
     <span
-      className={`inline-flex min-w-[2rem] items-center justify-center rounded-md px-[0.4rem] text-isi font-bold leading-[1.7rem] ${className}`}
+      className={cn('inline-flex min-w-[2rem] items-center justify-center rounded-md px-[0.4rem] text-isi font-bold leading-[1.7rem]', className)}
       style={{ background: w.bg, color: w.teks }}
     >
       {koridorId}
@@ -31,18 +36,10 @@ export function LencanaKoridor({ koridorId, className = '' }: { koridorId: numbe
   );
 }
 
-function Chip({ teks }: { teks: string }) {
-  return (
-    <span className="whitespace-nowrap rounded-md bg-gray-100 px-[0.5rem] text-kecil font-medium leading-[1.7rem] text-tj-teks">
-      {teks}
-    </span>
-  );
-}
-
-const WARNA_LABEL_RENCANA: Record<LabelRencana, string> = {
-  Tercepat: 'bg-tj-biru',
-  'Paling lega': 'bg-tj-sepi',
-};
+const VARIAN_LABEL_RENCANA = {
+  Tercepat: 'default',
+  'Paling lega': 'sukses',
+} as const satisfies Record<LabelRencana, string>;
 
 type PropsKartu = {
   rute: Rute;
@@ -60,11 +57,15 @@ function KartuRencana({ rute, label, aktif, onPilih, onDetail }: PropsKartu) {
   const teksKepadatan = LABEL[labelKepadatan(v)];
   const km = formatKm(rute.total_jarak_meter);
   const transit = jumlahTransit(rute);
-  const garis = aktif ? 'border-tj-biru' : 'border-tj-garis';
   const ringkasan = `koridor ${naik.map((n) => n.koridor_id).join(' lalu ')}, ${rute.estimasi_menit} menit, kepadatan ${teksKepadatan}`;
 
   return (
-    <div className={`relative flex min-h-0 w-full flex-col overflow-hidden rounded-2xl border-[3px] bg-white ${garis}`}>
+    <Card
+      className={cn(
+        'relative flex min-h-0 w-full flex-col overflow-hidden',
+        aktif && 'border-primary ring-2 ring-primary/20',
+      )}
+    >
       <button
         type="button"
         onClick={onPilih}
@@ -72,10 +73,10 @@ function KartuRencana({ rute, label, aktif, onPilih, onDetail }: PropsKartu) {
         aria-label={`Rencana ${ringkasan}`}
         className="flex min-h-0 w-full flex-col text-left"
       >
-        <div className={`flex w-full items-center gap-[0.25rem] border-b-[3px] py-[0.15rem] pl-[0.7rem] pr-[3rem] ${garis}`}>
+        <div className="flex w-full items-center gap-[0.25rem] border-b py-[0.25rem] pl-[0.8rem] pr-[3.2rem]">
           {naik.map((n, i) => (
             <span key={i} className="flex items-center gap-[0.25rem]">
-              {i > 0 && <IkonChevronKanan className="h-[0.9rem] w-[0.9rem] shrink-0 text-gray-500" />}
+              {i > 0 && <IkonChevronKanan className="h-[0.9rem] w-[0.9rem] shrink-0 text-muted-foreground" />}
               {naik.length < 3 && <IkonBus className="h-[1.5rem] w-[1.5rem]" />}
               <LencanaKoridor koridorId={n.koridor_id} />
             </span>
@@ -83,24 +84,24 @@ function KartuRencana({ rute, label, aktif, onPilih, onDetail }: PropsKartu) {
           <span className="ml-auto whitespace-nowrap text-isi font-bold leading-[1.7rem]">{rute.estimasi_menit} menit</span>
         </div>
 
-        <div className="w-full px-[0.8rem] py-[0.25rem]">
+        <div className="w-full px-[0.8rem] py-[0.3rem]">
           <div className="flex flex-wrap gap-[0.35rem]">
-            <Chip teks={formatRupiah(TARIF_RP)} />
-            {km && <Chip teks={km} />}
-            {transit > 0 && <Chip teks={`${transit}× transit`} />}
+            <Badge varian="secondary">{formatRupiah(TARIF_RP)}</Badge>
+            {km && <Badge varian="secondary">{km}</Badge>}
+            {transit > 0 && <Badge varian="secondary">{transit}× transit</Badge>}
           </div>
-          <div className="mt-[0.15rem] flex items-center justify-between gap-[0.4rem] text-kecil leading-tight">
+          <div className="mt-[0.2rem] flex items-center justify-between gap-[0.4rem] text-kecil leading-tight text-muted-foreground">
             <span>Kepadatan rata-rata</span>
             <span className="flex gap-[0.3rem]">
               {label.map((l) => (
-                <span key={l} className={`rounded-md px-[0.4rem] font-bold text-white ${WARNA_LABEL_RENCANA[l]}`}>
+                <Badge key={l} varian={VARIAN_LABEL_RENCANA[l]} className="font-bold leading-tight">
                   {l}
-                </span>
+                </Badge>
               ))}
             </span>
           </div>
           <div className="flex items-center gap-[0.6rem]">
-            <div className="h-[0.6rem] flex-1 overflow-hidden rounded-full bg-gray-200">
+            <div className="h-[0.5rem] flex-1 overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full" style={{ width: `${Math.round(v * 100)}%`, background: kepadatanKeWarna(v) }} />
             </div>
             <span className="whitespace-nowrap text-kecil">
@@ -110,15 +111,15 @@ function KartuRencana({ rute, label, aktif, onPilih, onDetail }: PropsKartu) {
         </div>
       </button>
 
-      <button
-        type="button"
+      <Button
+        ukuran="icon"
         onClick={onDetail}
         aria-label={`Lihat detail rencana ${ringkasan}`}
-        className="absolute right-[0.5rem] top-[0.15rem] flex h-[2rem] w-[2rem] items-center justify-center rounded-full bg-tj-biru text-white"
+        className="absolute right-[0.5rem] top-[0.2rem] rounded-full"
       >
         <IkonChevronKanan className="h-[1.1rem] w-[1.1rem]" />
-      </button>
-    </div>
+      </Button>
+    </Card>
   );
 }
 
@@ -158,60 +159,52 @@ export function DaftarRencana({ asal, tujuan, hasilRute, memuat, aktifIdx, galat
 
   return (
     <div className="layar-masuk flex h-full min-h-0 flex-col gap-[0.5rem] pb-[0.4rem]">
-      <button
-        type="button"
-        onClick={onKembali}
-        className="flex h-[2.4rem] items-center gap-[0.5rem] self-start rounded-xl border-2 border-tj-biru px-[0.9rem] text-isi font-bold text-tj-biru"
-      >
+      <Button varian="outline" onClick={onKembali} className="self-start">
         <IkonPanahKiri className="h-[1.2rem] w-[1.2rem]" />
         Ubah tujuan
-      </button>
+      </Button>
 
       <div className="flex items-center justify-between gap-[0.5rem]">
         <h2 className="whitespace-nowrap text-isi font-bold leading-tight">Rencana Perjalanan</h2>
         {jumlah > 1 && !galatTampil && (
           <div className="flex items-center gap-[0.4rem]">
-            <button type="button" disabled={idx === 0} onClick={() => pindah(idx - 1)} aria-label="Halaman sebelumnya" className="flex h-[2rem] w-[2rem] items-center justify-center rounded-lg bg-tj-biru text-white disabled:opacity-30">
+            <Button varian="outline" ukuran="icon" disabled={idx === 0} onClick={() => pindah(idx - 1)} aria-label="Halaman sebelumnya">
               <IkonChevronKanan className="h-[1.1rem] w-[1.1rem] rotate-180" />
-            </button>
-            <span className="text-kecil tabular-nums">
+            </Button>
+            <span className="text-kecil tabular-nums text-muted-foreground">
               {idx + 1}/{jumlah}
             </span>
-            <button type="button" disabled={idx >= jumlah - 1} onClick={() => pindah(idx + 1)} aria-label="Halaman berikutnya" className="flex h-[2rem] w-[2rem] items-center justify-center rounded-lg bg-tj-biru text-white disabled:opacity-30">
+            <Button varian="outline" ukuran="icon" disabled={idx >= jumlah - 1} onClick={() => pindah(idx + 1)} aria-label="Halaman berikutnya">
               <IkonChevronKanan className="h-[1.1rem] w-[1.1rem]" />
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
-      <dl className="overflow-hidden rounded-2xl border-[3px] border-tj-garis text-isi">
+      <dl className="overflow-hidden rounded-xl border text-isi shadow-xs">
         {[
           ['Dari', asal],
           ['Ke', tujuan],
         ].map(([k, v]) => (
-          <div key={k} className="grid grid-cols-[3.2rem_1fr] border-b-[3px] border-tj-garis last:border-b-0">
-            <dt className="border-r-[3px] border-tj-garis bg-gray-50 px-[0.5rem] py-[0.15rem] text-gray-600">{k}</dt>
+          <div key={k} className="grid grid-cols-[3.2rem_1fr] border-b last:border-b-0">
+            <dt className="border-r bg-muted px-[0.5rem] py-[0.15rem] text-muted-foreground">{k}</dt>
             <dd className="truncate px-[0.7rem] py-[0.15rem] font-medium">{v}</dd>
           </div>
         ))}
       </dl>
 
       {galatTampil ? (
-        <div role="alert" className="rounded-2xl border-[3px] border-tj-padat bg-red-50 p-[0.9rem] text-isi">
-          <div className="font-bold text-tj-padat">{galatTampil.judul}</div>
-          <div className="mt-[0.2rem] text-kecil">{galatTampil.pesan}</div>
-          <button
-            type="button"
-            onClick={galatTampil.bisaCoba ? onCoba : onKembali}
-            className="mt-[0.6rem] h-[2.6rem] rounded-xl bg-tj-biru px-[1.2rem] text-isi font-bold text-white"
-          >
+        <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/5 p-[0.9rem] text-isi">
+          <div className="font-bold text-destructive">{galatTampil.judul}</div>
+          <div className="mt-[0.2rem] text-kecil text-muted-foreground">{galatTampil.pesan}</div>
+          <Button onClick={galatTampil.bisaCoba ? onCoba : onKembali} className="mt-[0.6rem]">
             {galatTampil.bisaCoba ? 'Coba lagi' : 'Ubah tujuan'}
-          </button>
+          </Button>
         </div>
       ) : memuat && !hasilRute ? (
         <div aria-busy="true" className="grid min-h-0 flex-1 animate-pulse grid-rows-2 gap-[0.5rem]">
-          <div className="rounded-2xl bg-gray-200" />
-          <div className="rounded-2xl bg-gray-200" />
+          <div className="rounded-xl bg-muted" />
+          <div className="rounded-xl bg-muted" />
         </div>
       ) : (
         <>

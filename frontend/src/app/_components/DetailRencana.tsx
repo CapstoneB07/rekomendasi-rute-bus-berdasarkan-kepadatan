@@ -6,6 +6,10 @@ import { formatJam } from '@/lib/koridor';
 import { warnaLabelKepadatan, type NaikItem, type Rute } from '@/lib/route-utils';
 import { buatTiket, jamLeg, type Tiket } from '@/lib/tiket';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+
 import { LencanaKoridor } from './DaftarRencana';
 import { IkonCetak, IkonPanahKiri } from './ikon';
 import { TiketCetak } from './TiketCetak';
@@ -16,15 +20,15 @@ function KartuNaik({ item, simTime }: { item: NaikItem; simTime: number }) {
   const label = rek?.label_kepadatan;
 
   return (
-    <div className="shrink-0 overflow-hidden rounded-2xl border-[3px] border-tj-garis bg-white">
-      <div className="flex flex-wrap items-center gap-x-[0.5rem] gap-y-[0.1rem] border-b-[3px] border-tj-garis px-[0.7rem] py-[0.2rem]">
+    <Card className="shrink-0 overflow-hidden">
+      <div className="flex flex-wrap items-center gap-x-[0.5rem] gap-y-[0.1rem] border-b px-[0.8rem] py-[0.25rem]">
         <LencanaKoridor koridorId={item.koridor_id} />
         {rek ? (
           <>
-            <span className="whitespace-nowrap rounded-md bg-tj-teks px-[0.5rem] text-kecil font-bold leading-[1.7rem] text-white">
+            <Badge varian="outline" className="font-bold leading-[1.6rem]">
               {rek.bus_id}
-            </span>
-            <span className="ml-auto whitespace-nowrap text-kecil">
+            </Badge>
+            <span className="ml-auto whitespace-nowrap text-kecil text-muted-foreground">
               {rek.eta_menit <= 0 ? 'Segera' : `${rek.eta_menit} menit lagi`}
             </span>
             {label && (
@@ -38,7 +42,7 @@ function KartuNaik({ item, simTime }: { item: NaikItem; simTime: number }) {
             )}
           </>
         ) : (
-          <span className="ml-auto text-kecil text-gray-600">Belum ada bus terjadwal</span>
+          <span className="ml-auto text-kecil text-muted-foreground">Belum ada bus terjadwal</span>
         )}
       </div>
       <dl className="space-y-[0.2rem] px-[0.8rem] py-[0.4rem] text-isi leading-tight">
@@ -46,18 +50,18 @@ function KartuNaik({ item, simTime }: { item: NaikItem; simTime: number }) {
           <dt className="min-w-0">
             Naik di <b>{item.naik_di}</b>
           </dt>
-          <dd className="whitespace-nowrap text-kecil text-gray-600 tabular-nums">{naik !== null ? formatJam(naik) : '—'}</dd>
+          <dd className="whitespace-nowrap text-kecil text-muted-foreground tabular-nums">{naik !== null ? formatJam(naik) : '—'}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-[0.6rem]">
           <dt className="min-w-0">
             Turun di <b>{item.turun_di}</b>
           </dt>
-          <dd className="whitespace-nowrap text-kecil text-gray-600 tabular-nums">
+          <dd className="whitespace-nowrap text-kecil text-muted-foreground tabular-nums">
             ({item.waktu_menit} menit) {turun !== null ? formatJam(turun) : '—'}
           </dd>
         </div>
       </dl>
-    </div>
+    </Card>
   );
 }
 
@@ -76,15 +80,11 @@ export function DetailRencana({ rute, asal, tujuan, simTime, onKembali }: Props)
   return (
     <div className="layar-masuk flex h-full min-h-0 flex-col gap-[0.5rem] pb-[0.4rem]">
       <div className="flex items-center gap-[0.8rem]">
-        <button
-          type="button"
-          onClick={onKembali}
-          className="flex h-[2.4rem] shrink-0 items-center gap-[0.5rem] rounded-xl border-2 border-tj-biru px-[0.9rem] text-isi font-bold text-tj-biru"
-        >
+        <Button varian="outline" onClick={onKembali}>
           <IkonPanahKiri className="h-[1.2rem] w-[1.2rem]" />
           Kembali
-        </button>
-        <span className="min-w-0 truncate text-besar font-bold">Ke {tujuan}</span>
+        </Button>
+        <span className="min-w-0 truncate text-besar font-bold tracking-tight">Ke {tujuan}</span>
       </div>
 
       {/* Rute dengan banyak bus tidak dipadatkan; daftar bergulir bila tidak muat. */}
@@ -93,21 +93,24 @@ export function DetailRencana({ rute, asal, tujuan, simTime, onKembali }: Props)
           s.tipe === 'naik' ? (
             <KartuNaik key={i} item={s} simTime={simTime} />
           ) : (
-            <div key={i} className="shrink-0 rounded-xl bg-orange-50 px-[0.8rem] py-[0.25rem] text-kecil leading-snug">
+            <div
+              key={i}
+              className="shrink-0 rounded-lg border border-dashed border-tj-oranye/50 bg-tj-oranye/5 px-[0.8rem] py-[0.25rem] text-kecil leading-snug"
+            >
               Pindah bus di <b>{s.transit_di}</b> ke koridor {s.ke_koridor}
             </div>
           ),
         )}
       </div>
 
-      <button
-        type="button"
+      <Button
+        ukuran="lg"
         onClick={() => setTiket(buatTiket(rute, { asal, tujuan, simTime, dicetak: new Date() }))}
-        className="flex h-[2.8rem] w-full shrink-0 items-center justify-center gap-[0.6rem] rounded-xl bg-tj-biru text-isi font-bold text-white"
+        className="w-full font-bold"
       >
         <IkonCetak className="h-[1.4rem] w-[1.4rem]" />
         Cetak Informasi
-      </button>
+      </Button>
 
       {tiket && <TiketCetak tiket={tiket} onTutup={() => setTiket(null)} />}
     </div>
