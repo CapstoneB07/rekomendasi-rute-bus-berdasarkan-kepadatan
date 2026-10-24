@@ -1,16 +1,61 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
-/* Token desain kiosk (lihat folder "ui capstone"). Ukuran teks memakai rem karena rem sendiri
-   diskalakan mengikuti ukuran layar iPad di bawah, jadi 1rem ~ 24px di iPad 10,2" lanskap. */
+/* Token warna semantik ala shadcn/ui (https://ui.shadcn.com/docs/theming): netral zinc dengan
+   primary biru TransJakarta. Kiosk hanya memakai tema terang. */
+:root {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #0f47a1;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  /* zinc-600, sedikit lebih gelap dari bawaan shadcn supaya terbaca dari jarak kiosk. */
+  --muted-foreground: #52525b;
+  --accent: #eef3fb;
+  --accent-foreground: #0f47a1;
+  --destructive: #b91c1c;
+  --border: #e4e4e7;
+  --input: #d4d4d8;
+  --ring: #0f47a1;
+  --radius: 0.6rem;
+}
+
+/* Ukuran teks memakai rem karena rem sendiri diskalakan mengikuti ukuran layar iPad di bawah,
+   jadi 1rem ~ 24px di iPad 10,2" lanskap. */
 @theme inline {
-  --color-tj-biru: #0f47a1;
-  --color-tj-biru-tua: #0a3478;
-  --color-tj-biru-muda: #e8f0fb;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.1rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.2rem);
+  --radius-2xl: calc(var(--radius) + 0.4rem);
+
+  /* Warna merek dan status. Samakan sepi/padat dengan WARNA_KEPADATAN di route-utils.ts. */
   --color-tj-oranye: #ee6a00;
-  --color-tj-teks: #111827;
-  --color-tj-garis: #d4d4d8;
-  /* Samakan dengan WARNA_KEPADATAN di route-utils.ts. */
   --color-tj-sepi: #15803d;
   --color-tj-padat: #b91c1c;
   --font-sans: var(--font-noto), "Noto Sans", system-ui, sans-serif;
@@ -32,41 +77,51 @@ html {
   overscroll-behavior: none;
 }
 
-body {
-  height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
-  background: #ffffff;
-  color: var(--color-tj-teks);
-  font-family: var(--font-sans);
-  /* Kiosk: tanpa seleksi teks, menu tekan-lama, atau zoom dobel-ketuk. */
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  touch-action: manipulation;
-}
+/* Lapisan base supaya utilitas Tailwind tetap bisa menimpa. */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
 
-button {
-  cursor: pointer;
-}
-button:disabled {
-  cursor: not-allowed;
-}
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    /* Kiosk: tanpa seleksi teks, menu tekan-lama, atau zoom dobel-ketuk. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
 
-/* Umpan balik sentuh dan fokus papan ketik untuk semua tombol. */
-button {
-  transition:
-    transform 0.08s ease-out,
-    filter 0.08s ease-out;
-}
-button:active:not(:disabled) {
-  transform: scale(0.97);
-  filter: brightness(0.92);
-}
-button:focus-visible,
-input:focus-visible {
-  outline: 3px solid var(--color-tj-oranye);
-  outline-offset: 2px;
+  button {
+    cursor: pointer;
+    /* Umpan balik sentuh untuk semua tombol. */
+    transition:
+      transform 0.08s ease-out,
+      filter 0.08s ease-out,
+      background-color 0.15s ease-out,
+      color 0.15s ease-out;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  button:active:not(:disabled) {
+    transform: scale(0.97);
+    filter: brightness(0.94);
+  }
+
+  /* Cincin fokus papan ketik ala shadcn/ui. */
+  button:focus-visible,
+  input:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 5px color-mix(in srgb, var(--color-ring) 55%, transparent);
+  }
 }
 
 /* Pergantian layar: muncul halus. */
@@ -94,32 +149,32 @@ input:focus-visible {
   background: transparent;
 }
 .slider-jam::-webkit-slider-runnable-track {
-  height: 0.6rem;
+  height: 0.5rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-tj-oranye) 30%, white);
+  background: color-mix(in srgb, var(--color-tj-oranye) 25%, white);
 }
 .slider-jam::-webkit-slider-thumb {
   appearance: none;
-  width: 1.8rem;
-  height: 1.8rem;
-  margin-top: -0.6rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-top: -0.55rem;
   border-radius: 50%;
-  border: 3px solid white;
-  background: var(--color-tj-oranye);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  border: 2px solid var(--color-tj-oranye);
+  background: var(--color-background);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
 }
 .slider-jam::-moz-range-track {
-  height: 0.6rem;
+  height: 0.5rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-tj-oranye) 30%, white);
+  background: color-mix(in srgb, var(--color-tj-oranye) 25%, white);
 }
 .slider-jam::-moz-range-thumb {
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 1.6rem;
+  height: 1.6rem;
   border-radius: 50%;
-  border: 3px solid white;
-  background: var(--color-tj-oranye);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  border: 2px solid var(--color-tj-oranye);
+  background: var(--color-background);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
 }
 
 /* Kontrol zoom peta cukup besar untuk jari. */
@@ -137,7 +192,9 @@ input:focus-visible {
 .maplibregl-popup-content {
   font-size: var(--text-kecil);
   padding: 0.6rem 0.9rem;
-  border-radius: 0.7rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
 /* Tiket cetak. Ukuran dalam em supaya pratinjau layar (ikut skala rem kiosk) dan struk
@@ -216,5 +273,7 @@ input:focus-visible {
     overflow: visible;
     padding: 0;
     font-size: 9pt;
+    border-radius: 0;
+    box-shadow: none;
   }
 }
