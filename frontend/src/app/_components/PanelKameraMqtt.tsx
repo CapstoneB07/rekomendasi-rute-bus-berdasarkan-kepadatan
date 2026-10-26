@@ -21,15 +21,14 @@ export function PanelKameraMqtt() {
       <header className="flex items-center gap-[0.5rem] border-b px-[0.7rem] py-[0.3rem] text-kecil">
         <span className="font-bold">Kamera realtime</span>
         <Badge
-          varian={status === 'aktif' ? 'sukses' : status === 'terputus' ? 'destructive' : 'secondary'}
+          varian={status === 'aktif' ? 'aktif' : status === 'terputus' ? 'destructive' : 'secondary'}
           className="ml-auto text-[0.7rem] font-bold leading-[1.2rem]"
         >
           {status === 'aktif' ? 'LIVE' : status === 'terputus' ? 'OFFLINE' : '…'}
         </Badge>
       </header>
       {frame && (
-        // Object URL lokal tiap frame; next/image tidak membantu di sini.
-        // eslint-disable-next-line @next/next/no-img-element
+        // Object URL lokal tiap frame; next/image tidak membantu di sini. eslint-disable-next-line @next/next/no-img-element
         <img src={frame.src} alt="Frame kamera realtime" className="block h-auto w-full" />
       )}
       <p role="status" className="px-[0.7rem] py-[0.2rem] text-kecil text-muted-foreground">

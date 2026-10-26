@@ -49,9 +49,11 @@ export default function Operator() {
 
   return (
     <div className="flex h-dvh w-screen flex-col overflow-hidden bg-background">
-      <header className="flex shrink-0 flex-wrap items-center gap-[0.8rem] border-b px-[1.4rem] py-[0.5rem]">
-        <h1 className="text-besar font-bold tracking-tight">Operator</h1>
-        <Badge varian={isLive ? 'sukses' : 'peringatan'} className="font-bold">
+      <header className="flex h-[3.6rem] shrink-0 items-center gap-[0.8rem] border-b px-[1.4rem]">
+        {/* eslint-disable-next-line @next/next/no-img-element -- logo statis kecil, sama dengan header kiosk */}
+        <img src="/logo-transjakarta.png" alt="TransJakarta" className="h-[2.2rem] w-auto" />
+        <h1 className="border-l pl-[0.8rem] text-besar font-bold tracking-tight">Operator</h1>
+        <Badge varian={isLive ? 'aktif' : 'peringatan'} className="font-bold">
           {isLive ? 'LIVE' : 'SIMULASI'}
         </Badge>
         <span className={`text-jam font-bold tabular-nums ${isLive ? 'text-primary' : 'text-tj-oranye'}`}>
@@ -68,9 +70,10 @@ export default function Operator() {
 
       <main className="relative m-[1.4rem] mt-[0.6rem] min-h-0 flex-1 overflow-hidden rounded-xl border bg-muted shadow-sm">
         <RuteMap rute={undefined} halteMap={halteMap} bus={bus} fokus={halte} />
+        {/* Lebar dibatasi supaya tidak tertutup panel kamera (20rem) di kanan. */}
         <p
           role="status"
-          className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border bg-background/95 px-[0.6rem] py-[0.15rem] text-kecil shadow-sm"
+          className="absolute left-[0.6rem] top-[0.6rem] z-10 max-w-[calc(100%-22rem)] rounded-lg border bg-background/95 px-[0.6rem] py-[0.15rem] text-kecil shadow-sm"
         >
           {halteError ? 'Gagal memuat daftar halte. Pastikan server backend berjalan.' : status}
           {waktu.tersinkron === false && ' · Jam belum terkirim ke halaman user'}

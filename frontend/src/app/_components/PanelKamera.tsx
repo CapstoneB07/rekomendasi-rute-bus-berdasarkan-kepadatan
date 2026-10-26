@@ -20,8 +20,7 @@ const PESAN = {
 
 const JAM_WIB = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', timeStyle: 'medium' });
 
-// Frame kamera dengan kotak deteksi. Kotak memakai persen ukuran asli gambar
-// (diketahui setelah gambar dimuat), jadi ikut skala lebar tampilan.
+// Frame kamera dengan kotak deteksi. Kotak memakai persen ukuran asli gambar (diketahui setelah gambar dimuat), jadi ikut skala lebar tampilan.
 export function FrameKamera({ src, bboxes }: { src: string; bboxes: Bbox[] }) {
   const [ukuran, setUkuran] = useState<{ lebar: number; tinggi: number } | null>(null);
 
@@ -83,7 +82,7 @@ export function PanelKamera() {
       <header className="flex items-center gap-[0.5rem] border-b px-[0.7rem] py-[0.3rem] text-kecil">
         <span className="font-bold">Kamera{data && status === 'aktif' ? ` ${data.bus_id}` : ''}</span>
         <Badge
-          varian={status === 'aktif' ? 'sukses' : status === 'memuat' ? 'secondary' : 'destructive'}
+          varian={status === 'aktif' ? 'aktif' : status === 'memuat' ? 'secondary' : 'destructive'}
           className="ml-auto text-[0.7rem] font-bold leading-[1.2rem]"
         >
           {status === 'aktif' ? 'AKTIF' : status === 'basi' ? 'BASI' : status === 'memuat' ? '…' : 'OFFLINE'}
