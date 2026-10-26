@@ -14,12 +14,7 @@ import { PilihHalte } from './_components/PilihHalte';
 import { Button } from '@/components/ui/button';
 import { API_BASE, GalatApi, galatRute, waktuWib } from '@/lib/api';
 import { formatTanggal } from '@/lib/koridor';
-import {
-  statusBusAsli,
-  type Halte,
-  type HalteOpsi,
-  type Rute,
-} from '@/lib/route-utils';
+import type { Halte, HalteOpsi, Rute } from '@/lib/route-utils';
 import { useIdleReset } from '@/lib/use-idle-reset';
 import { useOnline } from '@/lib/use-online';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
@@ -65,7 +60,7 @@ export default function Home() {
 
   // Browser ini ikut meneruskan bus asli TJ ke backend (IP VPS diblokir broker).
   useRelayBusTj();
-  const { posisiBus, busAsli, busAsliError } = usePosisiBus(simTime, isLive);
+  const { posisiBus, busAsli } = usePosisiBus(simTime, isLive);
 
   const { data: halteList, isError: halteError, refetch: muatUlangHalte } = useQuery<HalteOpsi[]>({
     queryKey: ['halte-user'],
@@ -144,10 +139,11 @@ export default function Home() {
   const ruteAktif =
     hasilRute && hasilRute.length > 0 ? hasilRute[Math.min(aktifIdx, hasilRute.length - 1)] : undefined;
 
-  // Saat satu rencana dibuka, peta hanya menampilkan koridor yang dipakai rencana itu.
+  // Peta hanya menampilkan koridor (jalur dan bus) yang dipakai rencana aktif: kartu yang ditekan di
+  // daftar, atau rencana yang dibuka di detail.
   const koridorRencana = useMemo(
     () =>
-      layar === 'detail' && ruteAktif
+      layar !== 'beranda' && ruteAktif
         ? [...new Set(ruteAktif.segmen.flatMap((s) => (s.tipe === 'naik' ? [s.koridor_id] : [])))]
         : undefined,
     [layar, ruteAktif],
@@ -186,15 +182,6 @@ export default function Home() {
   const online = useOnline();
   // Jam WIB data rute terakhir; hanya relevan saat daftar/detail rencana tampil.
   const diperbaruiDetik = tampilPeta && pencarian && dataUpdatedAt > 0 ? waktuWib(new Date(dataUpdatedAt)).detik : null;
-  // Jumlah bus di label status mengikuti bus yang benar-benar tampil (setelah filter koridor).
-  const busAsliTampil = useMemo(
-    () =>
-      busAsli && koridorRencana
-        ? { ...busAsli, features: busAsli.features.filter((f) => koridorRencana.includes(f.properties.koridor_id)) }
-        : busAsli,
-    [busAsli, koridorRencana],
-  );
-  const statusLive = isLive && tampilPeta ? statusBusAsli(busAsliTampil, busAsliError) : null;
 
   return (
     <div className="flex h-dvh w-screen flex-col overflow-hidden bg-background">
@@ -206,12 +193,13 @@ export default function Home() {
         tanggal={tanggal}
       />
 
-      <main className="grid min-h-0 flex-1 grid-cols-[45fr_55fr] grid-rows-[minmax(0,1fr)] gap-x-[1rem] px-[1.4rem]">
+      {/* Peta memenuhi separuh kanan sampai tepi layar (full-bleed); panel di separuh kiri. */}
+      <main className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[minmax(0,1fr)]">
         {/* Peta tetap terpasang (hanya disembunyikan di beranda) supaya tidak dimuat ulang tiap pindah layar.
             Di beranda panel menutupi kedua kolom; peta yang tak terlihat tidak menangkap sentuhan.
             Atribusi MapLibre memaksa visibility: visible sendiri, jadi ikut disembunyikan dengan !important. */}
         <div
-          className={`relative col-start-2 row-start-1 my-[0.4rem] min-h-0 min-w-0 overflow-hidden rounded-xl border bg-muted shadow-sm ${
+          className={`relative col-start-2 row-start-1 min-h-0 min-w-0 overflow-hidden border-l bg-muted ${
             tampilPeta ? '' : 'invisible [&_.maplibregl-ctrl-attrib]:invisible!'
           }`}
         >
@@ -220,19 +208,12 @@ export default function Home() {
             halteMap={halteMap}
             bus={isLive ? busAsli : posisiBus}
             koridorFilter={koridorRencana}
+            legenda={false}
           />
-          {statusLive && (
-            <p
-              role="status"
-              className="absolute left-[0.6rem] top-[0.6rem] z-10 rounded-lg border bg-background/95 px-[0.6rem] py-[0.15rem] text-kecil shadow-sm"
-            >
-              {statusLive}
-            </p>
-          )}
         </div>
 
         <section
-          className={`row-start-1 min-h-0 min-w-0 pt-[0.4rem] ${
+          className={`row-start-1 min-h-0 min-w-0 px-[1.4rem] pt-[0.4rem] ${
             layar === 'beranda' ? 'col-span-2 col-start-1' : 'col-start-1'
           }`}
         >

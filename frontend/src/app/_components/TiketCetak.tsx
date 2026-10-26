@@ -18,8 +18,7 @@ function Baris({ label, nilai }: { label: string; nilai: string }) {
   );
 }
 
-// Pratinjau tiket. Dipasang langsung di <body> supaya CSS cetak cukup menyembunyikan
-// saudara-saudaranya (seluruh UI kiosk) dan hanya struk ini yang tercetak.
+// Pratinjau tiket. Dipasang langsung di <body> supaya CSS cetak cukup menyembunyikan saudara-saudaranya (seluruh UI kiosk) dan hanya struk ini yang tercetak.
 export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => void }) {
   useEffect(() => {
     const tutup = (e: KeyboardEvent) => e.key === 'Escape' && onTutup();

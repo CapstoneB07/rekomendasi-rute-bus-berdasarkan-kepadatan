@@ -38,7 +38,8 @@ describe('DetailRencana', () => {
     expect(screen.getByText('Ke Blok M')).toBeTruthy();
     expect(screen.getByText('TJ-101')).toBeTruthy();
     expect(screen.getByText('08.04')).toBeTruthy();
-    expect(screen.getByText('(6 menit) 08.10')).toBeTruthy();
+    expect(screen.getByText('· 6 menit')).toBeTruthy();
+    expect(screen.getByText('08.10')).toBeTruthy();
     expect(screen.getByText('Sepi')).toBeTruthy();
     expect(screen.getByText(/Pindah bus di/).textContent).toBe('Pindah bus di Monas ke koridor 13');
     expect(screen.getByText('Belum ada bus terjadwal')).toBeTruthy();

@@ -57,6 +57,6 @@ describe('WaktuKontrol', () => {
     expect(waktu.kembaliKeLive).toHaveBeenCalledOnce();
     cleanup();
     render(<WaktuKontrol waktu={buatWaktu({ isLive: true })} />);
-    expect((screen.getByRole('button', { name: '● Waktu nyata' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Waktu nyata' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

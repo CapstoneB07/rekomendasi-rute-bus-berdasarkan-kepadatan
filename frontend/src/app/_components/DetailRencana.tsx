@@ -54,11 +54,10 @@ function KartuNaik({ item, simTime }: { item: NaikItem; simTime: number }) {
         </div>
         <div className="flex items-baseline justify-between gap-[0.6rem]">
           <dt className="min-w-0">
-            Turun di <b>{item.turun_di}</b>
+            Turun di <b>{item.turun_di}</b>{' '}
+            <span className="whitespace-nowrap text-kecil text-muted-foreground">· {item.waktu_menit} menit</span>
           </dt>
-          <dd className="whitespace-nowrap text-kecil text-muted-foreground tabular-nums">
-            ({item.waktu_menit} menit) {turun !== null ? formatJam(turun) : '—'}
-          </dd>
+          <dd className="whitespace-nowrap text-kecil text-muted-foreground tabular-nums">{turun !== null ? formatJam(turun) : '—'}</dd>
         </div>
       </dl>
     </Card>
@@ -88,14 +87,14 @@ export function DetailRencana({ rute, asal, tujuan, simTime, onKembali }: Props)
       </div>
 
       {/* Rute dengan banyak bus tidak dipadatkan; daftar bergulir bila tidak muat. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-[0.5rem] overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col gap-[0.5rem] overflow-y-auto [scrollbar-width:thin]">
         {rute.segmen.map((s, i) =>
           s.tipe === 'naik' ? (
             <KartuNaik key={i} item={s} simTime={simTime} />
           ) : (
             <div
               key={i}
-              className="shrink-0 rounded-lg border border-dashed border-tj-oranye/50 bg-tj-oranye/5 px-[0.8rem] py-[0.25rem] text-kecil leading-snug"
+              className="shrink-0 rounded-lg border border-dashed border-input bg-muted px-[0.8rem] py-[0.25rem] text-kecil leading-snug"
             >
               Pindah bus di <b>{s.transit_di}</b> ke koridor {s.ke_koridor}
             </div>

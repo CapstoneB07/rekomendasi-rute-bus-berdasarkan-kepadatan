@@ -1,5 +1,4 @@
-// Menutupi layar sebelum reset otomatis; sentuhan apa pun di mana saja memperpanjang sesi
-// (ditangkap useIdleReset) dan hanya menutup peringatan, tanpa menekan tombol di bawahnya.
+// Menutupi layar sebelum reset otomatis; sentuhan apa pun di mana saja memperpanjang sesi (ditangkap useIdleReset) dan hanya menutup peringatan, tanpa menekan tombol di bawahnya.
 export function PeringatanIdle({ sisaDetik }: { sisaDetik: number }) {
   return (
     <div

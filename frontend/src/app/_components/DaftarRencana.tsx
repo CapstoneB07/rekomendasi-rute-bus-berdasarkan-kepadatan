@@ -71,40 +71,40 @@ function KartuRencana({ rute, label, aktif, onPilih, onDetail }: PropsKartu) {
         onClick={onPilih}
         aria-pressed={aktif}
         aria-label={`Rencana ${ringkasan}`}
-        className="flex min-h-0 w-full flex-col text-left"
+        className="flex min-h-0 w-full flex-1 flex-col text-left"
       >
-        <div className="flex w-full items-center gap-[0.25rem] border-b py-[0.25rem] pl-[0.8rem] pr-[3.2rem]">
-          {naik.map((n, i) => (
-            <span key={i} className="flex items-center gap-[0.25rem]">
-              {i > 0 && <IkonChevronKanan className="h-[0.9rem] w-[0.9rem] shrink-0 text-muted-foreground" />}
-              {naik.length < 3 && <IkonBus className="h-[1.5rem] w-[1.5rem]" />}
-              <LencanaKoridor koridorId={n.koridor_id} />
-            </span>
-          ))}
-          <span className="ml-auto whitespace-nowrap text-isi font-bold leading-[1.7rem]">{rute.estimasi_menit} menit</span>
+        <div className="flex w-full items-center gap-[0.3rem] border-b py-[0.25rem] pl-[0.8rem] pr-[2.8rem]">
+          {/* Koridor boleh turun baris bila sempit, supaya jumlah menit tidak tertimpa tombol detail. */}
+          <span className="flex min-w-0 flex-wrap items-center gap-[0.15rem]">
+            {naik.map((n, i) => (
+              <span key={i} className="flex items-center gap-[0.15rem]">
+                {i > 0 && <IkonChevronKanan className="h-[0.75rem] w-[0.75rem] shrink-0 text-muted-foreground" />}
+                {naik.length < 3 && <IkonBus className="h-[1.5rem] w-[1.5rem]" />}
+                <LencanaKoridor koridorId={n.koridor_id} />
+              </span>
+            ))}
+          </span>
+          <span className="ml-auto shrink-0 whitespace-nowrap text-isi font-bold leading-[1.7rem]">{rute.estimasi_menit} menit</span>
         </div>
 
-        <div className="w-full px-[0.8rem] py-[0.3rem]">
+        <div className="flex w-full flex-1 flex-col gap-[0.3rem] px-[0.8rem] py-[0.3rem]">
           <div className="flex flex-wrap gap-[0.35rem]">
             <Badge varian="secondary">{formatRupiah(TARIF_RP)}</Badge>
             {km && <Badge varian="secondary">{km}</Badge>}
             {transit > 0 && <Badge varian="secondary">{transit}× transit</Badge>}
+            {label.map((l, i) => (
+              <Badge key={l} varian={VARIAN_LABEL_RENCANA[l]} className={cn('font-bold', i === 0 && 'ml-auto')}>
+                {l}
+              </Badge>
+            ))}
           </div>
-          <div className="mt-[0.2rem] flex items-center justify-between gap-[0.4rem] text-kecil leading-tight text-muted-foreground">
-            <span>Kepadatan rata-rata</span>
-            <span className="flex gap-[0.3rem]">
-              {label.map((l) => (
-                <Badge key={l} varian={VARIAN_LABEL_RENCANA[l]} className="font-bold leading-tight">
-                  {l}
-                </Badge>
-              ))}
-            </span>
-          </div>
-          <div className="flex items-center gap-[0.6rem]">
+          {/* Bar menempel di dasar kartu supaya sejajar antar kartu yang tingginya disamakan. */}
+          <div className="mt-auto flex items-center gap-[0.6rem] text-kecil">
+            <span className="text-muted-foreground">Kepadatan</span>
             <div className="h-[0.5rem] flex-1 overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full" style={{ width: `${Math.round(v * 100)}%`, background: kepadatanKeWarna(v) }} />
             </div>
-            <span className="whitespace-nowrap text-kecil">
+            <span className="whitespace-nowrap">
               {Math.round(v * 100)}% {teksKepadatan}
             </span>
           </div>
@@ -115,7 +115,7 @@ function KartuRencana({ rute, label, aktif, onPilih, onDetail }: PropsKartu) {
         ukuran="icon"
         onClick={onDetail}
         aria-label={`Lihat detail rencana ${ringkasan}`}
-        className="absolute right-[0.5rem] top-[0.2rem] rounded-full"
+        className="absolute right-[0.5rem] top-[0.2rem]"
       >
         <IkonChevronKanan className="h-[1.1rem] w-[1.1rem]" />
       </Button>
@@ -159,13 +159,12 @@ export function DaftarRencana({ asal, tujuan, hasilRute, memuat, aktifIdx, galat
 
   return (
     <div className="layar-masuk flex h-full min-h-0 flex-col gap-[0.5rem] pb-[0.4rem]">
-      <Button varian="outline" onClick={onKembali} className="self-start">
-        <IkonPanahKiri className="h-[1.2rem] w-[1.2rem]" />
-        Ubah tujuan
-      </Button>
-
-      <div className="flex items-center justify-between gap-[0.5rem]">
-        <h2 className="whitespace-nowrap text-isi font-bold leading-tight">Rencana Perjalanan</h2>
+      <div className="flex items-center gap-[0.8rem]">
+        <Button varian="outline" onClick={onKembali}>
+          <IkonPanahKiri className="h-[1.2rem] w-[1.2rem]" />
+          Ubah tujuan
+        </Button>
+        <h2 className="min-w-0 flex-1 truncate text-besar font-bold tracking-tight">Rencana</h2>
         {jumlah > 1 && !galatTampil && (
           <div className="flex items-center gap-[0.4rem]">
             <Button varian="outline" ukuran="icon" disabled={idx === 0} onClick={() => pindah(idx - 1)} aria-label="Halaman sebelumnya">
@@ -181,7 +180,7 @@ export function DaftarRencana({ asal, tujuan, hasilRute, memuat, aktifIdx, galat
         )}
       </div>
 
-      <dl className="overflow-hidden rounded-xl border text-isi shadow-xs">
+      <dl className="shrink-0 overflow-hidden rounded-xl border text-isi shadow-xs">
         {[
           ['Dari', asal],
           ['Ke', tujuan],
@@ -207,8 +206,9 @@ export function DaftarRencana({ asal, tujuan, hasilRute, memuat, aktifIdx, galat
           <div className="rounded-xl bg-muted" />
         </div>
       ) : (
-        <>
-          <div className="flex min-h-0 flex-1 flex-col gap-[0.5rem]">
+        // Baris 1fr tanpa tinggi tetap: semua kartu setinggi kartu tertinggi di halaman ini. Wadahnya bergulir bila tetap tidak muat (ringkasan Dari/Ke tidak terhimpit); padding memberi ruang cincin kartu aktif.
+        <div className="-m-[0.2rem] min-h-0 flex-1 overflow-y-auto p-[0.2rem] [scrollbar-width:thin]">
+          <div className="grid auto-rows-fr gap-[0.5rem]">
             {items.map((r, i) => {
               const gi = idx * PER_HALAMAN + i;
               return (
@@ -223,7 +223,7 @@ export function DaftarRencana({ asal, tujuan, hasilRute, memuat, aktifIdx, galat
               );
             })}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

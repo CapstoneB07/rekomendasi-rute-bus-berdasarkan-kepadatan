@@ -22,12 +22,15 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
       aria-label="Mode simulasi"
       className="flex h-[2.6rem] items-center gap-[0.6rem] rounded-xl border bg-card px-[0.7rem] shadow-sm"
     >
-      <span className="whitespace-nowrap text-kecil font-bold text-tj-oranye">Mode simulasi</span>
+      <span className={cn('whitespace-nowrap text-kecil font-bold', isLive ? 'text-muted-foreground' : 'text-tj-oranye')}>
+        {isLive ? 'Simulasi' : 'Mode simulasi'}
+      </span>
 
       <Button
         ukuran="icon"
+        varian={isLive ? 'outline' : 'default'}
         onClick={togglePlay}
-        className="rounded-full bg-tj-oranye hover:bg-tj-oranye/90"
+        className={cn(!isLive && 'bg-tj-oranye hover:bg-tj-oranye/90')}
         aria-label={berjalan ? 'Jeda jam' : 'Jalankan jam'}
       >
         {berjalan ? <IkonJeda className="h-[1rem] w-[1rem]" /> : <IkonMain className="h-[1rem] w-[1rem]" />}
@@ -40,7 +43,7 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
         step={60}
         value={Math.min(Math.max(simTime, JAM_MULAI), JAM_SELESAI)}
         onChange={(e) => aturJam(Number(e.target.value))}
-        className="slider-jam h-[2rem] min-w-0 flex-1"
+        className={cn('slider-jam h-[2rem] min-w-0 flex-1', isLive && 'slider-jam-live')}
         aria-label="Geser jam simulasi"
       />
 
@@ -53,7 +56,7 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
             onClick={() => aturKecepatan(k)}
             aria-pressed={!isLive && kecepatan === k}
             className={cn(
-              'h-[1.8rem] min-w-[2.1rem] rounded-md px-[0.3rem] text-kecil font-medium leading-none text-muted-foreground',
+              'h-[2rem] min-w-[2.2rem] rounded-md px-[0.3rem] text-kecil font-medium leading-none text-muted-foreground',
               !isLive && kecepatan === k && 'bg-background font-bold text-tj-oranye shadow-sm',
             )}
           >
@@ -64,13 +67,14 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
 
       <Button
         ukuran="sm"
-        varian={isLive ? 'default' : 'outline'}
+        varian="outline"
         onClick={kembaliKeLive}
         disabled={isLive}
         aria-pressed={isLive}
-        className={cn('font-bold', isLive && 'bg-tj-sepi disabled:opacity-100')}
+        className={cn('font-bold', isLive && 'disabled:opacity-100')}
       >
-        {isLive ? '● Waktu nyata' : 'Waktu nyata'}
+        {isLive && <span aria-hidden className="size-[0.5rem] rounded-full bg-tj-sepi" />}
+        Waktu nyata
       </Button>
     </section>
   );
