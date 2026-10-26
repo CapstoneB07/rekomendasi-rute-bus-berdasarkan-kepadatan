@@ -41,15 +41,28 @@ const EMPTY_POINTS: PosisiBusResponse = { type: 'FeatureCollection', features: [
 // Gambar ulang bus asli maksimal ±30x per detik; cukup halus dan tidak membebani peta.
 const FRAME_BUS_MS = 33;
 
-const WARNA_LIVE = '#2563eb';
 const TRANSPARAN = 'rgba(0,0,0,0)';
 const WARNA_KORIDOR_EKSPRESI = ekspresiWarnaKoridor() as unknown as ExpressionSpecification;
 const WARNA_TEKS_KORIDOR_EKSPRESI = ekspresiWarnaKoridor('teks') as unknown as ExpressionSpecification;
 
-// Ukuran titik bus mengikuti zoom: titik kecil saat kota terlihat utuh, membesar menjadi
-// lencana bernomor koridor saat zoom dekat (gaya peta bus langsung).
+// Ukuran titik bus mengikuti zoom: titik kecil saat kota terlihat utuh, membesar menjadi lencana bernomor koridor saat zoom dekat (gaya peta bus langsung).
 const ZOOM_PANAH = 13;
 const ZOOM_LABEL = 15;
+// Skala penanda rute (titik + label) mengikuti zoom seperti titik bus: kecil saat kota terlihat utuh,
+// ukuran penuh saat zoom dekat. Label tetap terbaca di skala terkecil.
+const SKALA_PENANDA: [number, number][] = [[10, 0.55], [12, 0.7], [14, 0.85], [15, 1]];
+
+function skalaPenanda(zoom: number): number {
+  const [z0, s0] = SKALA_PENANDA[0];
+  if (zoom <= z0) return s0;
+  for (let i = 1; i < SKALA_PENANDA.length; i++) {
+    const [za, sa] = SKALA_PENANDA[i - 1];
+    const [zb, sb] = SKALA_PENANDA[i];
+    if (zoom <= zb) return sa + ((zoom - za) / (zb - za)) * (sb - sa);
+  }
+  return SKALA_PENANDA[SKALA_PENANDA.length - 1][1];
+}
+
 const JARI_TITIK: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 10, 3.5, 12, 5, 14, 7, 15, 9, 17, 12];
 // Kepadatan sebagai cahaya lembut di sekeliling titik; jarinya selalu sedikit lebih besar dari titik.
 const JARI_HALO: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 10, 7, 12, 9, 14, 12, 15, 14, 17, 18];
@@ -82,28 +95,109 @@ function buatGambarMoncong(): { data: ImageData; pixelRatio: number } {
   ctx.stroke();
   return { data: ctx.getImageData(0, 0, ukuran, ukuran), pixelRatio };
 }
-const WARNA_NAIK = '#111827';
-const WARNA_TRANSIT = '#d97706';
-const WARNA_TURUN = '#dc2626';
+// Penanda rute dibedakan lewat bentuk dan warna netral/primary, bukan hijau/kuning/merah, karena warna semafor di peta khusus untuk kepadatan.
+const GAYA_PENANDA = {
+  naik: { titik: 'rounded-full border-white bg-primary', label: 'border-primary bg-primary text-primary-foreground' },
+  transit: { titik: 'rotate-45 rounded-sm border-foreground bg-background', label: 'border-foreground bg-background text-foreground' },
+  turun: { titik: 'rounded-full border-white bg-foreground', label: 'border-foreground bg-foreground text-background' },
+} as const;
+type JenisPenanda = keyof typeof GAYA_PENANDA;
 
-// Penanda berlabel: titik di koordinat halte, label menempel di kanannya.
-// Label memakai textContent supaya nama halte tidak pernah diparse sebagai HTML.
-function buatPenanda(warna: string, teks: string, belah = false): HTMLElement {
+// Penanda berlabel: titik di koordinat halte, label menempel di kanannya. Label memakai textContent supaya nama halte tidak pernah diparse sebagai HTML.
+function buatPenanda(jenis: JenisPenanda, teks: string): HTMLElement {
+  const gaya = GAYA_PENANDA[jenis];
   const root = document.createElement('div');
-  root.className = 'relative h-5 w-5';
+  root.className = 'h-5 w-5';
+  root.dataset.jenis = jenis;
+  // Posisi root dikendalikan MapLibre (transform); skala zoom dipasang di isi agar tidak bertabrakan.
+  const isi = document.createElement('div');
+  isi.className = 'relative h-full w-full';
 
   const titik = document.createElement('div');
-  titik.className = `h-5 w-5 border-[3px] border-white shadow ${belah ? 'rotate-45 rounded-sm' : 'rounded-full'}`;
-  titik.style.background = warna;
+  titik.className = `h-5 w-5 border-[3px] shadow ${gaya.titik}`;
 
   const label = document.createElement('span');
-  label.className =
-    'absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-lg border-2 border-white px-2.5 py-1 text-kecil font-bold text-white shadow';
-  label.style.background = warna;
+  // Posisi label diatur tataLabel (left/top inline) supaya tidak terpotong tepi atau menimpa label lain.
+  label.className = `absolute left-0 top-0 whitespace-nowrap rounded-lg border px-2 py-0.5 text-kecil font-bold shadow-sm ${gaya.label}`;
   label.textContent = teks;
 
-  root.append(titik, label);
+  isi.append(titik, label);
+  root.append(isi);
   return root;
+}
+
+type Kotak = { x: number; y: number; w: number; h: number };
+
+// Jarak minimum antar label/titik supaya label yang berdekatan tidak tampak menempel.
+const RENGGANG_LABEL = 4;
+// Ukuran label pecahan (skala zoom) membuat luas tumpang "nol" bisa bernilai 1e-12; di bawah ini dianggap bebas.
+const TUMPANG_DIABAIKAN = 0.5;
+
+function lebarkan(k: Kotak, d: number): Kotak {
+  return { x: k.x - d, y: k.y - d, w: k.w + 2 * d, h: k.h + 2 * d };
+}
+
+function luasTumpang(a: Kotak, b: Kotak): number {
+  const lebar = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const tinggi = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return Math.max(0, lebar) * Math.max(0, tinggi);
+}
+
+// Tata label penanda supaya tidak terpotong tepi peta dan tidak saling menimpa. Tiap label mencoba sisi
+// kanan/kiri titiknya (sisi ke arah tengah peta dulu), lalu digeser ke atas/bawah; dipakai posisi pertama
+// yang bebas, atau yang paling sedikit menimpa bila semuanya bertabrakan. Titik penanda ikut dihindari.
+// NAIK/TURUN ditata dulu dan selalu tampil; label TRANSIT yang tidak punya tempat bebas (peta jauh di-zoom
+// out) disembunyikan sampai ada ruang, titiknya tetap terlihat.
+function tataLabel(map: MapLibreMap, penanda: Marker[]) {
+  const wadah = map.getContainer();
+  const batas: Kotak = { x: 0, y: 0, w: wadah.clientWidth, h: wadah.clientHeight };
+  // Ukur semua dulu, baru tulis posisi, supaya tidak memaksa tata letak ulang di tiap label.
+  // Isi penanda diskalakan k di sekitar pusat titik; ukuran layar = ukuran CSS x k.
+  const k = skalaPenanda(map.getZoom());
+  const data = penanda.flatMap((m) => {
+    const root = m.getElement();
+    const isi = root.firstElementChild as HTMLElement | null;
+    const label = root.querySelector('span');
+    if (!isi || !label) return [];
+    const wajib = root.dataset.jenis !== 'transit';
+    const s0 = root.offsetWidth;
+    return [{ isi, label, wajib, p: map.project(m.getLngLat()), s0, s: s0 * k, w: label.offsetWidth * k, h: label.offsetHeight * k }];
+  });
+  data.sort((a, b) => Number(b.wajib) - Number(a.wajib));
+  const terisi: Kotak[] = data.map(({ p, s }) => ({ x: p.x - s / 2, y: p.y - s / 2, w: s, h: s }));
+
+  for (const { isi, label, wajib, p, s0, s, w, h } of data) {
+    isi.style.transform = `scale(${k})`;
+    const jarak = s * 0.4;
+    const kanan = p.x + s / 2 + jarak;
+    const kiri = p.x - s / 2 - jarak - w;
+    const [utama, cadangan] = p.x < batas.w / 2 ? [kanan, kiri] : [kiri, kanan];
+    const naik = -(h / 2 + jarak);
+    const turun = h / 2 + jarak;
+    const calon: [number, number][] = [
+      [utama, 0], [cadangan, 0], [utama, naik], [utama, turun], [cadangan, naik], [cadangan, turun],
+    ];
+
+    let terbaik: Kotak = { x: utama, y: p.y - h / 2, w, h };
+    let skorTerbaik = Infinity;
+    for (const [x, dy] of calon) {
+      const k = { x, y: p.y - h / 2 + dy, w, h };
+      const longgar = lebarkan(k, RENGGANG_LABEL);
+      const skor = w * h - luasTumpang(k, batas) + terisi.reduce((t, o) => t + luasTumpang(longgar, o), 0);
+      if (skor < skorTerbaik) {
+        terbaik = k;
+        skorTerbaik = skor;
+      }
+      if (skor < TUMPANG_DIABAIKAN) break;
+    }
+    const tampil = wajib || skorTerbaik < TUMPANG_DIABAIKAN;
+    label.style.visibility = tampil ? '' : 'hidden';
+    if (!tampil) continue;
+    terisi.push(terbaik);
+    // Kembalikan dari koordinat layar ke koordinat CSS isi (sebelum diskalakan di sekitar pusatnya).
+    label.style.left = `${(terbaik.x - p.x) / k + s0 / 2}px`;
+    label.style.top = `${(terbaik.y - p.y) / k + s0 / 2}px`;
+  }
 }
 
 // Label bus berdata CV; cincin birunya digambar layer bus-live-ring.
@@ -112,8 +206,7 @@ function buatLabelLive(): HTMLElement {
   root.className = 'h-0 w-0';
   const label = document.createElement('span');
   label.className =
-    'absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-kecil font-bold text-white shadow';
-  label.style.background = WARNA_LIVE;
+    'absolute bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-2.5 py-0.5 text-kecil font-bold text-primary-foreground shadow';
   root.append(label);
   return root;
 }
@@ -154,22 +247,22 @@ function isiPopupBus(p: BusPosisi): HTMLElement {
   return root;
 }
 
-type Titik = { halte: Halte; warna: string; teks: string; belah?: boolean };
+type Titik = { halte: Halte; jenis: JenisPenanda; teks: string };
 
 function titikPenanda(rute: Rute, halteMap: Map<string, Halte>): Titik[] {
   const titik: Titik[] = [];
-  const tambah = (id: string, warna: string, awalan: string, belah?: boolean) => {
+  const tambah = (id: string, jenis: JenisPenanda) => {
     const halte = halteMap.get(id);
-    if (halte) titik.push({ halte, warna, teks: `${awalan} · ${halte.nama}`, belah });
+    if (halte) titik.push({ halte, jenis, teks: `${jenis.toUpperCase()} · ${halte.nama}` });
   };
 
   const naik = rute.segmen.filter((s) => s.tipe === 'naik');
   if (naik.length === 0) return titik;
-  tambah(naik[0].naik_di_id, WARNA_NAIK, 'NAIK');
+  tambah(naik[0].naik_di_id, 'naik');
   for (const s of rute.segmen) {
-    if (s.tipe === 'transit') tambah(s.transit_di_id, WARNA_TRANSIT, 'TRANSIT', true);
+    if (s.tipe === 'transit') tambah(s.transit_di_id, 'transit');
   }
-  tambah(naik[naik.length - 1].turun_di_id, WARNA_TURUN, 'TURUN');
+  tambah(naik[naik.length - 1].turun_di_id, 'turun');
   return titik;
 }
 
@@ -181,11 +274,13 @@ type Props = {
   koridorFilter?: number[];
   // Tanpa rute: peta diarahkan ke halte ini dan menandainya (pemilih lokasi halaman operator).
   fokus?: Halte;
+  // Legenda kepadatan bus; halaman user menyembunyikannya supaya peta bersih.
+  legenda?: boolean;
 };
 
 const LAYER_BUS = ['bus-ring', 'bus-arrow', 'bus-dots', 'bus-label'] as const;
 
-export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
+export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
@@ -218,6 +313,8 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
       style: BASEMAP_STYLE,
       center: JAKARTA,
       zoom: 11,
+      // Atribusi wajib (lisensi OSM/OpenMapTiles) tetap ada, tetapi diringkas menjadi tombol ⓘ.
+      attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
@@ -232,6 +329,8 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
     map.on('idle', () => setPetaGagal(false));
 
     map.on('load', () => {
+      // Mode ringkas MapLibre mulai terbuka dan baru menutup saat peta diseret; kiosk jarang diseret.
+      container.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
       // Jalur koridor tipis di bawah rute supaya posisi bus punya konteks.
       map.addSource('shapes', { type: 'geojson', data: EMPTY_LINES });
       map.addLayer({
@@ -265,8 +364,7 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
         paint: { 'line-color': ['get', 'warna'], 'line-width': 9 },
       });
 
-      // Bus di atas semua garis: titik warna koridor berbingkai putih, cahaya = kepadatan (tanpa cahaya bila
-      // tidak ada data), moncong = arah jalan (zoom sedang), nomor koridor di dalam titik (zoom dekat).
+      // Bus di atas semua garis: titik warna koridor berbingkai putih, cahaya = kepadatan (tanpa cahaya bila tidak ada data), moncong = arah jalan (zoom sedang), nomor koridor di dalam titik (zoom dekat).
       const { data: moncong, pixelRatio } = buatGambarMoncong();
       map.addImage('moncong', moncong, { pixelRatio });
       map.addSource('bus', { type: 'geojson', data: EMPTY_POINTS });
@@ -277,7 +375,7 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
         paint: {
           'circle-radius': JARI_HALO,
           'circle-blur': 0.15,
-          'circle-opacity': 0.5,
+          'circle-opacity': 0.7,
           // null -> -1 -> di bawah ambang pertama -> tanpa cahaya.
           'circle-color': [
             'step',
@@ -442,6 +540,11 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
 
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+    const aturLabel = () => tataLabel(map, markersRef.current);
+    map.on('move', aturLabel);
+    const lepas = () => {
+      map.off('move', aturLabel);
+    };
 
     const garis = rute ? buildRouteGeoJSON(rute.segmen, halteMap, shapes) : EMPTY_LINES;
     (map.getSource('rute') as GeoJSONSource).setData(garis);
@@ -449,11 +552,12 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
       if (fokus) {
         const lngLat: [number, number] = [fokus.lng, fokus.lat];
         markersRef.current.push(
-          new maplibregl.Marker({ element: buatPenanda(WARNA_NAIK, fokus.nama) }).setLngLat(lngLat).addTo(map),
+          new maplibregl.Marker({ element: buatPenanda('naik', fokus.nama) }).setLngLat(lngLat).addTo(map),
         );
         map.flyTo({ center: lngLat, zoom: 15, duration: 600 });
       }
-      return;
+      aturLabel();
+      return lepas;
     }
 
     const bounds = new maplibregl.LngLatBounds();
@@ -462,7 +566,7 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
     for (const t of titikPenanda(rute, halteMap)) {
       const lngLat: [number, number] = [t.halte.lng, t.halte.lat];
       markersRef.current.push(
-        new maplibregl.Marker({ element: buatPenanda(t.warna, t.teks, t.belah) })
+        new maplibregl.Marker({ element: buatPenanda(t.jenis, t.teks) })
           .setLngLat(lngLat)
           .addTo(map),
       );
@@ -470,6 +574,8 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
     }
 
     if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: { top: 70, bottom: 70, left: 70, right: 70 }, maxZoom: 15, duration: 600 });
+    aturLabel();
+    return lepas;
   }, [ready, rute, halteMap, shapes, fokus]);
 
   return (
@@ -483,23 +589,25 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus }: Props) {
           Peta belum dapat dimuat. Periksa koneksi internet.
         </p>
       )}
-      <ul className="absolute bottom-[0.6rem] left-[0.6rem] z-10 flex items-center gap-x-[0.8rem] rounded-lg border bg-background/95 px-[0.7rem] py-[0.25rem] text-kecil shadow-sm">
-        <li className="font-bold">Kepadatan:</li>
-        {[
-          ['Sepi', kepadatanKeWarna(0)],
-          ['Sedang', kepadatanKeWarna(0.5)],
-          ['Padat', kepadatanKeWarna(1)],
-        ].map(([teks, warna]) => (
-          <li key={teks} className="flex items-center gap-[0.3rem]">
-            {/* Titik dengan cahaya kepadatan, sama seperti layer bus-ring di peta. */}
-            <span
-              className="size-[0.6rem] rounded-full border border-white bg-muted-foreground"
-              style={{ boxShadow: `0 0 0.15rem 0.2rem color-mix(in srgb, ${warna} 60%, transparent)` }}
-            />
-            {teks}
-          </li>
-        ))}
-      </ul>
+      {legenda && (
+        <ul className="absolute bottom-[0.6rem] left-[0.6rem] z-10 flex items-center gap-x-[0.8rem] rounded-lg border bg-background/95 px-[0.7rem] py-[0.25rem] text-kecil shadow-sm">
+          <li className="font-bold">Kepadatan:</li>
+          {[
+            ['Sepi', kepadatanKeWarna(0)],
+            ['Sedang', kepadatanKeWarna(0.5)],
+            ['Padat', kepadatanKeWarna(1)],
+          ].map(([teks, warna]) => (
+            <li key={teks} className="flex items-center gap-[0.3rem]">
+              {/* Cincin kepadatan di sekeliling titik bus, versi tegas dari layer bus-ring di peta. */}
+              <span
+                className="size-[0.55rem] rounded-full border border-white bg-muted-foreground"
+                style={{ boxShadow: `0 0 0 0.18rem ${warna}` }}
+              />
+              {teks}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
