@@ -1,6 +1,18 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
-import { statusBusAsli, type PosisiBusAsliResponse, type StatusBroker } from './route-utils';
+import { statusBusAsli, WARNA_KEPADATAN, type PosisiBusAsliResponse, type StatusBroker } from './route-utils';
+
+describe('WARNA_KEPADATAN', () => {
+  // Peta (MapLibre) butuh nilai warna di JS, kelas Tailwind butuh token CSS; keduanya harus satu palet.
+  it('sama dengan token --color-tj-* di globals.css', () => {
+    const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+    for (const [nama, warna] of Object.entries(WARNA_KEPADATAN)) {
+      expect(css).toMatch(new RegExp(`--color-tj-${nama}:\\s*${warna};`, 'i'));
+    }
+  });
+});
 
 const respons = (status: StatusBroker, n: number): PosisiBusAsliResponse => ({
   type: 'FeatureCollection',

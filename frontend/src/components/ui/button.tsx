@@ -15,7 +15,8 @@ const UKURAN = {
   default: 'h-[2.4rem] px-[0.9rem] text-isi',
   sm: 'h-[2rem] rounded-md px-[0.6rem] text-kecil',
   lg: 'h-[2.8rem] px-[1.2rem] text-isi',
-  icon: 'size-[2rem] rounded-md',
+  // Tombol ikon selalu bulat supaya mudah dibedakan dari tombol berlabel.
+  icon: 'size-[2rem] rounded-full',
 } as const;
 
 export type VarianTombol = keyof typeof VARIAN;

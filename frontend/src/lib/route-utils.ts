@@ -92,7 +92,7 @@ export type PosisiBusAsliResponse = GeoJSON.FeatureCollection<GeoJSON.Point, Bus
 const TEKS_STATUS_BROKER: Record<Exclude<StatusBroker, 'tersambung'>, string> = {
   menyambung: 'Menyambung ke data bus TransJakarta…',
   ditolak: 'Data bus TransJakarta menolak koneksi; bus asli tidak tersedia.',
-  terputus: 'Koneksi ke data bus TransJakarta terputus, mencoba lagi…',
+  terputus: 'Data bus live terputus · mencoba lagi…',
 };
 
 // Teks status di bawah jam saat mode waktu nyata.
@@ -182,7 +182,7 @@ export function normalisasiKepadatanDisplay(kepadatan: number): number {
 // supaya distribusi merah/kuning/hijau seimbang untuk kepadatan jam sibuk
 // TransJakarta tipikal (mean ~0.5, std ~0.2).
 // Satu-satunya palet kepadatan: teks, bar, cincin bus, dan legenda memakainya. Cukup gelap untuk
-// terbaca di atas peta terang dan teks putih; samakan dengan --color-tj-sepi/-padat di globals.css.
+// terbaca di atas peta terang dan teks putih; harus sama dengan --color-tj-sepi/-sedang/-padat di globals.css.
 export const WARNA_KEPADATAN = { sepi: '#15803d', sedang: '#b45309', padat: '#b91c1c' } as const;
 
 export function kepadatanKeWarna(kepadatan: number): string {

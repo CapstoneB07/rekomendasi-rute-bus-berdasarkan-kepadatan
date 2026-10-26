@@ -9,6 +9,8 @@ const VARIAN = {
   destructive: 'border-transparent bg-destructive text-white',
   sukses: 'border-transparent bg-tj-sepi text-white',
   peringatan: 'border-transparent bg-tj-oranye text-white',
+  // Status menyala: titik hijau kecil, bukan blok hijau yang bisa dikira kepadatan Sepi.
+  aktif: 'text-foreground before:size-[0.5rem] before:rounded-full before:bg-tj-sepi',
 } as const;
 
 type Props = ComponentProps<'span'> & { varian?: keyof typeof VARIAN };

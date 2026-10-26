@@ -54,9 +54,11 @@
   --radius-xl: calc(var(--radius) + 0.2rem);
   --radius-2xl: calc(var(--radius) + 0.4rem);
 
-  /* Warna merek dan status. Samakan sepi/padat dengan WARNA_KEPADATAN di route-utils.ts. */
+  /* Hijau/kuning tua/merah hanya berarti kepadatan (dan hijau = status aktif); oranye hanya mode simulasi.
+     Harus sama dengan WARNA_KEPADATAN di route-utils.ts (dijaga route-utils.test.ts). */
   --color-tj-oranye: #ee6a00;
   --color-tj-sepi: #15803d;
+  --color-tj-sedang: #b45309;
   --color-tj-padat: #b91c1c;
   --font-sans: var(--font-noto), "Noto Sans", system-ui, sans-serif;
 
@@ -147,11 +149,18 @@ html {
 .slider-jam {
   appearance: none;
   background: transparent;
+  --slider-jalur: color-mix(in srgb, var(--color-tj-oranye) 25%, white);
+  --slider-pegangan: var(--color-tj-oranye);
+}
+/* Saat waktu nyata slider tidak sedang mengatur jam simulasi, jadi tampil netral (oranye = simulasi). */
+.slider-jam-live {
+  --slider-jalur: var(--color-muted);
+  --slider-pegangan: var(--color-input);
 }
 .slider-jam::-webkit-slider-runnable-track {
   height: 0.5rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-tj-oranye) 25%, white);
+  background: var(--slider-jalur);
 }
 .slider-jam::-webkit-slider-thumb {
   appearance: none;
@@ -159,22 +168,27 @@ html {
   height: 1.6rem;
   margin-top: -0.55rem;
   border-radius: 50%;
-  border: 2px solid var(--color-tj-oranye);
+  border: 2px solid var(--slider-pegangan);
   background: var(--color-background);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
 }
 .slider-jam::-moz-range-track {
   height: 0.5rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-tj-oranye) 25%, white);
+  background: var(--slider-jalur);
 }
 .slider-jam::-moz-range-thumb {
   width: 1.6rem;
   height: 1.6rem;
   border-radius: 50%;
-  border: 2px solid var(--color-tj-oranye);
+  border: 2px solid var(--slider-pegangan);
   background: var(--color-background);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+
+/* maplibre-gl.css memasang Helvetica/Arial pada peta; penanda, legenda, dan popup ikut font aplikasi. */
+.maplibregl-map {
+  font-family: var(--font-sans);
 }
 
 /* Kontrol zoom peta cukup besar untuk jari. */
