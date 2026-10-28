@@ -23,8 +23,8 @@ type Props = {
 export function Header({ namaHalte, onUbahHalte, halteSiap, waktu, tanggal }: Props) {
   const simulasi = !waktu.isLive;
   return (
-    <header className="shrink-0 border-b px-[1.4rem]">
-      <div className="grid h-[3.6rem] grid-cols-[1fr_auto_1fr] items-center gap-[0.8rem]">
+    <header className="shrink-0 border-b px-[1.4rem] hp:px-[1rem]">
+      <div className="grid h-[3.6rem] grid-cols-[1fr_auto_1fr] items-center gap-[0.8rem] hp:h-[3.4rem] hp:gap-[0.5rem]">
         {MODE_DEMO ? (
           <button
             type="button"
@@ -34,7 +34,7 @@ export function Header({ namaHalte, onUbahHalte, halteSiap, waktu, tanggal }: Pr
             className="-mx-[0.5rem] flex min-w-0 flex-col items-start justify-self-start rounded-lg px-[0.5rem] py-[0.1rem] text-left hover:bg-accent disabled:opacity-50"
           >
             <span className="text-kecil leading-tight text-muted-foreground">Anda di halte</span>
-            <span className="flex max-w-full items-center gap-[0.3rem] text-besar font-bold leading-tight text-primary">
+            <span className="flex max-w-full items-center gap-[0.3rem] text-besar font-bold leading-tight text-primary hp:text-isi">
               <span className="truncate">{namaHalte}</span>
               <IkonCaretBawah className="h-[1.1rem] w-[1.1rem] shrink-0 text-muted-foreground" />
             </span>
@@ -43,11 +43,11 @@ export function Header({ namaHalte, onUbahHalte, halteSiap, waktu, tanggal }: Pr
           // Kiosk terpasang di satu halte, jadi asal tidak bisa diganti pengguna.
           <div className="flex min-w-0 flex-col items-start justify-self-start">
             <span className="text-kecil leading-tight text-muted-foreground">Anda di halte</span>
-            <span className="max-w-full truncate text-besar font-bold leading-tight text-primary">{namaHalte}</span>
+            <span className="max-w-full truncate text-besar font-bold leading-tight text-primary hp:text-isi">{namaHalte}</span>
           </div>
         )}
 
-        <img src="/logo-transjakarta.png" alt="TransJakarta" className="h-[2.7rem] w-auto" />
+        <img src="/logo-transjakarta.png" alt="TransJakarta" className="h-[2.7rem] w-auto hp:h-[2rem]" />
 
         <div className="flex flex-col items-end justify-self-end">
           {simulasi ? (
@@ -57,7 +57,7 @@ export function Header({ namaHalte, onUbahHalte, halteSiap, waktu, tanggal }: Pr
           ) : (
             <div className="whitespace-nowrap text-kecil leading-tight text-muted-foreground">{tanggal}</div>
           )}
-          <div className={`text-jam font-bold leading-none tabular-nums ${simulasi ? 'text-tj-oranye' : 'text-primary'}`}>
+          <div className={`text-jam font-bold leading-none tabular-nums hp:text-judul ${simulasi ? 'text-tj-oranye' : 'text-primary'}`}>
             {formatJam(waktu.simTime)}
           </div>
         </div>

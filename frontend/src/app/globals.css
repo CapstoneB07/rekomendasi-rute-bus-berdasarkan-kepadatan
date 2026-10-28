@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
+/* Ponsel: satu kolom, peta di atas panel. Harus sama dengan QUERY_HP di lib/use-layar-hp.ts. */
+@custom-variant hp (@media (max-width: 767px));
+
 /* Token warna semantik ala shadcn/ui (https://ui.shadcn.com/docs/theming): netral zinc dengan
    primary biru TransJakarta. Kiosk hanya memakai tema terang. */
 :root {
@@ -77,6 +80,13 @@ html {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/* Ponsel: skala rem tetap terbaca dan target sentuh tidak mengecil; tinggi dijaga lewat gulir di dalam panel. */
+@media (max-width: 767px) {
+  html {
+    font-size: clamp(14px, 4vw, 16px);
+  }
 }
 
 /* Lapisan base supaya utilitas Tailwind tetap bisa menimpa. */
