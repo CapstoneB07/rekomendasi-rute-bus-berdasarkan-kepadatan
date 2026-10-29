@@ -15,3 +15,5 @@ runs/
 received_images_latency/
 
 .DS_Store
+
+datasets/
