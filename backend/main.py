@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import live, rute, simulation, waktu
+from routers import live, pencarian, rute, simulation, waktu
 from services.dijkstra import load_graph_data
 from services.gtfs_simulation import load_simulation_context, resolve_simulation_run_id
 from services.live_buses import LiveBuses
@@ -110,3 +110,4 @@ app.include_router(live.router)
 app.include_router(simulation.router)
 app.include_router(rute.router)
 app.include_router(waktu.router)
+app.include_router(pencarian.router)

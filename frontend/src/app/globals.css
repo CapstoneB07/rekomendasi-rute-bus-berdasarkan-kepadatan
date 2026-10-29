@@ -1,8 +1,11 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
+/* Ponsel: satu kolom, peta di atas panel. Harus sama dengan QUERY_HP di lib/use-layar-hp.ts. */
+@custom-variant hp (@media (max-width: 767px));
+
 /* Token warna semantik ala shadcn/ui (https://ui.shadcn.com/docs/theming): netral zinc dengan
-   primary biru TransJakarta. Kiosk hanya memakai tema terang. */
+   primary biru dan destructive merah TransJakarta (biru #2f489c, merah #d62126, dari papan rute resmi). Kiosk hanya memakai tema terang. */
 :root {
   --background: #ffffff;
   --foreground: #09090b;
@@ -10,19 +13,19 @@
   --card-foreground: #09090b;
   --popover: #ffffff;
   --popover-foreground: #09090b;
-  --primary: #0f47a1;
+  --primary: #2f489c;
   --primary-foreground: #ffffff;
   --secondary: #f4f4f5;
   --secondary-foreground: #18181b;
   --muted: #f4f4f5;
   /* zinc-600, sedikit lebih gelap dari bawaan shadcn supaya terbaca dari jarak kiosk. */
   --muted-foreground: #52525b;
-  --accent: #eef3fb;
-  --accent-foreground: #0f47a1;
-  --destructive: #b91c1c;
+  --accent: #eef1f9;
+  --accent-foreground: #2f489c;
+  --destructive: #d62126;
   --border: #e4e4e7;
   --input: #d4d4d8;
-  --ring: #0f47a1;
+  --ring: #2f489c;
   --radius: 0.6rem;
 }
 
@@ -57,6 +60,7 @@
   /* Hijau/kuning tua/merah hanya berarti kepadatan (dan hijau = status aktif); oranye hanya mode simulasi.
      Harus sama dengan WARNA_KEPADATAN di route-utils.ts (dijaga route-utils.test.ts). */
   --color-tj-oranye: #ee6a00;
+  --color-tj-merah: #d62126; /* merah merek, bukan 'padat' */
   --color-tj-sepi: #15803d;
   --color-tj-sedang: #b45309;
   --color-tj-padat: #b91c1c;
@@ -79,10 +83,22 @@ html {
   overscroll-behavior: none;
 }
 
+/* Ponsel: skala rem tetap terbaca dan target sentuh tidak mengecil; tinggi dijaga lewat gulir di dalam panel. */
+@media (max-width: 767px) {
+  html {
+    font-size: clamp(14px, 4vw, 16px);
+  }
+}
+
 /* Lapisan base supaya utilitas Tailwind tetap bisa menimpa. */
 @layer base {
   * {
     border-color: var(--color-border);
+    /* Gulir tetap jalan, batang gulirnya disembunyikan. */
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
   }
 
   body {

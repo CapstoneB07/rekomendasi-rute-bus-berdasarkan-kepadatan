@@ -12,10 +12,12 @@ import { Header } from './_components/Header';
 import { PeringatanIdle } from './_components/PeringatanIdle';
 import { PilihHalte } from './_components/PilihHalte';
 import { Button } from '@/components/ui/button';
-import { API_BASE, GalatApi, galatRute, waktuWib } from '@/lib/api';
+import { ambilRekomendasi, API_BASE, galatRute, waktuWib } from '@/lib/api';
+import { useBagikanPencarian } from '@/lib/use-pencarian';
 import { formatTanggal } from '@/lib/koridor';
 import type { Halte, HalteOpsi, Rute } from '@/lib/route-utils';
 import { useIdleReset } from '@/lib/use-idle-reset';
+import { useLayarHp } from '@/lib/use-layar-hp';
 import { useOnline } from '@/lib/use-online';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
 import { useRelayBusTj } from '@/lib/relay-bus-tj';
@@ -103,29 +105,8 @@ export default function Home() {
       Math.floor(simTime / RUTE_BUCKET_DETIK),
       isLive,
     ],
-    queryFn: async () => {
-      // Jam dibaca saat fetch (bukan saat render) supaya ETA bus segar pada tiap refetch.
-      const detik = simTimeRef.current;
-      const jam = Math.floor(detik / 3600) % 24;
-      const { hariTipe } = waktuWib();
-      const r = await fetch(`${API_BASE}/api/rute/rekomendasi`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          halte_asal: pencarian!.asal,
-          halte_tujuan: pencarian!.tujuan,
-          jam,
-          hari_tipe: hariTipe,
-          sim_time: detik,
-          live: isLive,
-        }),
-      });
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
-      }
-      return r.json();
-    },
+    // Jam dibaca saat fetch (bukan saat render) supaya ETA bus segar pada tiap refetch.
+    queryFn: () => ambilRekomendasi<Rute[]>(pencarian!.asal, pencarian!.tujuan, simTimeRef.current, isLive),
     enabled: pencarian !== null,
     refetchInterval: isLive ? REFRESH_MS : false,
     // Pertahankan hasil sebelumnya saat bucket jam berganti, hanya untuk pasangan halte yang sama.
@@ -135,6 +116,9 @@ export default function Home() {
         : undefined,
     retry: 1,
   });
+
+  // Operator ikut menggambar rute yang sedang dicari di kiosk ini.
+  useBagikanPencarian(pencarian, aktifIdx);
 
   const ruteAktif =
     hasilRute && hasilRute.length > 0 ? hasilRute[Math.min(aktifIdx, hasilRute.length - 1)] : undefined;
@@ -159,7 +143,9 @@ export default function Home() {
 
   // Pengguna berikutnya tidak boleh melihat pencarian orang sebelumnya.
   const adaSesi = layar !== 'beranda' || tujuanId !== null || pemilih !== null;
-  const sisaIdleDetik = useIdleReset(kembaliKeBeranda, IDLE_RESET_MS, adaSesi, IDLE_PERINGATAN_MS);
+  // Reset otomatis hanya untuk kiosk bersama; di ponsel pribadi pencarian tidak boleh hilang sendiri.
+  const hp = useLayarHp();
+  const sisaIdleDetik = useIdleReset(kembaliKeBeranda, IDLE_RESET_MS, adaSesi && !hp, IDLE_PERINGATAN_MS);
 
   // Kembali dari daftar rencana: tujuan dipertahankan supaya bisa diganti atau dicari ulang.
   const ubahTujuan = () => {
@@ -193,13 +179,14 @@ export default function Home() {
         tanggal={tanggal}
       />
 
-      {/* Peta memenuhi separuh kanan sampai tepi layar (full-bleed); panel di separuh kiri. */}
-      <main className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[minmax(0,1fr)]">
+      {/* Peta memenuhi separuh kanan sampai tepi layar (full-bleed); panel di separuh kiri.
+          Ponsel: satu kolom, peta di atas dan panel bergulir di bawahnya. */}
+      <main className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[minmax(0,1fr)] hp:grid-cols-1 hp:grid-rows-[minmax(0,2fr)_minmax(0,3fr)]">
         {/* Peta tetap terpasang (hanya disembunyikan di beranda) supaya tidak dimuat ulang tiap pindah layar.
             Di beranda panel menutupi kedua kolom; peta yang tak terlihat tidak menangkap sentuhan.
             Atribusi MapLibre memaksa visibility: visible sendiri, jadi ikut disembunyikan dengan !important. */}
         <div
-          className={`relative col-start-2 row-start-1 min-h-0 min-w-0 overflow-hidden border-l bg-muted ${
+          className={`relative col-start-2 row-start-1 min-h-0 min-w-0 overflow-hidden border-l bg-muted hp:col-start-1 hp:border-b hp:border-l-0 ${
             tampilPeta ? '' : 'invisible [&_.maplibregl-ctrl-attrib]:invisible!'
           }`}
         >
@@ -213,8 +200,8 @@ export default function Home() {
         </div>
 
         <section
-          className={`row-start-1 min-h-0 min-w-0 px-[1.4rem] pt-[0.4rem] ${
-            layar === 'beranda' ? 'col-span-2 col-start-1' : 'col-start-1'
+          className={`row-start-1 min-h-0 min-w-0 px-[1.4rem] pt-[0.4rem] hp:px-[1rem] ${
+            layar === 'beranda' ? 'col-span-2 col-start-1 hp:col-span-1 hp:row-[1/span_2]' : 'col-start-1 hp:row-start-2'
           }`}
         >
           {layar === 'beranda' && (
@@ -285,11 +272,6 @@ export default function Home() {
       )}
 
       {sisaIdleDetik !== null && <PeringatanIdle sisaDetik={sisaIdleDetik} />}
-
-      {/* Kiosk hanya dirancang lanskap. */}
-      <div className="fixed inset-0 z-[60] hidden items-center justify-center bg-primary p-[2rem] text-center text-judul font-bold text-primary-foreground [@media(orientation:portrait)]:flex">
-        Putar iPad ke posisi mendatar
-      </div>
     </div>
   );
 }

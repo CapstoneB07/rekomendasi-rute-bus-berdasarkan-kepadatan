@@ -17,16 +17,16 @@ type Props = {
 
 export function Beranda({ namaTujuan, halteSiap, bisaCari, onPilihTujuan, onCari }: Props) {
   return (
-    <div className="layar-masuk mx-auto flex h-full w-full max-w-[42rem] flex-col justify-center gap-[1.2rem] pb-[1.5rem]">
-      <div className="flex items-center gap-[1rem]">
-        <div className="min-w-0 flex-1">
+    <div className="layar-masuk mx-auto flex h-full w-full max-w-[42rem] flex-col justify-center gap-[1.2rem] pb-[1.5rem] hp:justify-start hp:overflow-y-auto hp:pt-[0.8rem] hp:pb-[1rem]">
+      <div className="flex items-center gap-[1rem] hp:flex-col-reverse hp:gap-[0.6rem]">
+        <div className="min-w-0 flex-1 hp:text-center">
           <h1 className="text-balance text-judul font-bold leading-tight tracking-tight">Cari Rute Bus yang Nyaman</h1>
           <p className="mt-[0.5rem] text-besar leading-snug text-muted-foreground">
             Pilih perjalanan yang nyaman, TJ siap membantu Anda.
           </p>
         </div>
         {/* Bidang accent lembut di belakang ilustrasi 3D supaya menyatu dengan UI yang datar. */}
-        <div className="relative w-[45%] max-w-[18rem] shrink-0">
+        <div className="relative w-[45%] max-w-[18rem] shrink-0 hp:w-[60%]">
           <div aria-hidden className="absolute inset-x-[4%] bottom-[2%] top-[18%] rounded-[50%] bg-accent" />
           <Image
             src="/maskot-bus.png"
