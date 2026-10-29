@@ -78,7 +78,7 @@ export function PanelKamera() {
   const status = statusKamera(data, error);
 
   return (
-    <Card role="region" aria-label="Kamera bus" className="w-[20rem] overflow-hidden bg-card/95">
+    <Card role="region" aria-label="Kamera bus" className="w-[20rem] overflow-hidden bg-card/95 hp:w-[16rem] hp:shrink-0">
       <header className="flex items-center gap-[0.5rem] border-b px-[0.7rem] py-[0.3rem] text-kecil">
         <span className="font-bold">Kamera{data && status === 'aktif' ? ` ${data.bus_id}` : ''}</span>
         <Badge

@@ -28,7 +28,7 @@ export function LencanaKoridor({ koridorId, className = '' }: { koridorId: numbe
   const w = warnaKoridor(koridorId);
   return (
     <span
-      className={cn('inline-flex min-w-[2rem] items-center justify-center rounded-md px-[0.4rem] text-isi font-bold leading-[1.7rem]', className)}
+      className={cn('inline-flex min-w-[2.6rem] items-center justify-center rounded-full px-[0.6rem] text-isi font-bold leading-[1.7rem]', className)}
       style={{ background: w.bg, color: w.teks }}
     >
       {koridorId}
@@ -207,7 +207,7 @@ export function DaftarRencana({ asal, tujuan, hasilRute, memuat, aktifIdx, galat
         </div>
       ) : (
         // Baris 1fr tanpa tinggi tetap: semua kartu setinggi kartu tertinggi di halaman ini. Wadahnya bergulir bila tetap tidak muat (ringkasan Dari/Ke tidak terhimpit); padding memberi ruang cincin kartu aktif.
-        <div className="-m-[0.2rem] min-h-0 flex-1 overflow-y-auto p-[0.2rem] [scrollbar-width:thin]">
+        <div className="-m-[0.2rem] min-h-0 flex-1 overflow-y-auto p-[0.2rem]">
           <div className="grid auto-rows-fr gap-[0.5rem]">
             {items.map((r, i) => {
               const gi = idx * PER_HALAMAN + i;

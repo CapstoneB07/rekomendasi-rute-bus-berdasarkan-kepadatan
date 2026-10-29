@@ -1,0 +1,3 @@
+.ks-stage{touch-action:pan-y;cursor:grab;outline:none;border-radius:8px}
+.ks-stage:focus-visible{outline:1px solid var(--anatomy-muted);outline-offset:6px}
+.ks-stage[data-drag]{cursor:grabbing}

@@ -20,7 +20,7 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
   return (
     <section
       aria-label="Mode simulasi"
-      className="flex h-[2.6rem] items-center gap-[0.6rem] rounded-xl border bg-card px-[0.7rem] shadow-sm"
+      className="flex h-[2.6rem] items-center gap-[0.6rem] rounded-xl border bg-card px-[0.7rem] shadow-sm hp:h-auto hp:flex-wrap hp:py-[0.4rem]"
     >
       <span className={cn('whitespace-nowrap text-kecil font-bold', isLive ? 'text-muted-foreground' : 'text-tj-oranye')}>
         {isLive ? 'Simulasi' : 'Mode simulasi'}
@@ -43,7 +43,7 @@ export function WaktuKontrol({ waktu }: { waktu: WaktuSimulasi }) {
         step={60}
         value={Math.min(Math.max(simTime, JAM_MULAI), JAM_SELESAI)}
         onChange={(e) => aturJam(Number(e.target.value))}
-        className={cn('slider-jam h-[2rem] min-w-0 flex-1', isLive && 'slider-jam-live')}
+        className={cn('slider-jam h-[2rem] min-w-0 flex-1 hp:order-last hp:basis-full', isLive && 'slider-jam-live')}
         aria-label="Geser jam simulasi"
       />
 

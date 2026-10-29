@@ -17,7 +17,7 @@ type Props = {
 
 export function Beranda({ namaTujuan, halteSiap, bisaCari, onPilihTujuan, onCari }: Props) {
   return (
-    <div className="layar-masuk mx-auto flex h-full w-full max-w-[42rem] flex-col justify-center gap-[1.2rem] pb-[1.5rem] hp:overflow-y-auto hp:pb-[1rem]">
+    <div className="layar-masuk mx-auto flex h-full w-full max-w-[42rem] flex-col justify-center gap-[1.2rem] pb-[1.5rem] hp:justify-start hp:overflow-y-auto hp:pt-[0.8rem] hp:pb-[1rem]">
       <div className="flex items-center gap-[1rem] hp:flex-col-reverse hp:gap-[0.6rem]">
         <div className="min-w-0 flex-1 hp:text-center">
           <h1 className="text-balance text-judul font-bold leading-tight tracking-tight">Cari Rute Bus yang Nyaman</h1>

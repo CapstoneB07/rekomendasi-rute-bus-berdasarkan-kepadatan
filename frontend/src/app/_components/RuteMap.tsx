@@ -20,6 +20,8 @@ import {
   type PosisiBusResponse,
   type Rute,
   buildRouteGeoJSON,
+  bearingNaikDiAtas,
+  potongGarisRute,
   kepadatanKeWarna,
 } from '@/lib/route-utils';
 
@@ -97,18 +99,21 @@ function buatGambarMoncong(): { data: ImageData; pixelRatio: number } {
 }
 // Penanda rute dibedakan lewat bentuk dan warna netral/primary, bukan hijau/kuning/merah, karena warna semafor di peta khusus untuk kepadatan.
 const GAYA_PENANDA = {
-  naik: { titik: 'rounded-full border-white bg-primary', label: 'border-primary bg-primary text-primary-foreground' },
-  transit: { titik: 'rotate-45 rounded-sm border-foreground bg-background', label: 'border-foreground bg-background text-foreground' },
-  turun: { titik: 'rounded-full border-white bg-foreground', label: 'border-foreground bg-foreground text-background' },
+  // NAIK adalah yang pertama dicari mata: label lebih besar dan selalu di atas penanda lain (z), nomor langkah menyusul urutan perjalanan.
+  naik: { titik: 'rounded-full border-white bg-primary', label: 'border-primary bg-primary text-isi text-primary-foreground', nomor: 'bg-white text-primary', z: 3 },
+  transit: { titik: 'rotate-45 rounded-sm border-foreground bg-background', label: 'border-foreground bg-background text-kecil text-foreground', nomor: 'bg-foreground text-background', z: 1 },
+  turun: { titik: 'rounded-full border-white bg-foreground', label: 'border-foreground bg-foreground text-kecil text-background', nomor: 'bg-background text-foreground', z: 2 },
 } as const;
 type JenisPenanda = keyof typeof GAYA_PENANDA;
 
 // Penanda berlabel: titik di koordinat halte, label menempel di kanannya. Label memakai textContent supaya nama halte tidak pernah diparse sebagai HTML.
-function buatPenanda(jenis: JenisPenanda, teks: string): HTMLElement {
+// `urut` (nomor langkah perjalanan) opsional: penanda lokasi operator tidak punya urutan.
+function buatPenanda(jenis: JenisPenanda, teks: string, urut?: number): HTMLElement {
   const gaya = GAYA_PENANDA[jenis];
   const root = document.createElement('div');
   root.className = 'h-5 w-5';
   root.dataset.jenis = jenis;
+  root.style.zIndex = String(gaya.z);
   // Posisi root dikendalikan MapLibre (transform); skala zoom dipasang di isi agar tidak bertabrakan.
   const isi = document.createElement('div');
   isi.className = 'relative h-full w-full';
@@ -118,8 +123,14 @@ function buatPenanda(jenis: JenisPenanda, teks: string): HTMLElement {
 
   const label = document.createElement('span');
   // Posisi label diatur tataLabel (left/top inline) supaya tidak terpotong tepi atau menimpa label lain.
-  label.className = `absolute left-0 top-0 whitespace-nowrap rounded-lg border px-2 py-0.5 text-kecil font-bold shadow-sm ${gaya.label}`;
-  label.textContent = teks;
+  label.className = `absolute left-0 top-0 inline-flex items-center gap-[0.35rem] whitespace-nowrap rounded-lg border px-2 py-0.5 font-bold shadow-sm ${gaya.label}`;
+  if (urut !== undefined) {
+    const nomor = document.createElement('span');
+    nomor.className = `inline-flex size-[1.2em] shrink-0 items-center justify-center rounded-full text-[0.8em] leading-none ${gaya.nomor}`;
+    nomor.textContent = String(urut);
+    label.append(nomor);
+  }
+  label.append(teks);
 
   isi.append(titik, label);
   root.append(isi);
@@ -247,13 +258,13 @@ function isiPopupBus(p: BusPosisi): HTMLElement {
   return root;
 }
 
-type Titik = { halte: Halte; jenis: JenisPenanda; teks: string };
+type Titik = { halte: Halte; jenis: JenisPenanda; teks: string; urut: number };
 
 function titikPenanda(rute: Rute, halteMap: Map<string, Halte>): Titik[] {
   const titik: Titik[] = [];
   const tambah = (id: string, jenis: JenisPenanda) => {
     const halte = halteMap.get(id);
-    if (halte) titik.push({ halte, jenis, teks: `${jenis.toUpperCase()} · ${halte.nama}` });
+    if (halte) titik.push({ halte, jenis, teks: `${jenis.toUpperCase()} · ${halte.nama}`, urut: titik.length + 1 });
   };
 
   const naik = rute.segmen.filter((s) => s.tipe === 'naik');
@@ -276,11 +287,17 @@ type Props = {
   fokus?: Halte;
   // Legenda kepadatan bus; halaman user menyembunyikannya supaya peta bersih.
   legenda?: boolean;
+  // Bila diisi, rute digambar bertahap (operator) dan animasinya diputar ulang tiap nilai ini berganti.
+  animasi?: number;
+  // Peta diputar otomatis saat ada rute supaya halte NAIK di atas dan TURUN di bawah (operator).
+  putarKeNaik?: boolean;
 };
+
+const DURASI_ANIMASI_RUTE_MS = 3000;
 
 const LAYER_BUS = ['bus-ring', 'bus-arrow', 'bus-dots', 'bus-label'] as const;
 
-export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = true }: Props) {
+export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = true, animasi, putarKeNaik }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
@@ -338,14 +355,14 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = t
         type: 'line',
         source: 'shapes',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': 'rgba(17,24,39,0.35)', 'line-width': 7 },
+        paint: { 'line-color': 'rgba(17,24,39,0.35)', 'line-width': 4.5 },
       });
       map.addLayer({
         id: 'shapes-line',
         type: 'line',
         source: 'shapes',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': WARNA_KORIDOR_EKSPRESI, 'line-width': 4 },
+        paint: { 'line-color': WARNA_KORIDOR_EKSPRESI, 'line-width': 2.5 },
       });
       map.addSource('rute', { type: 'geojson', data: EMPTY_LINES });
       // Casing gelap di bawah garis berwarna supaya rute (termasuk koridor kuning) terbaca di peta terang.
@@ -542,13 +559,17 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = t
     markersRef.current = [];
     const aturLabel = () => tataLabel(map, markersRef.current);
     map.on('move', aturLabel);
-    const lepas = () => {
-      map.off('move', aturLabel);
-    };
 
     const garis = rute ? buildRouteGeoJSON(rute.segmen, halteMap, shapes) : EMPTY_LINES;
-    (map.getSource('rute') as GeoJSONSource).setData(garis);
+    const sumberRute = map.getSource('rute') as GeoJSONSource;
+    let raf = 0;
+    const lepas = () => {
+      cancelAnimationFrame(raf);
+      map.off('move', aturLabel);
+    };
     if (!rute) {
+      sumberRute.setData(garis);
+      if (map.getBearing() !== 0) map.easeTo({ bearing: 0, duration: 600 });
       if (fokus) {
         const lngLat: [number, number] = [fokus.lng, fokus.lat];
         markersRef.current.push(
@@ -563,20 +584,45 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = t
     const bounds = new maplibregl.LngLatBounds();
     garis.features.forEach((f) => f.geometry.coordinates.forEach((c) => bounds.extend(c as [number, number])));
 
-    for (const t of titikPenanda(rute, halteMap)) {
-      const lngLat: [number, number] = [t.halte.lng, t.halte.lat];
-      markersRef.current.push(
-        new maplibregl.Marker({ element: buatPenanda(t.jenis, t.teks) })
-          .setLngLat(lngLat)
-          .addTo(map),
-      );
-      bounds.extend(lngLat);
+    const titik = titikPenanda(rute, halteMap);
+    const pasangPenanda = (daftar: Titik[]) => {
+      for (const t of daftar) {
+        markersRef.current.push(
+          new maplibregl.Marker({ element: buatPenanda(t.jenis, t.teks, t.urut) })
+            .setLngLat([t.halte.lng, t.halte.lat])
+            .addTo(map),
+        );
+      }
+      aturLabel();
+    };
+    for (const t of titik) bounds.extend([t.halte.lng, t.halte.lat]);
+    const bearing = putarKeNaik && titik.length >= 2 ? bearingNaikDiAtas(titik[0].halte, titik[titik.length - 1].halte) : 0;
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { padding: { top: 70, bottom: legenda ? 120 : 70, left: 70, right: 70 }, maxZoom: 15, bearing, duration: putarKeNaik ? 1000 : 600 });
     }
 
-    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: { top: 70, bottom: 70, left: 70, right: 70 }, maxZoom: 15, duration: 600 });
-    aturLabel();
+    // Animasi pembentukan rute (operator): garis tumbuh dari halte naik, penanda lain muncul setelah garis selesai.
+    const animasikan = animasi !== undefined && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!animasikan) {
+      sumberRute.setData(garis);
+      pasangPenanda(titik);
+      return lepas;
+    }
+    sumberRute.setData(EMPTY_LINES);
+    pasangPenanda(titik.slice(0, 1));
+    const mulai = performance.now();
+    const frame = (t: number) => {
+      const p = Math.min((t - mulai) / DURASI_ANIMASI_RUTE_MS, 1);
+      sumberRute.setData(potongGarisRute(garis, p * p * (3 - 2 * p)));
+      if (p < 1) {
+        raf = requestAnimationFrame(frame);
+      } else {
+        pasangPenanda(titik.slice(1));
+      }
+    };
+    raf = requestAnimationFrame(frame);
     return lepas;
-  }, [ready, rute, halteMap, shapes, fokus]);
+  }, [ready, rute, halteMap, shapes, fokus, animasi, legenda, putarKeNaik]);
 
   return (
     <div className="relative h-full w-full">

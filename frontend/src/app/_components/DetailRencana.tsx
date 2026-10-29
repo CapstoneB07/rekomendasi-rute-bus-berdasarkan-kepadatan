@@ -87,7 +87,7 @@ export function DetailRencana({ rute, asal, tujuan, simTime, onKembali }: Props)
       </div>
 
       {/* Rute dengan banyak bus tidak dipadatkan; daftar bergulir bila tidak muat. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-[0.5rem] overflow-y-auto [scrollbar-width:thin]">
+      <div className="flex min-h-0 flex-1 flex-col gap-[0.5rem] overflow-y-auto">
         {rute.segmen.map((s, i) =>
           s.tipe === 'naik' ? (
             <KartuNaik key={i} item={s} simTime={simTime} />

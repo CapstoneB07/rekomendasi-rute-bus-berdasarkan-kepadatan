@@ -36,6 +36,27 @@ export class GalatApi extends Error {
   }
 }
 
+// POST /api/rute/rekomendasi untuk jam `detik` (detik dalam hari); dipakai kiosk dan animasi rute operator.
+export async function ambilRekomendasi<T>(asal: string, tujuan: string, detik: number, live: boolean): Promise<T> {
+  const r = await fetch(`${API_BASE}/api/rute/rekomendasi`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      halte_asal: asal,
+      halte_tujuan: tujuan,
+      jam: Math.floor(detik / 3600) % 24,
+      hari_tipe: waktuWib().hariTipe,
+      sim_time: detik,
+      live,
+    }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
+  }
+  return r.json();
+}
+
 export type GalatTampil = { judul: string; pesan: string; bisaCoba: boolean };
 
 // 400/404 = permintaan valid tapi tidak ada rute (pesan backend sudah berbahasa Indonesia).

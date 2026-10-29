@@ -12,7 +12,8 @@ import { Header } from './_components/Header';
 import { PeringatanIdle } from './_components/PeringatanIdle';
 import { PilihHalte } from './_components/PilihHalte';
 import { Button } from '@/components/ui/button';
-import { API_BASE, GalatApi, galatRute, waktuWib } from '@/lib/api';
+import { ambilRekomendasi, API_BASE, galatRute, waktuWib } from '@/lib/api';
+import { useBagikanPencarian } from '@/lib/use-pencarian';
 import { formatTanggal } from '@/lib/koridor';
 import type { Halte, HalteOpsi, Rute } from '@/lib/route-utils';
 import { useIdleReset } from '@/lib/use-idle-reset';
@@ -104,29 +105,8 @@ export default function Home() {
       Math.floor(simTime / RUTE_BUCKET_DETIK),
       isLive,
     ],
-    queryFn: async () => {
-      // Jam dibaca saat fetch (bukan saat render) supaya ETA bus segar pada tiap refetch.
-      const detik = simTimeRef.current;
-      const jam = Math.floor(detik / 3600) % 24;
-      const { hariTipe } = waktuWib();
-      const r = await fetch(`${API_BASE}/api/rute/rekomendasi`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          halte_asal: pencarian!.asal,
-          halte_tujuan: pencarian!.tujuan,
-          jam,
-          hari_tipe: hariTipe,
-          sim_time: detik,
-          live: isLive,
-        }),
-      });
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
-      }
-      return r.json();
-    },
+    // Jam dibaca saat fetch (bukan saat render) supaya ETA bus segar pada tiap refetch.
+    queryFn: () => ambilRekomendasi<Rute[]>(pencarian!.asal, pencarian!.tujuan, simTimeRef.current, isLive),
     enabled: pencarian !== null,
     refetchInterval: isLive ? REFRESH_MS : false,
     // Pertahankan hasil sebelumnya saat bucket jam berganti, hanya untuk pasangan halte yang sama.
@@ -136,6 +116,9 @@ export default function Home() {
         : undefined,
     retry: 1,
   });
+
+  // Operator ikut menggambar rute yang sedang dicari di kiosk ini.
+  useBagikanPencarian(pencarian, aktifIdx);
 
   const ruteAktif =
     hasilRute && hasilRute.length > 0 ? hasilRute[Math.min(aktifIdx, hasilRute.length - 1)] : undefined;
@@ -218,7 +201,7 @@ export default function Home() {
 
         <section
           className={`row-start-1 min-h-0 min-w-0 px-[1.4rem] pt-[0.4rem] hp:px-[1rem] ${
-            layar === 'beranda' ? 'col-span-2 col-start-1 hp:col-span-1 hp:row-span-2' : 'col-start-1 hp:row-start-2'
+            layar === 'beranda' ? 'col-span-2 col-start-1 hp:col-span-1 hp:row-[1/span_2]' : 'col-start-1 hp:row-start-2'
           }`}
         >
           {layar === 'beranda' && (

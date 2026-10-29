@@ -283,6 +283,54 @@ function coordinatesFromShape(
 // dengan property `warna` yang dipakai oleh paint expression `['get', 'warna']`
 // pada layer line MapLibre. Ini memberikan warna per-segmen tanpa membuat
 // banyak layer terpisah.
+// Arah putar peta (bearing MapLibre: arah kompas yang menghadap atas layar) supaya halte `naik` berada di atas
+// dan `turun` di bawah. 0 bila keduanya hampir berimpit (arahnya tidak berarti).
+export function bearingNaikDiAtas(naik: { lng: number; lat: number }, turun: { lng: number; lat: number }): number {
+  const dx = (turun.lng - naik.lng) * Math.cos((naik.lat * Math.PI) / 180);
+  const dy = turun.lat - naik.lat;
+  if (Math.hypot(dx, dy) < 0.001) return 0;
+  const arahKeTurun = (Math.atan2(dx, dy) * 180) / Math.PI;
+  return (arahKeTurun + 180 + 360) % 360;
+}
+
+const panjangDerajat = (a: number[], b: number[]) => Math.hypot((b[0] - a[0]) * Math.cos((a[1] * Math.PI) / 180), b[1] - a[1]);
+
+// Bagian awal rute sepanjang `fraksi` (0..1) dari total panjang, berurutan antar fitur: dasar animasi
+// pembentukan rute. Fitur yang belum tercapai dibuang; fitur yang terpotong dipangkas tepat di titiknya.
+export function potongGarisRute(
+  garis: GeoJSON.FeatureCollection<GeoJSON.LineString>,
+  fraksi: number,
+): GeoJSON.FeatureCollection<GeoJSON.LineString> {
+  const panjang = garis.features.map((f) =>
+    f.geometry.coordinates.slice(1).reduce((n, c, i) => n + panjangDerajat(f.geometry.coordinates[i], c), 0),
+  );
+  let sisa = Math.min(Math.max(fraksi, 0), 1) * panjang.reduce((n, p) => n + p, 0);
+  const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+  for (const [i, f] of garis.features.entries()) {
+    if (sisa <= 0) break;
+    if (sisa >= panjang[i]) {
+      features.push(f);
+      sisa -= panjang[i];
+      continue;
+    }
+    const koordinat = [f.geometry.coordinates[0]];
+    for (const c of f.geometry.coordinates.slice(1)) {
+      const langkah = panjangDerajat(koordinat[koordinat.length - 1], c);
+      if (langkah >= sisa) {
+        const t = sisa / langkah;
+        const a = koordinat[koordinat.length - 1];
+        koordinat.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t]);
+        break;
+      }
+      koordinat.push(c);
+      sisa -= langkah;
+    }
+    features.push({ ...f, geometry: { type: 'LineString', coordinates: koordinat } });
+    break;
+  }
+  return { type: 'FeatureCollection', features };
+}
+
 export function buildRouteGeoJSON(
   segmen: RuteSegmen[],
   halteMap: Map<string, Halte>,
