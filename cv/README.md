@@ -43,6 +43,11 @@ pembacaan lebih tua dari TTL backend, bus kembali memakai data simulasi.
   `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY`. Service-role key hanya boleh
   ada di perangkat worker. Tanpa keduanya, upload mati dan worker jalan seperti
   biasa.
+- Frame untuk panel kamera di halaman operator: tiap ±1 detik (`FRAME_INTERVAL_SECONDS`)
+  JPEG asli diunggah ke bucket `kamera-frames` (`<bus_id>/latest.jpg`, ditimpa), lalu
+  `{frame_path, bboxes}` di-upsert ke `kamera_live`
+  ([`backend/sql/kamera_live.sql`](../backend/sql/kamera_live.sql)). Bbox dalam piksel frame
+  asli; kotaknya digambar di browser.
 - `BUS_ID` di `cv_worker.py` harus sama dengan `LIVE_CV_BUS_ID` di `.env`
   backend (saat ini `Koridor_1_A`).
 
