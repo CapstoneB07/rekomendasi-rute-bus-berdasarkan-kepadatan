@@ -1,3 +1,6 @@
+import base64
+import binascii
+import json
 import os
 from datetime import datetime
 
@@ -30,6 +33,9 @@ REDIS_QUEUE_NAME = f"cv_task_queue:{BUS_ID}"
 SAVE_RECEIVED_IMAGES = True
 SAVE_DIR = "received_images"
 
+# Awal setiap file JPEG (SOI).
+JPEG_MAGIC = bytes([0xFF, 0xD8])
+
 message_count = 0
 saved_count = 0
 
@@ -55,10 +61,43 @@ def get_timestamp():
     )[:-3]
 
 
+def extract_jpeg(payload):
+    """
+    Mengembalikan bytes JPEG dari payload MQTT, atau None bila tidak dikenali.
+
+    Tiga format diterima: JPEG mentah (diawali FF D8), JSON
+    {"timestamp": ..., "image": "<base64>"} dari firmware ESP32 terbaru, dan
+    teks base64 polos (boleh berawalan data URL). Hasilnya selalu JPEG mentah
+    supaya cv_worker.py tidak perlu tahu format kirimnya.
+    """
+    if payload[:2] == JPEG_MAGIC:
+        return payload
+
+    text = payload.strip()
+    if text[:1] == b"{":
+        try:
+            text = json.loads(text).get("image", "")
+        except (ValueError, AttributeError):
+            return None
+        if not isinstance(text, str):
+            return None
+    else:
+        text = text.decode("ascii", errors="ignore")
+
+    if text.startswith("data:"):
+        text = text.partition(",")[2]
+
+    try:
+        decoded = base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+
+    return decoded if decoded[:2] == JPEG_MAGIC else None
+
+
 def save_image(image_bytes):
     """
-    Menulis payload binary langsung ke file JPEG.
-    Tidak ada Base64 decode dan tidak ada JPEG re-encode.
+    Menulis bytes JPEG langsung ke file (tanpa JPEG re-encode).
     """
     global saved_count
 
@@ -133,11 +172,7 @@ def on_message(client, userdata, msg):
     try:
         message_count += 1
 
-        # ====================================================
-        # RAW BINARY - JANGAN decode UTF-8
-        # ====================================================
-
-        image_bytes = msg.payload
+        payload = msg.payload
 
         print(
             "\n[MQTT SERVICE] MESSAGE MASUK | "
@@ -150,13 +185,22 @@ def on_message(client, userdata, msg):
 
         print(
             f"[MQTT SERVICE] payload_size="
-            f"{len(image_bytes)} bytes "
-            f"({len(image_bytes) / 1024:.2f} KB)"
+            f"{len(payload)} bytes "
+            f"({len(payload) / 1024:.2f} KB)"
         )
 
-        if not image_bytes:
+        if not payload:
             print(
                 "[MQTT WARNING] Payload kosong."
+            )
+            return
+
+        image_bytes = extract_jpeg(payload)
+
+        if image_bytes is None:
+            print(
+                "[MQTT WARNING] Payload bukan JPEG, JSON "
+                "berisi gambar base64, maupun base64 JPEG; diabaikan."
             )
             return
 
@@ -185,7 +229,7 @@ def on_message(client, userdata, msg):
 
         print(
             "[MQTT SERVICE] "
-            "Payload raw binary diteruskan ke Redis | "
+            "JPEG diteruskan ke Redis | "
             f"queue={REDIS_QUEUE_NAME}"
         )
 
@@ -227,7 +271,7 @@ print(
 )
 
 print(
-    "[INFO] Payload = RAW BINARY"
+    "[INFO] Payload = JPEG mentah / JSON {image: base64} / base64"
 )
 
 print(
