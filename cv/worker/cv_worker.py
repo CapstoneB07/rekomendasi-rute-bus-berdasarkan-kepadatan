@@ -100,13 +100,18 @@ def get_image_quality(image):
     return float(np.mean(gray)), float(np.std(gray))
 
 
-def apply_roi(image):
-    h, w = image.shape[:2]
+def roi_box(w, h):
     rx1, ry1, rx2, ry2 = ROI
     x1 = max(0, min(w - 1, int(rx1 * w)))
     y1 = max(0, min(h - 1, int(ry1 * h)))
     x2 = max(x1 + 1, min(w, int(rx2 * w)))
     y2 = max(y1 + 1, min(h, int(ry2 * h)))
+    return x1, y1, x2, y2
+
+
+def apply_roi(image):
+    h, w = image.shape[:2]
+    x1, y1, x2, y2 = roi_box(w, h)
     return image[y1:y2, x1:x2]
 
 
@@ -339,6 +344,11 @@ try:
             high_area_rejected = 0
             aspect_rejected = 0
 
+            # Bbox untuk panel operator memakai koordinat frame asli (yang diunggah),
+            # jadi geser dengan pojok ROI bila ROI aktif.
+            roi_x, roi_y = roi_box(original_width, original_height)[:2] if ENABLE_ROI else (0, 0)
+            valid_bboxes = []
+
             processing_height, processing_width = enhanced_frame.shape[:2]
             total_pixels = processing_height * processing_width
             raw_detections = len(results[0].boxes)
@@ -373,6 +383,14 @@ try:
                     continue
 
                 valid_headcount += 1
+                valid_bboxes.append({
+                    "x": x1 + roi_x,
+                    "y": y1 + roi_y,
+                    "w": box_width,
+                    "h": box_height,
+                    "kelas": "person",
+                    "skor": round(float(box.conf[0]), 2),
+                })
 
             postprocess_ms = (time.perf_counter() - t0) * 1000
 
@@ -410,6 +428,7 @@ try:
 
             if live_pusher:
                 live_pusher.submit(output_headcount)
+                live_pusher.submit_frame(image_bytes, valid_bboxes)
 
             print(
                 f"\n[{ts_received}] [CV WORKER] "

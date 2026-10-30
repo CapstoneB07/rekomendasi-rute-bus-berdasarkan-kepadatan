@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 
-import { PanelKameraMqtt } from '../_components/PanelKameraMqtt';
+import { PanelKamera } from '../_components/PanelKamera';
 import { PilihHalte } from '../_components/PilihHalte';
 import { WaktuKontrol } from '../_components/WaktuKontrol';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,7 @@ import { useWaktuOperator } from '@/lib/use-waktu-simulasi';
 // MapLibre butuh `window`, jadi hanya dirender di browser.
 const RuteMap = dynamic(() => import('../_components/RuteMap').then((m) => m.RuteMap), { ssr: false });
 
-// Halaman operator: kamera realtime dan peta bus simulasi/asli masing-masing setengah layar penuh (ponsel: bertumpuk), kontrol jam, dan pemilih lokasi halte.
+// Halaman operator: kamera deteksi CV dan peta bus simulasi/asli masing-masing setengah layar penuh (ponsel: bertumpuk), kontrol jam, dan pemilih lokasi halte.
 export default function Operator() {
   const waktu = useWaktuOperator();
   const { simTime, isLive } = waktu;
@@ -96,7 +96,7 @@ export default function Operator() {
           </p>
         </div>
 
-        <PanelKameraMqtt />
+        <PanelKamera />
       </main>
 
       {pemilihTerbuka && halteList && (

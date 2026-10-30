@@ -1,8 +1,12 @@
-"""Kirim headcount ke tabel Supabase `kepadatan_live` untuk backend aplikasi.
+"""Kirim headcount dan frame kamera ke Supabase untuk backend aplikasi.
 
-Satu baris per bus fisik (upsert). Backend memolling baris ini dan memakainya
-sebagai kepadatan satu bus; lihat backend/sql/kepadatan_live.sql di root
-monorepo untuk skema tabelnya.
+Headcount: tabel `kepadatan_live`, satu baris per bus fisik (upsert). Backend
+memolling baris ini dan memakainya sebagai kepadatan satu bus; lihat
+backend/sql/kepadatan_live.sql di root monorepo untuk skema tabelnya.
+
+Frame: JPEG terbaru diunggah ke bucket `kamera-frames`, lalu path dan bbox
+deteksinya di-upsert ke `kamera_live` (backend/sql/kamera_live.sql) untuk
+panel kamera di halaman operator.
 
 Hitungan YOLO per frame berfluktuasi, jadi yang dikirim adalah median dari
 beberapa frame terakhir, paling sering sekali per PUSH_INTERVAL_SECONDS.
@@ -22,7 +26,10 @@ import requests
 from dotenv import load_dotenv
 
 LIVE_TABLE = "kepadatan_live"
+CAMERA_TABLE = "kamera_live"
+FRAME_BUCKET = "kamera-frames"
 PUSH_INTERVAL_SECONDS = 3.0
+FRAME_INTERVAL_SECONDS = 1.0
 MEDIAN_WINDOW = 5
 REQUEST_TIMEOUT_SECONDS = 5.0
 
@@ -34,7 +41,12 @@ def _log(level, message):
 class LivePusher:
     def __init__(self, bus_id, supabase_url, service_key):
         self.bus_id = bus_id
-        self._endpoint = f"{supabase_url.rstrip('/')}/rest/v1/{LIVE_TABLE}?on_conflict=bus_id"
+        base = supabase_url.rstrip("/")
+        self._endpoint = f"{base}/rest/v1/{LIVE_TABLE}?on_conflict=bus_id"
+        self._camera_endpoint = f"{base}/rest/v1/{CAMERA_TABLE}?on_conflict=bus_id"
+        # Satu objek tetap per bus (ditimpa tiap frame) supaya bucket tidak menumpuk.
+        self._frame_path = f"{bus_id}/latest.jpg"
+        self._frame_endpoint = f"{base}/storage/v1/object/{FRAME_BUCKET}/{self._frame_path}"
         self._headers = {
             "apikey": service_key,
             "Authorization": f"Bearer {service_key}",
@@ -44,7 +56,9 @@ class LivePusher:
         self._counts = deque(maxlen=MEDIAN_WINDOW)
         self._last_push = float("-inf")
         self._in_flight = threading.Lock()
-        self._executor = ThreadPoolExecutor(max_workers=1)
+        self._last_frame_push = float("-inf")
+        self._frame_in_flight = threading.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=2)
 
     @classmethod
     def from_env(cls, bus_id):
@@ -86,3 +100,40 @@ class LivePusher:
             _log("LIVE ERROR", f"gagal upsert {LIVE_TABLE}: {type(e).__name__}: {e}")
         finally:
             self._in_flight.release()
+
+    def submit_frame(self, jpeg_bytes, bboxes):
+        """Unggah frame beserta bbox-nya bila interval sudah lewat."""
+        now = time.monotonic()
+        if now - self._last_frame_push < FRAME_INTERVAL_SECONDS:
+            return
+        if not self._frame_in_flight.acquire(blocking=False):
+            return  # unggahan sebelumnya belum selesai
+        self._last_frame_push = now
+        self._executor.submit(self._upload_frame, jpeg_bytes, bboxes)
+
+    def _upload_frame(self, jpeg_bytes, bboxes):
+        try:
+            response = requests.post(
+                self._frame_endpoint,
+                data=jpeg_bytes,
+                headers={
+                    **self._headers,
+                    "Content-Type": "image/jpeg",
+                    "x-upsert": "true",
+                    "cache-control": "max-age=0",
+                },
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            response = requests.post(
+                self._camera_endpoint,
+                json={"bus_id": self.bus_id, "frame_path": self._frame_path, "bboxes": bboxes},
+                headers=self._headers,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            _log("LIVE", f"upsert {CAMERA_TABLE} bbox={len(bboxes)}")
+        except Exception as e:
+            _log("LIVE ERROR", f"gagal unggah frame: {type(e).__name__}: {e}")
+        finally:
+            self._frame_in_flight.release()

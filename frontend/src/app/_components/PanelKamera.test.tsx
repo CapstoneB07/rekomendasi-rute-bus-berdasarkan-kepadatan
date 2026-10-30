@@ -45,7 +45,7 @@ describe('FrameKamera', () => {
     expect(besar.style.height).toBe('50%');
     expect(kecil.style.width).toBe('10%');
     expect(kecil.style.height).toBe('10%');
-    expect(screen.getByText('person 55%')).toBeTruthy();
+    expect(screen.getByText('person 0.55')).toBeTruthy();
   });
 });
 
