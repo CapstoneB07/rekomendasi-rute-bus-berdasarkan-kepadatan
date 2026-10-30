@@ -71,7 +71,8 @@ export function PanelKamera() {
   const { data, error } = useQuery<FrameKameraResponse>({
     queryKey: ['kamera-bus'],
     queryFn: async () => {
-      const r = await fetch(`${API_BASE}/api/live/camera`);
+      // no-store: respons 404/410 tanpa header cache dipakai ulang browser, sehingga panel tetap BASI setelah worker hidup lagi.
+      const r = await fetch(`${API_BASE}/api/live/camera`, { cache: 'no-store' });
       if (!r.ok) {
         const body = await r.json().catch(() => null);
         throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
