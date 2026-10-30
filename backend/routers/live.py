@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
@@ -10,6 +11,7 @@ from services.gtfs_simulation import kepadatan_bus_live
 from services.live_crowding import LIVE_CV_BUS_ID
 
 router = APIRouter(prefix="/api/live")
+logger = logging.getLogger(__name__)
 
 WIB = ZoneInfo("Asia/Jakarta")
 KEPADATAN_KOSONG = {
@@ -124,7 +126,8 @@ def get_live_camera(bus_id: str, request: Request):
     """Frame kamera terbaru bus + bounding box deteksi (URL bertanda tangan, berumur pendek).
 
     404 bila bus belum pernah mengirim frame; 410 bila frame terakhir sudah
-    melewati LIVE_CV_TTL_SECONDS.
+    melewati LIVE_CV_TTL_SECONDS. 503 bila Supabase gagal (tabel/bucket belum ada,
+    jaringan, kredensial), supaya bisa dibedakan dari kamera yang memang offline.
     """
     try:
         return frame_terbaru(request.app.state.supabase, bus_id)
@@ -132,3 +135,6 @@ def get_live_camera(bus_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Bus tidak dikenal")
     except FrameBasi:
         raise HTTPException(status_code=410, detail="Frame kamera basi")
+    except Exception:
+        logger.exception("Gagal membaca frame kamera bus %s dari Supabase", bus_id)
+        raise HTTPException(status_code=503, detail="Layanan kamera tidak tersedia")

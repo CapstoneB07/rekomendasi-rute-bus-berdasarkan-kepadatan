@@ -80,3 +80,16 @@ def test_camera_bus_belum_dikonfigurasi(monkeypatch):
     monkeypatch.setattr(live, "LIVE_CV_BUS_ID", None)
     res = _client({"CV-1": _row(10)}).get("/api/live/camera")
     assert res.status_code == 404
+
+
+def test_camera_supabase_gagal_jadi_503():
+    class _Rusak(_FakeSupabase):
+        def execute(self):
+            raise RuntimeError("Could not find the table 'kamera_live'")
+
+    app = FastAPI()
+    app.include_router(live.router)
+    app.state.supabase = _Rusak({})
+    res = TestClient(app, raise_server_exceptions=False).get("/api/live/camera/CV-1")
+    assert res.status_code == 503
+    assert res.json()["detail"] == "Layanan kamera tidak tersedia"
