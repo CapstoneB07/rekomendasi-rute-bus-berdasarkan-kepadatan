@@ -7,6 +7,8 @@ import { skalaBbox, type Bbox } from '@/lib/kamera';
 // Area cetak printer thermal 80 mm = 576 dot (72 mm x 8 dot/mm, 203 dpi). Gambar dibuat
 // persis selebar ini agar tiap piksel gambar = satu dot, tanpa di-resample driver.
 export const LEBAR_DOT_80MM = 576;
+// Printer RPP02N (58 mm) mencetak 384 dot; lebar itu yang dikirim ke endpoint cetak.
+export const LEBAR_DOT_58MM = 384;
 
 // Hasil GET /api/live/camera/snapshot: frame JPEG dan bbox dari baris yang sama.
 export type SnapshotKamera = {
@@ -21,6 +23,8 @@ export type FotoThermal = {
   lebar: number;
   tinggi: number;
   jumlahDeteksi: number;
+  // Bitmap 1-bit (bit 1 = hitam, 8 dot per byte) dalam base64, untuk POST /api/print/foto.
+  bitsB64: string;
 };
 
 type PikselRgba = { data: Uint8ClampedArray; width: number; height: number };
@@ -110,6 +114,43 @@ export function gambarKotak(ctx: KonteksKotak, bboxes: Bbox[], asli: { lebar: nu
   }
 }
 
+// Kemas piksel hitam-putih menjadi 1 bit per dot (1 = hitam). Lebar harus kelipatan 8.
+export function kemasBit({ data, width, height }: PikselRgba): Uint8Array {
+  const perBaris = width / 8;
+  const out = new Uint8Array(perBaris * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Garis kotak yang di-antialias bisa abu-abu; ambang tengah memutuskannya.
+      if (data[(y * width + x) * 4] < 128) out[y * perBaris + (x >> 3)] |= 0x80 >> (x & 7);
+    }
+  }
+  return out;
+}
+
+function base64DariBytes(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// Kirim foto ke printer thermal yang terpasang di komputer backend.
+export async function kirimCetak(foto: FotoThermal, baris: string[]): Promise<void> {
+  const r = await fetch(`${API_BASE}/api/print/foto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lebar: foto.lebar, tinggi: foto.tinggi, bits_b64: foto.bitsB64, baris }),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => null);
+    throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
+  }
+}
+
+export function pesanGalatCetak(err: unknown): string {
+  if (err instanceof GalatApi && err.status === 503) return 'Printer tidak dapat dihubungi. Pastikan printer menyala dan sudah ter-pairing, lalu ulangi.';
+  return 'Foto gagal dicetak. Pastikan server backend berjalan, lalu ulangi.';
+}
+
 // Ambil frame + bbox yang pasti satu pasangan (di-unduh di server, tanpa CORS ke Storage).
 export async function ambilSnapshot(): Promise<SnapshotKamera> {
   // no-store: respons 404/410 tanpa header cache dipakai ulang browser, sama seperti panel kamera.
@@ -156,7 +197,8 @@ export async function buatFotoThermal(snap: SnapshotKamera, lebarDot = LEBAR_DOT
     ctx.putImageData(piksel, 0, 0);
     gambarKotak(ctx, snap.bboxes, asli, tujuan);
 
-    return { dataUrl: canvas.toDataURL('image/png'), ...tujuan, jumlahDeteksi: snap.bboxes.length };
+    const bitsB64 = base64DariBytes(kemasBit(ctx.getImageData(0, 0, tujuan.lebar, tujuan.tinggi)));
+    return { dataUrl: canvas.toDataURL('image/png'), ...tujuan, jumlahDeteksi: snap.bboxes.length, bitsB64 };
   } finally {
     bitmap.close();
   }

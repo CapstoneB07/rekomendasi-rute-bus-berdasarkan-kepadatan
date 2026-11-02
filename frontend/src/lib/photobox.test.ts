@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GalatApi } from './api';
-import { ambilSnapshot, ditherThermal, gambarKotak, pesanGalatFoto, ukuranCetak } from './photobox';
+import { ambilSnapshot, ditherThermal, gambarKotak, kemasBit, kirimCetak, pesanGalatCetak, pesanGalatFoto, ukuranCetak } from './photobox';
 
 function rgba(lebar: number, tinggi: number, luma: (x: number, y: number) => number) {
   const data = new Uint8ClampedArray(lebar * tinggi * 4);
@@ -102,5 +102,35 @@ describe('pesanGalatFoto', () => {
     expect(pesanGalatFoto(new GalatApi(404, ''))).toMatch(/offline/);
     expect(pesanGalatFoto(new GalatApi(503, ''))).toMatch(/tidak tersedia/);
     expect(pesanGalatFoto(new TypeError('Failed to fetch'))).toMatch(/gagal diambil/);
+  });
+});
+
+describe('kemasBit', () => {
+  it('1 bit per dot, 1 = hitam, bit tertinggi = dot paling kiri', () => {
+    // 16 dot x 2 baris: baris 0 hitam di x=0 dan x=15, baris 1 hitam di x=8..10.
+    const img = rgba(16, 2, (x, y) => ((y === 0 && (x === 0 || x === 15)) || (y === 1 && x >= 8 && x <= 10) ? 0 : 255));
+    expect(Array.from(kemasBit(img))).toEqual([0b10000000, 0b00000001, 0b00000000, 0b11100000]);
+  });
+});
+
+describe('kirimCetak', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const foto = { dataUrl: '', lebar: 384, tinggi: 10, jumlahDeteksi: 1, bitsB64: 'AAAA' };
+
+  it('POST bitmap dan baris teks ke /api/print/foto', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"status":"ok"}'));
+    vi.stubGlobal('fetch', fetchMock);
+    await kirimCetak(foto, ['Bus: CV-1']);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/print\/foto$/);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ lebar: 384, tinggi: 10, bits_b64: 'AAAA', baris: ['Bus: CV-1'] });
+  });
+
+  it('respons gagal menjadi GalatApi dengan status-nya', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'mati' }), { status: 503 })));
+    await expect(kirimCetak(foto, [])).rejects.toMatchObject({ status: 503 });
+    expect(pesanGalatCetak(new GalatApi(503, ''))).toMatch(/Printer tidak dapat dihubungi/);
+    expect(pesanGalatCetak(new Error('x'))).toMatch(/gagal dicetak/);
   });
 });
