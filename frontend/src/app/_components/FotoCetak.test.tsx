@@ -16,12 +16,12 @@ vi.mock('@/lib/photobox', async (impor) => ({
 }));
 
 const SNAP = { bus_id: 'CV-1', frame_b64: 'AAAA', bboxes: [], updated_at: '2026-10-15T03:00:00+00:00' };
-const FOTO = { dataUrl: 'data:image/png;base64,AAAA', lebar: 576, tinggi: 432, jumlahDeteksi: 7 };
+const FOTO = { dataUrl: 'data:image/png;base64,AAAA', lebar: 576, tinggi: 432, jumlahDeteksi: 7, bitsB64: 'AAAA' };
 
 beforeEach(() => {
   mocks.ambilSnapshot.mockReset();
   mocks.buatFotoThermal.mockReset();
-  vi.stubGlobal('print', vi.fn());
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"status":"ok"}')));
 });
 afterEach(() => {
   cleanup();
@@ -41,11 +41,9 @@ describe('FotoCetak', () => {
 
     const cetak = screen.getByRole('button', { name: /Cetak/ }) as HTMLButtonElement;
     expect(cetak.disabled).toBe(false);
-    fireEvent.click(cetak);
-    expect(window.print).toHaveBeenCalledOnce();
   });
 
-  it('menutup dialog setelah pencetakan selesai (afterprint)', async () => {
+  it('Cetak mengirim bitmap ke backend lalu menutup dialog', async () => {
     mocks.ambilSnapshot.mockResolvedValue(SNAP);
     mocks.buatFotoThermal.mockResolvedValue(FOTO);
     const onTutup = vi.fn();
@@ -53,9 +51,27 @@ describe('FotoCetak', () => {
     await screen.findByAltText(/Foto kamera bus/);
 
     fireEvent.click(screen.getByRole('button', { name: /Cetak/ }));
+    await waitFor(() => expect(onTutup).toHaveBeenCalledOnce());
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/print\/foto$/);
+    const body = JSON.parse(String(init?.body));
+    expect(body).toMatchObject({ lebar: 576, tinggi: 432, bits_b64: 'AAAA' });
+    expect(body.baris).toContain('Bus: CV-1');
+  });
+
+  it('printer tidak terjangkau (503): tampilkan pesan dan dialog tetap terbuka untuk diulang', async () => {
+    mocks.ambilSnapshot.mockResolvedValue(SNAP);
+    mocks.buatFotoThermal.mockResolvedValue(FOTO);
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ detail: 'x' }), { status: 503 }));
+    const onTutup = vi.fn();
+    render(<FotoCetak onTutup={onTutup} />);
+    await screen.findByAltText(/Foto kamera bus/);
+
+    fireEvent.click(screen.getByRole('button', { name: /Cetak/ }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Printer tidak dapat dihubungi/);
     expect(onTutup).not.toHaveBeenCalled();
-    window.dispatchEvent(new Event('afterprint'));
-    expect(onTutup).toHaveBeenCalledOnce();
+    expect((screen.getByRole('button', { name: /Cetak/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('frame basi: tampilkan pesan, cetak nonaktif, Ulangi mengambil snapshot lagi', async () => {

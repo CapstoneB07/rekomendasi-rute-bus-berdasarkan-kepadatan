@@ -40,17 +40,24 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 Tombol **Ambil Foto** di `/operator` (panel kamera) mengambil frame + kotak deteksi
 terbaru, menampilkan pratinjau 1-bit, lalu mencetaknya ke struk thermal 80 mm.
 
-Setup komputer operator (printer thermal via USB):
+Tombol **Cetak** mengirim bitmap 1-bit (576 dot, kertas 80 mm) ke
+`POST /api/print/foto`. Backend membungkusnya menjadi ESC/POS raster (`GS v 0`) dan
+menulisnya langsung ke port serial Bluetooth printer, jadi **tanpa driver printer Windows**
+dan tanpa dialog cetak browser. Backend harus berjalan di komputer yang ter-pairing dengan printer.
 
-1. Pasang driver printer, jadikan **printer default** Windows, ukuran kertas **80 mm**
-   (roll), margin 0 atau minimum, skala 100%.
-2. Jalankan Chrome dalam mode cetak langsung (tanpa dialog):
+Setup (Windows):
 
-   ```
-   chrome.exe --kiosk-printing --app=https://<alamat-frontend>/operator
-   ```
+1. Pasangkan printer di Pengaturan > Bluetooth & perangkat. Windows membuat port
+   "Standard Serial over Bluetooth link (COMn)" untuknya; cari nomornya di Device Manager
+   (Ports) atau lewat properti perangkat Bluetooth.
+2. Set `PRINTER_PORT` (default `COM13`) di lingkungan backend, mis. `PRINTER_PORT=COM13`.
+3. Jalankan backend, buka `/operator`, tekan **Ambil Foto** lalu **Cetak**.
 
-Catatan: gambar dibuat selebar 576 dot (area cetak 80 mm @ 203 dpi) dan dicetak 1:1.
-Bila printer memakai 58 mm, ubah `LEBAR_DOT_80MM` di `src/lib/photobox.ts` menjadi 384.
+Port COM bersifat eksklusif: tutup aplikasi lain yang memakai printer (mis. OpenLabel di
+komputer yang sama) sebelum mencetak. Printer mati/di luar jangkauan menghasilkan 503 dan
+pesan di dialog.
+
+Catatan: lebar gambar = `LEBAR_DOT_80MM` (576 dot, area cetak 72 mm @ 203 dpi) di `src/lib/photobox.ts`.
+Bila kepala cetak printer hanya 58 mm (384 dot), ubah konstanta itu ke 384. Gambar dicetak 1:1 per dot.
 Frame diambil lewat `GET /api/live/camera/snapshot` (backend yang mengunduh dari
 Supabase), sehingga gambar dan bbox selalu dari frame yang sama dan tanpa CORS.

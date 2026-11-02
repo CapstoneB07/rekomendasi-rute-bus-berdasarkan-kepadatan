@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
-import { ambilSnapshot, buatFotoThermal, pesanGalatFoto, type FotoThermal } from '@/lib/photobox';
+import { ambilSnapshot, buatFotoThermal, kirimCetak, pesanGalatCetak, pesanGalatFoto, type FotoThermal } from '@/lib/photobox';
 import { nomorTiket } from '@/lib/tiket';
 
 import { IkonCetak } from './ikon';
@@ -18,6 +18,8 @@ const WAKTU_WIB = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', d
 export function FotoCetak({ onTutup }: { onTutup: () => void }) {
   const [hasil, setHasil] = useState<Hasil>({ status: 'memuat' });
   const [percobaan, setPercobaan] = useState(0);
+  const [mencetak, setMencetak] = useState(false);
+  const [galatCetak, setGalatCetak] = useState<string | null>(null);
 
   useEffect(() => {
     let batal = false;
@@ -42,12 +44,21 @@ export function FotoCetak({ onTutup }: { onTutup: () => void }) {
 
   const ulangi = () => {
     setHasil({ status: 'memuat' });
+    setGalatCetak(null);
     setPercobaan((n) => n + 1);
   };
-  const cetak = () => {
-    // Dengan --kiosk-printing tidak ada dialog yang bisa dibatalkan; tutup setelah cetak dikirim supaya satu tekan = satu foto.
-    window.addEventListener('afterprint', onTutup, { once: true });
-    window.print();
+  const cetak = async () => {
+    if (hasil.status !== 'siap') return;
+    setMencetak(true);
+    setGalatCetak(null);
+    try {
+      // Printer Bluetooth tidak punya driver Windows, jadi bitmap dikirim ke backend yang menulis ESC/POS ke port COM-nya.
+      await kirimCetak(hasil.foto, [`Terdeteksi: ${hasil.foto.jumlahDeteksi} penumpang`, `Bus: ${hasil.bus}`, `Direkam: ${hasil.direkam}`, `No.: ${hasil.nomor}`]);
+      onTutup();
+    } catch (err) {
+      setGalatCetak(pesanGalatCetak(err));
+      setMencetak(false);
+    }
   };
 
   return createPortal(
@@ -91,6 +102,12 @@ export function FotoCetak({ onTutup }: { onTutup: () => void }) {
         </p>
       )}
 
+      {galatCetak && (
+        <p role="alert" className="tiket-aksi max-w-[24rem] rounded-lg bg-background px-[1rem] py-[0.8rem] text-center text-isi text-destructive shadow-lg">
+          {galatCetak}
+        </p>
+      )}
+
       <div className="tiket-aksi flex w-full max-w-[24rem] gap-[0.8rem]">
         <Button varian="outline" ukuran="lg" onClick={onTutup} className="flex-1">
           Tutup
@@ -98,9 +115,9 @@ export function FotoCetak({ onTutup }: { onTutup: () => void }) {
         <Button varian="outline" ukuran="lg" onClick={ulangi} disabled={hasil.status === 'memuat'} className="flex-1">
           Ulangi
         </Button>
-        <Button ukuran="lg" autoFocus onClick={cetak} disabled={hasil.status !== 'siap'} className="flex-1 font-bold">
+        <Button ukuran="lg" autoFocus onClick={cetak} disabled={hasil.status !== 'siap' || mencetak} className="flex-1 font-bold">
           <IkonCetak className="h-[1.4rem] w-[1.4rem]" />
-          Cetak
+          {mencetak ? 'Mencetak…' : 'Cetak'}
         </Button>
       </div>
     </div>,
