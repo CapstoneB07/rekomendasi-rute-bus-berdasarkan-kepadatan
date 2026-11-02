@@ -76,3 +76,60 @@ def test_nama_port_default_env_dan_validasi(monkeypatch):
     monkeypatch.setenv("PRINTER_PORT", "C:\\evil")
     with pytest.raises(thermal_printer.PrinterGagal):
         thermal_printer.nama_port()
+
+
+def _tata(**kw):
+    return thermal_printer._tata_baris(thermal_printer.BarisTeks(**kw), 20)
+
+
+def test_tata_baris_kolom_rata_kanan_dan_garis():
+    assert _tata(teks="Dari", kanan="Harmoni") == ["Dari" + " " * 9 + "Harmoni"]
+    assert _tata(garis=True) == ["-" * 20]
+    assert _tata(teks="Judul", tengah=True) == ["       Judul"]
+
+
+def test_tata_baris_membungkus_teks_panjang():
+    # label + nilai tidak muat satu baris: label dibungkus, nilai rata kanan di baris sendiri
+    assert _tata(teks="Naik - Halte Panjang Sekali", kanan="08.04") == ["Naik - Halte Panjang", "Sekali", " " * 15 + "08.04"]
+    assert _tata(teks="satu dua tiga empat lima enam") == ["satu dua tiga empat", "lima enam"]
+    assert _tata(teks="") == [""]
+
+
+def test_susun_escpos_teks_gaya_dan_ascii():
+    B = thermal_printer.BarisTeks
+    data = thermal_printer.susun_escpos_teks([B(teks="Koridor 1 \u00b7 Bus", tebal=True, besar=True), B(teks="biasa")], kolom=40)
+    assert data.startswith(b"\x1b\x40")
+    # Judul: tebal dan tinggi dua kali, lebar kolom tetap; teks biasa tanpa perintah ukuran; non-ASCII menjadi "?".
+    assert b"\x1b\x45\x01\x1d\x21\x01Koridor 1 ? Bus\x1d\x21\x00\x1b\x45\x00\n" in data
+    assert b"biasa\n" in data and data.endswith(b"\n\n\n\n")
+
+
+def test_susun_escpos_teks_judul_tidak_menyusutkan_kolom():
+    B = thermal_printer.BarisTeks
+    data = thermal_printer.susun_escpos_teks([B(teks="Tiket Rencana Perjalanan", besar=True, tengah=True)], kolom=48)
+    assert data.count(b"\x1d\x21\x01") == 1 and b"Tiket Rencana Perjalanan" in data  # satu baris
+
+
+def _tiket():
+    return {"baris": [{"teks": "Tiket Rencana Perjalanan", "tebal": True, "tengah": True}, {"teks": "Dari", "kanan": "Harmoni"}]}
+
+
+def test_cetak_tiket_mengirim_ke_printer(monkeypatch):
+    terkirim = []
+    monkeypatch.setattr(thermal_printer, "kirim", terkirim.append)
+    r = client.post("/api/print/tiket", json=_tiket())
+    assert r.status_code == 200 and r.json() == {"status": "ok"}
+    assert b"Tiket Rencana Perjalanan" in terkirim[0] and b"Harmoni" in terkirim[0]
+
+
+def test_cetak_tiket_validasi_dan_printer_gagal(monkeypatch):
+    assert client.post("/api/print/tiket", json={"baris": []}).status_code == 422
+    assert client.post("/api/print/tiket", json={"baris": [{"teks": "x" * 201}]}).status_code == 422
+    assert client.post("/api/print/tiket", json={"baris": [{"teks": "x"}] * 81}).status_code == 422
+
+    def gagal(_data):
+        raise thermal_printer.PrinterGagal("Printer di COM13 tidak dapat dihubungi")
+
+    monkeypatch.setattr(thermal_printer, "kirim", gagal)
+    r = client.post("/api/print/tiket", json=_tiket())
+    assert r.status_code == 503 and "COM13" in r.json()["detail"]

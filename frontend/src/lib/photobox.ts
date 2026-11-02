@@ -2,6 +2,7 @@
 // untuk printer thermal 80 mm, dan siapkan datanya untuk struk (FotoCetak).
 
 import { API_BASE, GalatApi } from '@/lib/api';
+import { kirimKePrinter } from '@/lib/cetak';
 import { skalaBbox, type Bbox } from '@/lib/kamera';
 
 // Area cetak printer thermal 80 mm = 576 dot (72 mm x 8 dot/mm, 203 dpi). Gambar dibuat
@@ -132,21 +133,8 @@ function base64DariBytes(bytes: Uint8Array): string {
 }
 
 // Kirim foto ke printer thermal yang terpasang di komputer backend.
-export async function kirimCetak(foto: FotoThermal, baris: string[]): Promise<void> {
-  const r = await fetch(`${API_BASE}/api/print/foto`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lebar: foto.lebar, tinggi: foto.tinggi, bits_b64: foto.bitsB64, baris }),
-  });
-  if (!r.ok) {
-    const body = await r.json().catch(() => null);
-    throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
-  }
-}
-
-export function pesanGalatCetak(err: unknown): string {
-  if (err instanceof GalatApi && err.status === 503) return 'Printer tidak dapat dihubungi. Pastikan printer menyala dan sudah ter-pairing, lalu ulangi.';
-  return 'Foto gagal dicetak. Pastikan server backend berjalan, lalu ulangi.';
+export function kirimCetak(foto: FotoThermal, baris: string[]): Promise<void> {
+  return kirimKePrinter('/api/print/foto', { lebar: foto.lebar, tinggi: foto.tinggi, bits_b64: foto.bitsB64, baris });
 }
 
 // Ambil frame + bbox yang pasti satu pasangan (di-unduh di server, tanpa CORS ke Storage).

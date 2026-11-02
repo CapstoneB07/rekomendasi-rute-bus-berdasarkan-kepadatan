@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { NaikItem, Rute, TransitItem } from './route-utils';
-import { buatTiket, jamLeg, nomorTiket } from './tiket';
+import { barisCetakTiket, buatTiket, jamLeg, nomorTiket } from './tiket';
 
 const naik = (
   koridor_id: number,
@@ -93,5 +93,40 @@ describe('buatTiket', () => {
     expect(t.tiba).toBe('—');
     expect(t.langkah[0]).toMatchObject({ busKe: null, jamNaik: '—', jamTurun: '—' });
     expect(t.jumlahTransit).toBe(0);
+  });
+});
+
+describe('barisCetakTiket', () => {
+  const t = buatTiket(
+    rute([
+      naik(1, 'Harmoni', 'Monas', 6, { bus_id: 'TJ-101', eta_menit: 4, leg_clock_detik: JAM_8, urutan_kedatangan: 3 }),
+      transit('Monas', 13),
+      naik(13, 'Monas', 'Blok M', 20, null),
+    ]),
+    { asal: 'Harmoni', tujuan: 'Blok M', simTime: JAM_8, dicetak: DICETAK },
+  );
+  const baris = barisCetakTiket(t);
+
+  it('judul, tanpa nomor tiket, dan ringkasan perjalanan sebagai baris label-nilai', () => {
+    expect(baris[0]).toEqual({ teks: 'Tiket Rencana Perjalanan', tebal: true, besar: true, tengah: true });
+    expect(JSON.stringify(baris)).not.toMatch(/TJ-\d|No\. tiket/);
+    expect(baris).toContainEqual({ teks: 'Dari', kanan: 'Harmoni' });
+    expect(baris).toContainEqual({ teks: 'Estimasi', kanan: '40 menit' });
+    expect(baris).toContainEqual({ teks: 'Transit', kanan: '1x' });
+  });
+
+  it('tiap leg: koridor dengan Bus ke-N, Naik - / Turun - berjam, dan transit', () => {
+    expect(baris).toContainEqual({ teks: 'Koridor 1 - Bus ke-3', tebal: true });
+    expect(baris).toContainEqual({ teks: 'Naik - Harmoni', kanan: '08.04' });
+    expect(baris).toContainEqual({ teks: 'Turun - Monas', kanan: '08.10' });
+    expect(baris).toContainEqual({ teks: 'Pindah di Monas ke koridor 13' });
+    // Tanpa bus terjadwal: hanya koridor, tanpa "Bus ke-".
+    expect(baris).toContainEqual({ teks: 'Koridor 13', tebal: true });
+  });
+
+  it('semua teks ASCII agar tidak menjadi tanda tanya di printer', () => {
+    const teks = baris.flatMap((b) => [b.teks ?? '', b.kanan ?? '']).filter((x) => x !== '—');
+    // Jam tak diketahui ("—") memang non-ASCII; backend menggantinya dengan "?".
+    expect(teks.every((x) => /^[ -~]*$/.test(x))).toBe(true);
   });
 });

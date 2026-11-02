@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GalatApi } from './api';
-import { ambilSnapshot, ditherThermal, gambarKotak, kemasBit, kirimCetak, pesanGalatCetak, pesanGalatFoto, ukuranCetak } from './photobox';
+import { ambilSnapshot, ditherThermal, gambarKotak, kemasBit, kirimCetak, pesanGalatFoto, ukuranCetak } from './photobox';
 
 function rgba(lebar: number, tinggi: number, luma: (x: number, y: number) => number) {
   const data = new Uint8ClampedArray(lebar * tinggi * 4);
@@ -130,7 +130,5 @@ describe('kirimCetak', () => {
   it('respons gagal menjadi GalatApi dengan status-nya', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'mati' }), { status: 503 })));
     await expect(kirimCetak(foto, [])).rejects.toMatchObject({ status: 503 });
-    expect(pesanGalatCetak(new GalatApi(503, ''))).toMatch(/Printer tidak dapat dihubungi/);
-    expect(pesanGalatCetak(new Error('x'))).toMatch(/gagal dicetak/);
-  });
+      });
 });

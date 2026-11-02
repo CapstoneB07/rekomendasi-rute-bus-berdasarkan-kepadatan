@@ -1,6 +1,6 @@
 import { formatJam } from './koridor';
 import { jumlahTransit } from './rencana';
-import type { NaikItem, Rute } from './route-utils';
+import { teksBusKe, type NaikItem, type Rute } from './route-utils';
 
 // Jam (detik) naik dan turun satu leg. leg_clock_detik = jam tiba di halte naik (sudah
 // memperhitungkan transit sebelumnya); tanpa bus rekomendasi jamnya tidak diketahui.
@@ -33,6 +33,41 @@ export type Tiket = {
   jumlahTransit: number;
   langkah: LangkahTiket[];
 };
+
+// Satu baris struk teks untuk POST /api/print/tiket. `kanan` membuat baris "label ..... nilai";
+// tata letak kolomnya (48 kolom, rata kanan, pembungkusan) dikerjakan backend.
+export type BarisCetak = { teks?: string; kanan?: string; tebal?: boolean; besar?: boolean; tengah?: boolean; garis?: boolean };
+
+// Isi tiket sama dengan pratinjau di TiketCetak, tetapi sebagai teks polos untuk printer thermal.
+export function barisCetakTiket(t: Tiket): BarisCetak[] {
+  const baris: BarisCetak[] = [
+    { teks: 'Tiket Rencana Perjalanan', tebal: true, besar: true, tengah: true },
+    { garis: true },
+    { teks: 'Dicetak', kanan: t.dicetak },
+    { garis: true },
+    { teks: 'Dari', kanan: t.asal },
+    { teks: 'Ke', kanan: t.tujuan },
+    { teks: 'Berangkat', kanan: t.berangkat },
+    { teks: 'Tiba (perkiraan)', kanan: t.tiba },
+    { teks: 'Estimasi', kanan: `${t.estimasiMenit} menit` },
+    { teks: 'Transit', kanan: t.jumlahTransit === 0 ? 'Langsung' : `${t.jumlahTransit}x` },
+    { garis: true },
+  ];
+  for (const l of t.langkah) {
+    if (l.tipe === 'naik') {
+      const bus = teksBusKe(l.busKe);
+      baris.push(
+        { teks: `Koridor ${l.koridor}${bus ? ` - ${bus}` : ''}`, tebal: true },
+        { teks: `Naik - ${l.naikDi}`, kanan: l.jamNaik },
+        { teks: `Turun - ${l.turunDi}`, kanan: l.jamTurun },
+      );
+    } else {
+      baris.push({ teks: `Pindah di ${l.di} ke koridor ${l.keKoridor}` });
+    }
+  }
+  baris.push({ garis: true }, { teks: 'Jam bersifat perkiraan dan dapat berubah. Selamat jalan!', tengah: true });
+  return baris;
+}
 
 const WIB = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Jakarta',

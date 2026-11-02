@@ -8,10 +8,14 @@ berpengaruh pada tautan Bluetooth, jadi tidak perlu pyserial.
 
 import os
 import re
+import textwrap
 import threading
 import time
+from dataclasses import dataclass
 
 PORT_DEFAULT = "COM13"
+# Font A printer 80 mm: 12 dot per karakter, jadi 576 dot = 48 kolom.
+KOLOM_TEKS = 48
 LEBAR_MAKS_DOT = 576
 TINGGI_MAKS_DOT = 3000
 # Printer kecil punya buffer terbatas: raster dikirim per pita lalu diberi jeda, bukan sekali jalan.
@@ -34,6 +38,48 @@ def nama_port() -> str:
 
 def _teks_ascii(teks: str) -> bytes:
     return "".join(c if 32 <= ord(c) < 127 else "?" for c in teks).encode("ascii")
+
+
+@dataclass(frozen=True)
+class BarisTeks:
+    """Satu baris struk teks. `kanan` diisi bila baris berbentuk "label ..... nilai"."""
+
+    teks: str = ""
+    kanan: str = ""
+    tebal: bool = False
+    besar: bool = False  # judul: tinggi dua kali, lebar kolom tetap
+    tengah: bool = False
+    garis: bool = False
+
+
+def _tata_baris(b: BarisTeks, kolom: int) -> list[str]:
+    """Pecah satu BarisTeks menjadi baris-baris selebar `kolom` (teks ASCII)."""
+    if b.garis:
+        return ["-" * kolom]
+    teks, kanan = _teks_ascii(b.teks).decode(), _teks_ascii(b.kanan).decode()
+    if kanan:
+        if len(teks) + 1 + len(kanan) <= kolom:
+            return [teks + " " * (kolom - len(teks) - len(kanan)) + kanan]
+        # Terlalu panjang untuk satu baris: label dibungkus, nilai rata kanan di baris sendiri.
+        kiri = textwrap.wrap(teks, kolom) if teks else []
+        return kiri + [x.rjust(kolom) for x in textwrap.wrap(kanan, kolom)]
+    baris = textwrap.wrap(teks, kolom) or [""]
+    return [x.center(kolom).rstrip() for x in baris] if b.tengah else baris
+
+
+def susun_escpos_teks(baris: list[BarisTeks], kolom: int = KOLOM_TEKS) -> bytes:
+    """Struk teks ESC/POS: tiap BarisTeks ditata ke `kolom` karakter lalu dicetak apa adanya.
+
+    Karakter Font A 1x; baris `besar` (judul) hanya dua kali tinggi, jadi lebar kolom tetap."""
+    out = bytearray(b"\x1b\x40")  # ESC @: reset
+    for b in baris:
+        # ESC E n: tebal. GS ! n: ukuran karakter (0x01 = tinggi dua kali).
+        gaya_awal = (b"\x1b\x45\x01" if b.tebal else b"") + (b"\x1d\x21\x01" if b.besar else b"")
+        gaya_akhir = (b"\x1d\x21\x00" if b.besar else b"") + (b"\x1b\x45\x00" if b.tebal else b"")
+        for teks in _tata_baris(b, kolom):
+            out += gaya_awal + _teks_ascii(teks) + gaya_akhir + b"\n"
+    out += b"\n\n\n\n"  # dorong kertas keluar dari kepala cetak
+    return bytes(out)
 
 
 def susun_escpos(lebar: int, tinggi: int, bits: bytes, baris: list[str]) -> bytes:

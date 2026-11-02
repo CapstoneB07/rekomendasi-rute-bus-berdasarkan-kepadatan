@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Rute } from '@/lib/route-utils';
@@ -51,8 +51,9 @@ describe('DetailRencana', () => {
     expect(onKembali).toHaveBeenCalledOnce();
   });
 
-  it('Cetak Informasi membuka pratinjau tiket; Cetak memanggil print, Tutup menutupnya', () => {
-    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+  it('Cetak Informasi membuka pratinjau tiket; Cetak mengirim ke printer, Tutup menutupnya', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"status":"ok"}'));
+    vi.stubGlobal('fetch', fetchMock);
     tampilkan();
     fireEvent.click(screen.getByRole('button', { name: 'Cetak Informasi' }));
 
@@ -68,10 +69,26 @@ describe('DetailRencana', () => {
     expect(tiket.getByText('Pindah di Monas ke koridor 13')).toBeTruthy();
 
     fireEvent.click(tiket.getByRole('button', { name: 'Cetak' }));
-    expect(print).toHaveBeenCalledOnce();
+    // Berhasil dicetak: dialog menutup sendiri.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/print\/tiket$/);
+    const baris = JSON.parse(String(init?.body)).baris;
+    expect(baris[0]).toMatchObject({ teks: 'Tiket Rencana Perjalanan', besar: true });
+    expect(baris).toContainEqual({ teks: 'Koridor 1 - Bus ke-2', tebal: true });
+    vi.unstubAllGlobals();
+  });
 
-    fireEvent.click(tiket.getByRole('button', { name: 'Tutup' }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    print.mockRestore();
+  it('printer tidak terjangkau: pesan tampil dan dialog tetap terbuka', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'x' }), { status: 503 })));
+    tampilkan();
+    fireEvent.click(screen.getByRole('button', { name: 'Cetak Informasi' }));
+    const tiket = within(screen.getByRole('dialog', { name: 'Tiket perjalanan' }));
+
+    fireEvent.click(tiket.getByRole('button', { name: 'Cetak' }));
+    expect((await tiket.findByRole('alert')).textContent).toMatch(/Printer tidak dapat dihubungi/);
+    expect(screen.getByRole('dialog', { name: 'Tiket perjalanan' })).toBeTruthy();
+    expect((tiket.getByRole('button', { name: 'Cetak' }) as HTMLButtonElement).disabled).toBe(false);
+    vi.unstubAllGlobals();
   });
 });

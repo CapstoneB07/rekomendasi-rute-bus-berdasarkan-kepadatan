@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
-import { ambilSnapshot, buatFotoThermal, kirimCetak, pesanGalatCetak, pesanGalatFoto, type FotoThermal } from '@/lib/photobox';
+import { pesanGalatCetak } from '@/lib/cetak';
+import { ambilSnapshot, buatFotoThermal, kirimCetak, pesanGalatFoto, type FotoThermal } from '@/lib/photobox';
 import { nomorTiket } from '@/lib/tiket';
 
 import { IkonCetak } from './ikon';
@@ -56,7 +57,7 @@ export function FotoCetak({ onTutup }: { onTutup: () => void }) {
       await kirimCetak(hasil.foto, [`Terdeteksi: ${hasil.foto.jumlahDeteksi} penumpang`, `Bus: ${hasil.bus}`, `Direkam: ${hasil.direkam}`, `No.: ${hasil.nomor}`]);
       onTutup();
     } catch (err) {
-      setGalatCetak(pesanGalatCetak(err));
+      setGalatCetak(pesanGalatCetak(err, 'Foto'));
       setMencetak(false);
     }
   };
