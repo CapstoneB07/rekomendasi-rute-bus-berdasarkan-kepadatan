@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
+import { teksBusKe } from '@/lib/route-utils';
 import type { Tiket } from '@/lib/tiket';
 
 import { Button } from '@/components/ui/button';
@@ -35,11 +36,9 @@ export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => vo
     >
       <article className="tiket rounded-lg shadow-lg">
         <header className="tiket-kepala">
-          <b>TransJakarta Lega</b>
-          <span>Tiket Rencana Perjalanan</span>
+          <b>Tiket Rencana Perjalanan</b>
         </header>
         <div className="tiket-garis" />
-        <Baris label="No. tiket" nilai={tiket.nomor} />
         <Baris label="Dicetak" nilai={tiket.dicetak} />
         <div className="tiket-garis" />
         <Baris label="Dari" nilai={tiket.asal} />
@@ -55,10 +54,10 @@ export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => vo
               <li key={i}>
                 <b>
                   Koridor {l.koridor}
-                  {l.bus && ` · Bus ${l.bus}`}
+                  {teksBusKe(l.busKe) && ` · ${teksBusKe(l.busKe)}`}
                 </b>
-                <Baris label={`Naik ${l.naikDi}`} nilai={l.jamNaik} />
-                <Baris label={`Turun ${l.turunDi}`} nilai={l.jamTurun} />
+                <Baris label={`Naik - ${l.naikDi}`} nilai={l.jamNaik} />
+                <Baris label={`Turun - ${l.turunDi}`} nilai={l.jamTurun} />
               </li>
             ) : (
               <li key={i} className="tiket-transit">
