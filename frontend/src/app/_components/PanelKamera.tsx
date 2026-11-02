@@ -5,6 +5,9 @@ import { useQuery } from '@tanstack/react-query';
 
 import { API_BASE, GalatApi } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { FotoCetak } from './FotoCetak';
+import { IkonCetak } from './ikon';
 import { skalaBbox, statusKamera, type Bbox, type FrameKameraResponse } from '@/lib/kamera';
 
 // Worker mengunggah frame tiap ±1 detik; polling 2 detik menjaga tampilan tetap dekat realtime.
@@ -68,6 +71,7 @@ export function FrameKamera({ src, bboxes }: { src: string; bboxes: Bbox[] }) {
 // Panel kamera bus fisik (CV worker) untuk halaman operator.
 // Mengisi satu sel grid penuh (setengah layar), sama seperti peta di sebelahnya.
 export function PanelKamera() {
+  const [fotoTerbuka, setFotoTerbuka] = useState(false);
   const { data, error } = useQuery<FrameKameraResponse>({
     queryKey: ['kamera-bus'],
     queryFn: async () => {
@@ -115,6 +119,13 @@ export function PanelKamera() {
       >
         {status === 'aktif' ? `${data?.bboxes.length} deteksi · ${JAM_WIB.format(new Date(data!.updated_at))}` : PESAN[status]}
       </p>
+      {status === 'aktif' && (
+        <Button ukuran="sm" onClick={() => setFotoTerbuka(true)} className="absolute right-[0.6rem] top-[0.6rem] font-bold">
+          <IkonCetak className="h-[1.1rem] w-[1.1rem]" />
+          Ambil Foto
+        </Button>
+      )}
+      {fotoTerbuka && <FotoCetak onTutup={() => setFotoTerbuka(false)} />}
     </section>
   );
 }
