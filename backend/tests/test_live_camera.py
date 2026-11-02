@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -32,6 +33,9 @@ class _FakeSupabase:
     def execute(self):
         row = self._rows.get(self._bus_id)
         return SimpleNamespace(data=[row] if row else [])
+
+    def download(self, path):
+        return b"JPEG:" + path.encode()
 
     def create_signed_url(self, path, expires_in):
         return {"signedURL": f"https://storage.test/{path}?exp={expires_in}"}
@@ -93,3 +97,37 @@ def test_camera_supabase_gagal_jadi_503():
     res = TestClient(app, raise_server_exceptions=False).get("/api/live/camera/CV-1")
     assert res.status_code == 503
     assert res.json()["detail"] == "Layanan kamera tidak tersedia"
+
+
+def test_snapshot_frame_dan_bbox_berpasangan(monkeypatch):
+    monkeypatch.setattr(live, "LIVE_CV_BUS_ID", "CV-1")
+    res = _client({"CV-1": _row(10)}).get("/api/live/camera/snapshot")
+    assert res.status_code == 200
+    body = res.json()
+    assert base64.b64decode(body["frame_b64"]) == b"JPEG:CV-1/latest.jpg"
+    assert body["bboxes"] == BBOXES
+    assert body["bus_id"] == "CV-1"
+
+
+def test_snapshot_frame_basi_410(monkeypatch):
+    monkeypatch.setattr(live, "LIVE_CV_BUS_ID", "CV-1")
+    assert _client({"CV-1": _row(500)}).get("/api/live/camera/snapshot").status_code == 410
+
+
+def test_snapshot_belum_dikonfigurasi_404(monkeypatch):
+    monkeypatch.setattr(live, "LIVE_CV_BUS_ID", None)
+    assert _client({"CV-1": _row(10)}).get("/api/live/camera/snapshot").status_code == 404
+
+
+def test_snapshot_unduhan_gagal_jadi_503(monkeypatch):
+    monkeypatch.setattr(live, "LIVE_CV_BUS_ID", "CV-1")
+
+    class _TanpaFile(_FakeSupabase):
+        def download(self, path):
+            raise RuntimeError("Object not found")
+
+    app = FastAPI()
+    app.include_router(live.router)
+    app.state.supabase = _TanpaFile({"CV-1": _row(10)})
+    res = TestClient(app, raise_server_exceptions=False).get("/api/live/camera/snapshot")
+    assert res.status_code == 503
