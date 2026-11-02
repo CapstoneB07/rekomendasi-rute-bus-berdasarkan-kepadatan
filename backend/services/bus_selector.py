@@ -350,6 +350,10 @@ def select_bus_per_segmen(
             "label_kepadatan": _label_kepadatan(terbaik["kepadatan"]),
             "kategori_kepadatan": _kategori_kepadatan(terbaik["kepadatan"]),
             "eta_menit": terbaik["eta_menit"],
+            # Bus ini adalah bus ke-N yang tiba di halte naik pada koridornya (1 = yang pertama datang).
+            # Bus tidak punya kode di lapangan, jadi penumpang mengenalinya dengan menghitung bus
+            # berkoridor sama yang lewat; bus yang tiba pada menit yang sama tidak dihitung lebih dulu.
+            "urutan_kedatangan": 1 + sum(1 for b in kandidat if b["eta_menit"] < terbaik["eta_menit"]),
             "selection_score": round(terbaik["score"], 4),
             "selection_reason": selection_reason,
             "safe_density_threshold": SAFE_NEXT_BUS_DENSITY_THRESHOLD,

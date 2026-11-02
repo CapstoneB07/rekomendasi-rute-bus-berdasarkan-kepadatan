@@ -15,7 +15,7 @@ export type LangkahTiket =
   | {
       tipe: 'naik';
       koridor: number;
-      bus: string | null;
+      busKe: number | null;
       naikDi: string;
       turunDi: string;
       jamNaik: string;
@@ -24,7 +24,6 @@ export type LangkahTiket =
   | { tipe: 'transit'; di: string; keKoridor: number };
 
 export type Tiket = {
-  nomor: string;
   dicetak: string;
   asal: string;
   tujuan: string;
@@ -65,7 +64,7 @@ export function nomorTiket(date: Date, acak: () => string = acakHex): string {
 
 export function buatTiket(
   rute: Rute,
-  opsi: { asal: string; tujuan: string; simTime: number; dicetak: Date; acak?: () => string },
+  opsi: { asal: string; tujuan: string; simTime: number; dicetak: Date },
 ): Tiket {
   const langkah: LangkahTiket[] = rute.segmen.map((s) => {
     if (s.tipe === 'transit') return { tipe: 'transit', di: s.transit_di, keKoridor: s.ke_koridor };
@@ -73,7 +72,7 @@ export function buatTiket(
     return {
       tipe: 'naik',
       koridor: s.koridor_id,
-      bus: s.bus_rekomendasi?.bus_id ?? null,
+      busKe: s.bus_rekomendasi?.urutan_kedatangan ?? null,
       naikDi: s.naik_di,
       turunDi: s.turun_di,
       jamNaik: jam.naik !== null ? formatJam(jam.naik) : '—',
@@ -84,7 +83,6 @@ export function buatTiket(
   const p = bagianWib(opsi.dicetak);
 
   return {
-    nomor: nomorTiket(opsi.dicetak, opsi.acak),
     dicetak: `${p.day}/${p.month}/${p.year} ${p.hour}.${p.minute}`,
     asal: opsi.asal,
     tujuan: opsi.tujuan,

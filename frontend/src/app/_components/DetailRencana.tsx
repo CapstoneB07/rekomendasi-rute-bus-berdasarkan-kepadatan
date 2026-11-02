@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { formatJam } from '@/lib/koridor';
-import { warnaLabelKepadatan, type NaikItem, type Rute } from '@/lib/route-utils';
+import { teksBusKe, warnaLabelKepadatan, type NaikItem, type Rute } from '@/lib/route-utils';
 import { buatTiket, jamLeg, type Tiket } from '@/lib/tiket';
 
 import { Badge } from '@/components/ui/badge';
@@ -25,9 +25,11 @@ function KartuNaik({ item, simTime }: { item: NaikItem; simTime: number }) {
         <LencanaKoridor koridorId={item.koridor_id} />
         {rek ? (
           <>
-            <Badge varian="outline" className="font-bold leading-[1.6rem]">
-              {rek.bus_id}
-            </Badge>
+            {teksBusKe(rek.urutan_kedatangan) && (
+              <Badge varian="outline" className="font-bold leading-[1.6rem]">
+                {teksBusKe(rek.urutan_kedatangan)}
+              </Badge>
+            )}
             <span className="ml-auto whitespace-nowrap text-kecil text-muted-foreground">
               {rek.eta_menit <= 0 ? 'Segera' : `${rek.eta_menit} menit lagi`}
             </span>

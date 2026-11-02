@@ -8,7 +8,7 @@ const naik = (
   naik_di: string,
   turun_di: string,
   waktu_menit: number,
-  rek: { bus_id: string; eta_menit: number; leg_clock_detik?: number } | null,
+  rek: { bus_id: string; eta_menit: number; leg_clock_detik?: number; urutan_kedatangan?: number } | null,
 ): NaikItem =>
   ({
     tipe: 'naik',
@@ -60,19 +60,18 @@ describe('jamLeg', () => {
 });
 
 describe('buatTiket', () => {
-  const opsi = { asal: 'Harmoni', tujuan: 'Blok M', simTime: JAM_8, dicetak: DICETAK, acak: () => '0F0F' };
+  const opsi = { asal: 'Harmoni', tujuan: 'Blok M', simTime: JAM_8, dicetak: DICETAK };
 
   it('membentuk tiket dengan transit: berangkat dari leg pertama, tiba dari leg terakhir', () => {
     const t = buatTiket(
       rute([
-        naik(1, 'Harmoni', 'Monas', 6, { bus_id: 'TJ-101', eta_menit: 4, leg_clock_detik: JAM_8 }),
+        naik(1, 'Harmoni', 'Monas', 6, { bus_id: 'TJ-101', eta_menit: 4, leg_clock_detik: JAM_8, urutan_kedatangan: 3 }),
         transit('Monas', 13),
-        naik(13, 'Monas', 'Blok M', 20, { bus_id: 'TJ-213', eta_menit: 3, leg_clock_detik: JAM_8 + 600 }),
+        naik(13, 'Monas', 'Blok M', 20, { bus_id: 'TJ-213', eta_menit: 3, leg_clock_detik: JAM_8 + 600, urutan_kedatangan: 1 }),
       ]),
       opsi,
     );
     expect(t).toEqual({
-      nomor: 'TJ-261015-080509-0F0F',
       dicetak: '15/10/26 08.05',
       asal: 'Harmoni',
       tujuan: 'Blok M',
@@ -81,9 +80,9 @@ describe('buatTiket', () => {
       estimasiMenit: 40,
       jumlahTransit: 1,
       langkah: [
-        { tipe: 'naik', koridor: 1, bus: 'TJ-101', naikDi: 'Harmoni', turunDi: 'Monas', jamNaik: '08.04', jamTurun: '08.10' },
+        { tipe: 'naik', koridor: 1, busKe: 3, naikDi: 'Harmoni', turunDi: 'Monas', jamNaik: '08.04', jamTurun: '08.10' },
         { tipe: 'transit', di: 'Monas', keKoridor: 13 },
-        { tipe: 'naik', koridor: 13, bus: 'TJ-213', naikDi: 'Monas', turunDi: 'Blok M', jamNaik: '08.13', jamTurun: '08.33' },
+        { tipe: 'naik', koridor: 13, busKe: 1, naikDi: 'Monas', turunDi: 'Blok M', jamNaik: '08.13', jamTurun: '08.33' },
       ],
     });
   });
@@ -92,7 +91,7 @@ describe('buatTiket', () => {
     const t = buatTiket(rute([naik(1, 'Harmoni', 'Blok M', 20, null)]), opsi);
     expect(t.berangkat).toBe('—');
     expect(t.tiba).toBe('—');
-    expect(t.langkah[0]).toMatchObject({ bus: null, jamNaik: '—', jamTurun: '—' });
+    expect(t.langkah[0]).toMatchObject({ busKe: null, jamNaik: '—', jamTurun: '—' });
     expect(t.jumlahTransit).toBe(0);
   });
 });
