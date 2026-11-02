@@ -34,3 +34,23 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Photobox operator (cetak foto kamera ke printer thermal)
+
+Tombol **Ambil Foto** di `/operator` (panel kamera) mengambil frame + kotak deteksi
+terbaru, menampilkan pratinjau 1-bit, lalu mencetaknya ke struk thermal 80 mm.
+
+Setup komputer operator (printer thermal via USB):
+
+1. Pasang driver printer, jadikan **printer default** Windows, ukuran kertas **80 mm**
+   (roll), margin 0 atau minimum, skala 100%.
+2. Jalankan Chrome dalam mode cetak langsung (tanpa dialog):
+
+   ```
+   chrome.exe --kiosk-printing --app=https://<alamat-frontend>/operator
+   ```
+
+Catatan: gambar dibuat selebar 576 dot (area cetak 80 mm @ 203 dpi) dan dicetak 1:1.
+Bila printer memakai 58 mm, ubah `LEBAR_DOT_80MM` di `src/lib/photobox.ts` menjadi 384.
+Frame diambil lewat `GET /api/live/camera/snapshot` (backend yang mengunduh dari
+Supabase), sehingga gambar dan bbox selalu dari frame yang sama dan tanpa CORS.
