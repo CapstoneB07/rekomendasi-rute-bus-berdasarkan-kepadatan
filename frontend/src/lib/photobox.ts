@@ -7,8 +7,6 @@ import { skalaBbox, type Bbox } from '@/lib/kamera';
 // Area cetak printer thermal 80 mm = 576 dot (72 mm x 8 dot/mm, 203 dpi). Gambar dibuat
 // persis selebar ini agar tiap piksel gambar = satu dot, tanpa di-resample driver.
 export const LEBAR_DOT_80MM = 576;
-// Printer RPP02N (58 mm) mencetak 384 dot; lebar itu yang dikirim ke endpoint cetak.
-export const LEBAR_DOT_58MM = 384;
 
 // Hasil GET /api/live/camera/snapshot: frame JPEG dan bbox dari baris yang sama.
 export type SnapshotKamera = {

@@ -16,7 +16,7 @@ vi.mock('@/lib/photobox', async (impor) => ({
 }));
 
 const SNAP = { bus_id: 'CV-1', frame_b64: 'AAAA', bboxes: [], updated_at: '2026-10-15T03:00:00+00:00' };
-const FOTO = { dataUrl: 'data:image/png;base64,AAAA', lebar: 384, tinggi: 288, jumlahDeteksi: 7, bitsB64: 'AAAA' };
+const FOTO = { dataUrl: 'data:image/png;base64,AAAA', lebar: 576, tinggi: 432, jumlahDeteksi: 7, bitsB64: 'AAAA' };
 
 beforeEach(() => {
   mocks.ambilSnapshot.mockReset();
@@ -56,7 +56,7 @@ describe('FotoCetak', () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(String(url)).toMatch(/\/api\/print\/foto$/);
     const body = JSON.parse(String(init?.body));
-    expect(body).toMatchObject({ lebar: 384, tinggi: 288, bits_b64: 'AAAA' });
+    expect(body).toMatchObject({ lebar: 576, tinggi: 432, bits_b64: 'AAAA' });
     expect(body.baris).toContain('Bus: CV-1');
   });
 

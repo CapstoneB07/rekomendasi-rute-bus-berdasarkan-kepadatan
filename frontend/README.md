@@ -38,9 +38,9 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ## Photobox operator (cetak foto kamera ke printer thermal)
 
 Tombol **Ambil Foto** di `/operator` (panel kamera) mengambil frame + kotak deteksi
-terbaru, menampilkan pratinjau 1-bit, lalu mencetaknya ke struk thermal 58 mm.
+terbaru, menampilkan pratinjau 1-bit, lalu mencetaknya ke struk thermal 80 mm.
 
-Tombol **Cetak** mengirim bitmap 1-bit (384 dot, printer 58 mm RPP02N) ke
+Tombol **Cetak** mengirim bitmap 1-bit (576 dot, kertas 80 mm) ke
 `POST /api/print/foto`. Backend membungkusnya menjadi ESC/POS raster (`GS v 0`) dan
 menulisnya langsung ke port serial Bluetooth printer, jadi **tanpa driver printer Windows**
 dan tanpa dialog cetak browser. Backend harus berjalan di komputer yang ter-pairing dengan printer.
@@ -57,7 +57,7 @@ Port COM bersifat eksklusif: tutup aplikasi lain yang memakai printer (mis. Open
 komputer yang sama) sebelum mencetak. Printer mati/di luar jangkauan menghasilkan 503 dan
 pesan di dialog.
 
-Catatan: bila memakai printer 80 mm, ganti `LEBAR_DOT_58MM` di `FotoCetak.tsx` dengan
-`LEBAR_DOT_80MM` (576). Gambar dicetak 1:1 per dot.
+Catatan: lebar gambar = `LEBAR_DOT_80MM` (576 dot, area cetak 72 mm @ 203 dpi) di `src/lib/photobox.ts`.
+Bila kepala cetak printer hanya 58 mm (384 dot), ubah konstanta itu ke 384. Gambar dicetak 1:1 per dot.
 Frame diambil lewat `GET /api/live/camera/snapshot` (backend yang mengunduh dari
 Supabase), sehingga gambar dan bbox selalu dari frame yang sama dan tanpa CORS.

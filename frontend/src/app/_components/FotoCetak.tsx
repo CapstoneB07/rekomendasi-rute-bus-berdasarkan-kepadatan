@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
-import { ambilSnapshot, buatFotoThermal, kirimCetak, LEBAR_DOT_58MM, pesanGalatCetak, pesanGalatFoto, type FotoThermal } from '@/lib/photobox';
+import { ambilSnapshot, buatFotoThermal, kirimCetak, pesanGalatCetak, pesanGalatFoto, type FotoThermal } from '@/lib/photobox';
 import { nomorTiket } from '@/lib/tiket';
 
 import { IkonCetak } from './ikon';
@@ -25,7 +25,7 @@ export function FotoCetak({ onTutup }: { onTutup: () => void }) {
     let batal = false;
     ambilSnapshot()
       .then(async (snap) => {
-        const foto = await buatFotoThermal(snap, LEBAR_DOT_58MM);
+        const foto = await buatFotoThermal(snap);
         if (batal) return;
         const waktu = new Date(snap.updated_at);
         setHasil({ status: 'siap', foto, bus: snap.bus_id, direkam: WAKTU_WIB.format(waktu), nomor: nomorTiket(new Date()) });
