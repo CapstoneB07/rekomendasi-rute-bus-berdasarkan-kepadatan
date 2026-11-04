@@ -269,6 +269,13 @@ html {
 .tiket-transit {
   font-style: italic;
 }
+/* Foto photobox: sudah 1-bit dan selebar area cetak, jangan di-smoothing agar tiap piksel = satu dot. */
+.foto-cetak {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
 .tiket-kaki {
   text-align: center;
   font-size: 0.9em;

@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 
-from services.camera_frames import BusTidakDikenal, FrameBasi, frame_terbaru
+from services.camera_frames import BusTidakDikenal, FrameBasi, frame_terbaru, snapshot_terbaru
 from services.gtfs_simulation import kepadatan_bus_live
 from services.live_crowding import LIVE_CV_BUS_ID
 
@@ -113,12 +113,36 @@ def get_live_positions(request: Request):
     return {"type": "FeatureCollection", "status": live.status, "features": features}
 
 
+def _baca_kamera(bus_id: str, request: Request, baca):
+    """Jalankan `baca` (frame_terbaru / snapshot_terbaru) dan petakan galatnya ke status HTTP."""
+    try:
+        return baca(request.app.state.supabase, bus_id)
+    except BusTidakDikenal:
+        raise HTTPException(status_code=404, detail="Bus tidak dikenal")
+    except FrameBasi:
+        raise HTTPException(status_code=410, detail="Frame kamera basi")
+    except Exception:
+        logger.exception("Gagal membaca frame kamera bus %s dari Supabase", bus_id)
+        raise HTTPException(status_code=503, detail="Layanan kamera tidak tersedia")
+
+
+def _bus_kamera_terkonfigurasi() -> str:
+    if not LIVE_CV_BUS_ID:
+        raise HTTPException(status_code=404, detail="Kamera bus belum dikonfigurasi")
+    return LIVE_CV_BUS_ID
+
+
 @router.get("/camera")
 def get_live_camera_cv(request: Request):
     """Frame kamera bus fisik yang dikonfigurasi (LIVE_CV_BUS_ID), untuk halaman operator."""
-    if not LIVE_CV_BUS_ID:
-        raise HTTPException(status_code=404, detail="Kamera bus belum dikonfigurasi")
-    return get_live_camera(LIVE_CV_BUS_ID, request)
+    return get_live_camera(_bus_kamera_terkonfigurasi(), request)
+
+
+# Didaftarkan sebelum /camera/{bus_id} supaya "snapshot" tidak terbaca sebagai bus_id.
+@router.get("/camera/snapshot")
+def get_live_camera_snapshot(request: Request):
+    """Frame + bbox yang berpasangan sebagai base64, untuk photobox di halaman operator."""
+    return _baca_kamera(_bus_kamera_terkonfigurasi(), request, snapshot_terbaru)
 
 
 @router.get("/camera/{bus_id}")
@@ -129,12 +153,4 @@ def get_live_camera(bus_id: str, request: Request):
     melewati LIVE_CV_TTL_SECONDS. 503 bila Supabase gagal (tabel/bucket belum ada,
     jaringan, kredensial), supaya bisa dibedakan dari kamera yang memang offline.
     """
-    try:
-        return frame_terbaru(request.app.state.supabase, bus_id)
-    except BusTidakDikenal:
-        raise HTTPException(status_code=404, detail="Bus tidak dikenal")
-    except FrameBasi:
-        raise HTTPException(status_code=410, detail="Frame kamera basi")
-    except Exception:
-        logger.exception("Gagal membaca frame kamera bus %s dari Supabase", bus_id)
-        raise HTTPException(status_code=503, detail="Layanan kamera tidak tersedia")
+    return _baca_kamera(bus_id, request, frame_terbaru)

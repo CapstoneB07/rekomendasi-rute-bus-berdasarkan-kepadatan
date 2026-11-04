@@ -29,6 +29,8 @@ export type BusRekomendasi = {
   kepadatan: number;
   label_kepadatan: 'Sepi' | 'Sedang' | 'Padat';
   eta_menit: number;
+  // Bus ini adalah bus ke-N yang tiba di halte naik pada koridornya (1 = yang pertama datang).
+  urutan_kedatangan?: number;
   kategori_kepadatan?: 'sepi' | 'sedang' | 'padat' | 'sangat_padat';
   selection_score?: number;
   selection_reason?: 'next_bus_safe_density' | 'bus_score';
@@ -96,6 +98,11 @@ const TEKS_STATUS_BROKER: Record<Exclude<StatusBroker, 'tersambung'>, string> = 
 };
 
 // Teks status di bawah jam saat mode waktu nyata.
+// Bus di lapangan tidak punya kode, hanya tulisan koridor, jadi penumpang mengenalinya dari urutan kedatangan.
+export function teksBusKe(urutan: number | null | undefined): string | null {
+  return urutan ? `Bus ke-${urutan}` : null;
+}
+
 export function statusBusAsli(data: PosisiBusAsliResponse | undefined, isError: boolean): string {
   if (isError) return 'Bus asli tidak dapat dimuat. Pastikan server backend berjalan.';
   if (!data) return 'Memuat posisi bus asli…';
