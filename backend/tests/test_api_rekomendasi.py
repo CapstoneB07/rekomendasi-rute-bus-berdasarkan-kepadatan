@@ -3,12 +3,11 @@
 Dilewati otomatis jika kredensial Supabase tidak tersedia. MQTT dimatikan
 agar test tidak membuka koneksi keluar selain Supabase.
 
-Test performa (TC-PERF-*) memeriksa target objective: respon pencarian rute < 100 ms.
+Gate latensi (p95 < 100 ms) ada di test_latensi_rute.py (graf offline, dijalankan CI).
+TC-PERF-03 di sini hanya mencetak profil waktu per tahap terhadap data nyata.
 """
 
 import os
-import statistics
-import time
 
 import pytest
 from dotenv import load_dotenv
@@ -19,8 +18,6 @@ pytestmark = pytest.mark.skipif(
     not (os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
     reason="kredensial Supabase tidak tersedia",
 )
-
-TARGET_MS = 100
 
 
 @pytest.fixture(scope="module")
@@ -128,34 +125,7 @@ def test_tc_api_10_endpoint_simulasi_dan_live(client):
     assert client.get("/api/live/positions").status_code == 200
 
 
-# ---- Performa (objective 2) ------------------------------------------
-
-def _ukur(client, pasangan, ulang=5, **extra):
-    waktu = []
-    for a, b in pasangan:
-        for _ in range(ulang):
-            t0 = time.perf_counter()
-            r = client.post("/api/rute/rekomendasi", json={"halte_asal": a, "halte_tujuan": b, "jam": 9, **extra})
-            waktu.append((time.perf_counter() - t0) * 1000)
-            assert r.status_code == 200
-    waktu.sort()
-    p = lambda q: waktu[min(len(waktu) - 1, int(len(waktu) * q))]
-    print(
-        f"\nn={len(waktu)} mean={statistics.mean(waktu):.1f}ms "
-        f"p50={p(.5):.1f} p95={p(.95):.1f} p99={p(.99):.1f} max={waktu[-1]:.1f}"
-    )
-    return p(0.5), p(0.95)
-
-
-def test_tc_perf_01_p50_di_bawah_100ms(client, pasangan):
-    p50, _ = _ukur(client, pasangan)
-    assert p50 < TARGET_MS, f"p50={p50:.1f}ms > {TARGET_MS}ms"
-
-
-def test_tc_perf_02_p95_di_bawah_100ms(client, pasangan):
-    _, p95 = _ukur(client, pasangan)
-    assert p95 < TARGET_MS, f"p95={p95:.1f}ms > {TARGET_MS}ms"
-
+# ---- Profil (informasi) ------------------------------------------
 
 def test_tc_perf_03_profil_tahap(client, pasangan):
     """Informasi saja: rincian waktu per tahap untuk satu pasangan."""

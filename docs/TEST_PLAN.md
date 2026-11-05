@@ -17,14 +17,13 @@ Objective:
 | TC-API-08 | - | API | request identik 2x | respons identik (deterministik) | idem |
 | TC-API-09 | - | API | mode live | 200/404, tanpa error | idem |
 | TC-API-10 | - | API | GET simulation/halte, shapes, positions, live/positions | 200 | idem |
-| TC-PERF-01 | 2 | Performa | 8 pasangan halte x 5 ulang | p50 < 100 ms | idem |
-| TC-PERF-02 | 2 | Performa | idem | p95 < 100 ms | idem |
-| TC-PERF-03 | 2 | Performa | profil cProfile per tahap | informasi bottleneck | script profil |
-| TC-FE-01 | - | FE | `npx vitest run`, `tsc --noEmit`, `eslint` | lulus, tanpa warning | CI/manual |
-| TC-OBJ1-01 | 1 | FE operator | buka halaman operator | ada peta + bus simulasi | manual (belum ada) |
-| TC-OBJ1-02 | 1 | FE operator | ubah waktu & lokasi simulasi | posisi bus berubah | manual (belum ada) |
-| TC-OBJ1-03 | 1 | FE operator | tampil frame kamera + bbox deteksi | gambar + kotak deteksi tampil | manual (belum ada) |
-| TC-OBJ3-01 | 3 | Tiket | pilih rute lalu tekan cetak | tiket tercetak (rute, halte, jam, harga) | manual (belum ada) |
+| TC-PERF-01 | 2 | Performa | build_graph + dijkstra pada graf sintetis 288 halte, 30 sampel | p95 < 100 ms (200 ms di CI) | backend/tests/test_latensi_rute.py (gate CI) |
+| TC-PERF-02 | 2 | Performa | profil cProfile per tahap pada data nyata | informasi bottleneck | backend/tests/test_api_rekomendasi.py (hanya mencetak) |
+| TC-FE-01 | - | FE | `npx vitest run`, `tsc --noEmit`, `eslint` | lulus, tanpa warning | CI (`.github/workflows/ci.yml`) |
+| TC-OBJ1-01 | 1 | FE operator | buka halaman operator | ada peta + bus simulasi | manual |
+| TC-OBJ1-02 | 1 | FE operator | ubah waktu & lokasi simulasi | posisi bus berubah | manual |
+| TC-OBJ1-03 | 1 | FE operator | tampil frame kamera + bbox deteksi | gambar + kotak deteksi tampil | manual |
+| TC-OBJ3-01 | 3 | Tiket | pilih rute lalu tekan cetak | tiket tercetak (rute, halte, jam, harga) | manual |
 
-Menjalankan: `cd backend && ./venv/Scripts/python.exe -m pytest tests -q` (test API memakai backend/.env dan dilewati tanpa kredensial);
+Menjalankan: `cd backend && ./venv/Scripts/python.exe -m pytest tests -q` (test API memakai backend/.env dan dilewati tanpa kredensial; gate latensi offline, di CI ambangnya 200 ms karena runner bersama);
 `cd frontend && npx vitest run && npx tsc --noEmit && npx eslint`.
