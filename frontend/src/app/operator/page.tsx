@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ambilRekomendasi, API_BASE } from '@/lib/api';
 import { formatJam } from '@/lib/koridor';
 import { statusBusAsli, type HalteOpsi, type Rute } from '@/lib/route-utils';
+import { useBagikanLokasi } from '@/lib/use-lokasi';
 import { usePencarianKiosk } from '@/lib/use-pencarian';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
 import { useRelayBusTj } from '@/lib/relay-bus-tj';
@@ -41,6 +42,7 @@ export default function Operator() {
   });
   const halteMap = useMemo(() => new Map((halteList ?? []).map((h) => [h.halte_id, h])), [halteList]);
   const halte = halteId ? halteMap.get(halteId) : undefined;
+  useBagikanLokasi(halteId);
 
   // Rute yang sedang dicari di kiosk: dihitung ulang di sini (jam operator) lalu digambar bertahap di peta.
   const pencarian = usePencarianKiosk();

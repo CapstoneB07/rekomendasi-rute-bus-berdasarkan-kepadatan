@@ -13,6 +13,7 @@ import { PeringatanIdle } from './_components/PeringatanIdle';
 import { PilihHalte } from './_components/PilihHalte';
 import { Button } from '@/components/ui/button';
 import { ambilRekomendasi, API_BASE, galatRute, waktuWib } from '@/lib/api';
+import { useLokasiOperator } from '@/lib/use-lokasi';
 import { useBagikanPencarian } from '@/lib/use-pencarian';
 import { formatTanggal } from '@/lib/koridor';
 import type { Halte, HalteOpsi, Rute } from '@/lib/route-utils';
@@ -83,6 +84,11 @@ export default function Home() {
     () => halteList?.find((h) => h.nama === HALTE_ASAL_DEFAULT) ?? halteList?.[0],
     [halteList],
   );
+  // Pilihan operator menimpa pilihan demo setiap kali operator mengganti halte.
+  const lokasiOperator = useLokasiOperator();
+  useEffect(() => {
+    if (lokasiOperator) setAsalId(lokasiOperator);
+  }, [lokasiOperator]);
   const asal = asalId ?? asalDefault?.halte_id ?? null;
   const namaAsal = asal ? (halteMap.get(asal)?.nama ?? '…') : '…';
   const namaTujuan = tujuanId ? (halteMap.get(tujuanId)?.nama ?? null) : null;
