@@ -168,6 +168,15 @@ stage.addEventListener("keydown", (event) => {
   describe();
   run();
 });
+const tabs = document.querySelectorAll(".ks-tab");
+for (const tab of tabs) {
+  tab.addEventListener("click", () => {
+    stage.dataset.tab = tab.dataset.tab;
+    for (const other of tabs) other.setAttribute("aria-selected", String(other === tab));
+    // Tab cetak panduan = tombol Cetak Informasi sudah ditekan: tiket keluar dari slot.
+    if (tab.dataset.tab === "cetak") printNow();
+  });
+}
 if (still.matches) touring = false;
 draw();
 describe();

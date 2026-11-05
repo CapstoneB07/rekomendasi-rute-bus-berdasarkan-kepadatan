@@ -145,41 +145,91 @@ const glassPoly = roundRect(m(SCREEN_L), 0, m(SCREEN_H / 2 + 5), m(SCREEN_W / 2 
 const glass = T.prism({ name: "layar.kaca", group: kiosk, layer: body, F: FACE_F, polygon: glassPoly, s0: GLASS_T[0], s1: GLASS_T[1], tone: "mid", crease: "lo", material: "gunmetal" });
 
 const asset = (name) => `data:image/png;base64,${readFileSync(join(HERE, "aset", name)).toString("base64")}`;
-const logo = asset("logo-transjakarta.png");
+const logo = asset("logo-transjakarta-putih.png");
 const mascot = asset("maskot-bus.png");
+const petaRute = `data:image/jpeg;base64,${readFileSync(join(HERE, "aset", "peta-rute.jpeg")).toString("base64")}`;
+const SCREEN_SHEETS = [
+  { id: "beranda", label: "Beranda" },
+  { id: "daftar", label: "Daftar rencana" },
+  { id: "detail", label: "Detail rencana" },
+  { id: "cetak", label: "Cetak panduan" },
+];
+// Layar berbagi satu header; tiap tab hanya mengganti isi di bawahnya (diatur lewat data-tab di kiosk.css).
 const screenSvg = () => {
   const W = SCREEN_W;
   const H = SCREEN_H;
   const font = "Noto Sans, Segoe UI, Arial, sans-serif";
   const pill = (x, y, w, h, r, fill, stroke = "none") => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
   const txt = (x, y, size, weight, fill, text, anchor = "start") => `<text x="${x}" y="${y}" font-family="${font}" font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}">${text}</text>`;
-  return `<g transform="scale(${M})">
-    <rect width="${W}" height="${H}" fill="#ffffff"/>
-    ${txt(18, 20, 10.5, 400, "#52525b", "Anda di halte")}
-    ${txt(18, 40, 17, 700, "#0f47a1", "Bundaran HI")}
-    <image href="${logo}" x="${W / 2 - 46}" y="7" width="92" height="38" preserveAspectRatio="xMidYMid meet"/>
-    ${txt(W - 18, 18, 10, 400, "#52525b", "Kamis, 29 Oktober 2026", "end")}
-    ${txt(W - 18, 42, 24, 700, "#0f47a1", "08:30", "end")}
-    <rect x="0" y="52" width="${W}" height="1.5" fill="#e4e4e7"/>
-    ${txt(70, 94, 23, 700, "#09090b", "Cari Rute Bus")}
-    ${txt(70, 120, 23, 700, "#09090b", "yang Nyaman")}
-    ${txt(70, 142, 11.5, 400, "#52525b", "Pilih perjalanan yang nyaman,")}
-    ${txt(70, 158, 11.5, 400, "#52525b", "TJ siap membantu Anda.")}
-    <ellipse cx="350" cy="116" rx="86" ry="44" fill="#eef3fb"/>
+  const ink = "#09090b";
+  const muted = "#52525b";
+  const blue = "#2f489c";
+  const green = "#15803d";
+  const badge = (x, y, w, label, fill, color) => pill(x, y, w, 13, 6.5, fill) + txt(x + w / 2, y + 9.6, 8, 700, color, label, "middle");
+  const koridor = (x, y, id) => {
+    const c = { 1: ["#D62126", "#FFFFFF"], 6: ["#4DB04F", "#000000"] }[id];
+    return pill(x, y, 24, 14, 7, c[0]) + txt(x + 12, y + 10.2, 9, 700, c[1], id, "middle");
+  };
+  // Layar selain beranda dua kolom sama lebar seperti aplikasi: konten di kiri (CW), peta di kanan.
+  const CW = W / 2;
+  const PAD = 10;
+  const IN = CW - 2 * PAD;
+  const back = (label) => `${pill(PAD, 61, label.length * 4.6 + 22, 18, 6, "#ffffff", "#d4d4d8")}<path d="M${PAD + 9} 70 l3.5 -3.5 M${PAD + 9} 70 l3.5 3.5" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"/>${txt(PAD + 17, 73.4, 8.5, 700, ink, label)}`;
+  const route = `${pill(PAD, 84, IN, 28, 6, "#ffffff", "#e4e4e7")}<rect x="${PAD + 1}" y="85" width="34" height="26" fill="#f4f4f5"/><path d="M${PAD} 98 h${IN}" stroke="#e4e4e7"/>${txt(PAD + 6, 94, 7.4, 400, muted, "Dari")}${txt(PAD + 6, 107, 7.4, 400, muted, "Ke")}${txt(PAD + 42, 94, 8, 500, ink, "Bundaran HI")}${txt(PAD + 42, 107, 8, 500, ink, "Blok M")}`;
+  const density = (x, y, w, v, label) => `${txt(x, y + 5, 7, 400, muted, "Kepadatan")}<rect x="${x + 36}" y="${y}" width="${w - 84}" height="5" rx="2.5" fill="#f4f4f5"/><rect x="${x + 36}" y="${y}" width="${(w - 84) * v}" height="5" rx="2.5" fill="${green}"/>${txt(x + w, y + 5, 7, 400, ink, `${Math.round(v * 100)}% ${label}`, "end")}`;
+  const card = (y, ids, menit, chips, tag, v, active) => `${pill(PAD, y, IN, 70, 7, "#ffffff", active ? blue : "#e4e4e7")}<path d="M${PAD} ${y + 21} h${IN}" stroke="#e4e4e7"/>${ids.map((id, i) => koridor(PAD + 7 + i * 34, y + 4, id) + (i ? `<path d="M${PAD + 7 + i * 34 - 8} ${y + 8} l3 3 -3 3" stroke="${muted}" fill="none" stroke-width="1.2"/>` : "")).join("")}${txt(CW - PAD - 30, y + 14, 9, 700, ink, `${menit} menit`, "end")}${pill(CW - PAD - 24, y + 4, 18, 13, 4.5, blue)}<path d="M${CW - PAD - 17} ${y + 7.5} l3.4 3 -3.4 3" stroke="#fff" fill="none" stroke-width="1.5"/>${chips.map(([label, dx, w]) => badge(PAD + 7 + dx, y + 28, w, label, "#f4f4f5", ink)).join("")}${badge(CW - PAD - 7 - tag[1], y + 28, tag[1], tag[0], tag[2], "#ffffff")}${density(PAD + 7, y + 55, IN - 14, v, "Sepi")}`;
+  const header = `<rect width="${W}" height="52" fill="${blue}"/><rect y="52" width="${W}" height="3" fill="#d62126"/>
+    ${txt(18, 20, 10.5, 400, "#ffffffcc", "Anda di halte")}
+    ${txt(18, 40, 17, 700, "#ffffff", "Bundaran HI")}
+    <image href="${logo}" x="${W / 2 - 46}" y="13" width="92" height="26" preserveAspectRatio="xMidYMid meet"/>
+    ${txt(W - 18, 18, 10, 400, "#ffffffcc", "Kamis, 29 Oktober 2026", "end")}
+    ${txt(W - 18, 42, 24, 700, "#ffffff", "08:30", "end")}`;
+  const beranda = `${txt(70, 94, 23, 700, ink, "Cari Rute Bus")}
+    ${txt(70, 120, 23, 700, ink, "yang Nyaman")}
+    ${txt(70, 142, 11.5, 400, muted, "Pilih perjalanan yang nyaman,")}
+    ${txt(70, 158, 11.5, 400, muted, "TJ siap membantu Anda.")}
+    <ellipse cx="350" cy="116" rx="86" ry="44" fill="#eef1f9"/>
     <image href="${mascot}" x="282" y="68" width="136" height="85" preserveAspectRatio="xMidYMid meet"/>
     ${pill(70, 176, W - 140, 38, 9, "#ffffff", "#d4d4d8")}
-    ${pill(78, 182, 26, 26, 6, "#eef3fb")}
-    <circle cx="91" cy="193" r="4.4" fill="none" stroke="#0f47a1" stroke-width="2"/><path d="M91 198 L91 203" stroke="#0f47a1" stroke-width="2"/>
-    ${txt(114, 192, 9, 500, "#52525b", "Ke:")}
-    ${txt(114, 206, 12.5, 500, "#52525b", "Sentuh untuk memilih tujuan…")}
-    ${pill(70, 222, W - 140, 38, 9, "#0f47a1")}
+    ${pill(78, 182, 26, 26, 6, "#eef1f9")}
+    <circle cx="91" cy="193" r="4.4" fill="none" stroke="${blue}" stroke-width="2"/><path d="M91 198 L91 203" stroke="${blue}" stroke-width="2"/>
+    ${txt(114, 192, 9, 400, muted, "Ke:")}
+    ${txt(114, 206, 12.5, 500, muted, "Sentuh untuk memilih tujuan…")}
+    ${pill(70, 222, W - 140, 38, 9, blue)}
     <circle cx="${W / 2 - 50}" cy="241" r="6" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M${W / 2 - 46} 245 L${W / 2 - 41} 250" stroke="#fff" stroke-width="2.2"/>
-    ${txt(W / 2 - 32, 247, 15, 700, "#ffffff", "Cari Rute")}
-  </g>`;
+    ${txt(W / 2 - 32, 247, 15, 700, "#ffffff", "Cari Rute")}`;
+  const daftar = `${back("Ubah tujuan")}${txt(PAD + 86, 73.4, 10, 700, ink, "Rencana")}${txt(CW - PAD, 73.4, 7.4, 400, muted, "1/1", "end")}${route}
+    ${card(118, [1], 24, [["Rp3.500", 0, 34], ["9,2 km", 38, 30]], ["Tercepat", 42, blue], 0.34, true)}
+    ${card(192, [1, 6], 31, [["Rp3.500", 0, 34], ["11,8 km", 38, 34], ["1× transit", 76, 38]], ["Paling lega", 50, green], 0.21, false)}`;
+  const leg = (y) => `${pill(PAD, y, IN, 84, 7, "#ffffff", "#e4e4e7")}<path d="M${PAD} ${y + 21} h${IN}" stroke="#e4e4e7"/>${koridor(PAD + 6, y + 4, 1)}${pill(PAD + 34, y + 4, 34, 13, 4.5, "#ffffff", "#d4d4d8")}${txt(PAD + 51, y + 13.4, 7.6, 700, ink, "TJ-112", "middle")}${txt(CW - PAD - 36, y + 13.4, 7.2, 400, muted, "3 menit lagi", "end")}<circle cx="${CW - PAD - 30}" cy="${y + 10.5}" r="3" fill="${green}"/>${txt(CW - PAD - 6, y + 13.4, 7.4, 700, green, "Sepi", "end")}${txt(PAD + 6, y + 40, 9, 400, ink, `Naik di <tspan font-weight="700">Bundaran HI</tspan>`)}${txt(CW - PAD - 6, y + 40, 7.4, 400, muted, "08:33", "end")}${txt(PAD + 6, y + 62, 9, 400, ink, `Turun di <tspan font-weight="700">Blok M</tspan>`)}${txt(PAD + 6, y + 73, 7.4, 400, muted, "24 menit perjalanan")}${txt(CW - PAD - 6, y + 62, 7.4, 400, muted, "08:57", "end")}`;
+  const detailBody = `${back("Kembali")}${txt(PAD + 62, 73.4, 10, 700, ink, "Ke Blok M")}
+    ${leg(86)}`;
+  const detail = `${detailBody}
+    ${pill(PAD, 224, IN, 34, 8, blue)}<rect x="${CW / 2 - 46}" y="235" width="11" height="8" rx="1.4" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M${CW / 2 - 43.5} 243 v4.5 h6 v-4.5" stroke="#fff" stroke-width="1.6" fill="none"/>${txt(CW / 2 - 30, 245.5, 11, 700, "#ffffff", "Cetak Informasi")}`;
+  const row = (y, a, b) => `${txt(176, y, 8, 400, muted, a)}${txt(300, y, 8, 700, ink, b, "end")}`;
+  const cetak = `<g opacity="0.35">${detailBody}</g><rect width="${W}" height="${H}" fill="#000000" opacity="0.5"/>
+    <rect x="166" y="62" width="144" height="150" rx="5" fill="#ffffff"/>
+    ${txt(238, 76, 10, 700, blue, "TransJakarta Lega", "middle")}${txt(238, 85, 6.8, 400, muted, "Tiket Rencana Perjalanan", "middle")}
+    <path d="M174 90 H302" stroke="#d4d4d8" stroke-dasharray="3 2"/>
+    ${row(100, "Dari", "Bundaran HI")}${row(110, "Ke", "Blok M")}${row(120, "Berangkat", "08:30")}${row(130, "Estimasi", "24 menit")}${row(140, "Transit", "Langsung")}
+    <path d="M174 146 H302" stroke="#d4d4d8" stroke-dasharray="3 2"/>
+    <rect x="174" y="152" width="3" height="28" rx="1.5" fill="#ee6a00"/>
+    ${txt(183, 160, 8.2, 700, ink, "Koridor 1 · Bus TJ-112")}${txt(183, 170, 7.4, 400, muted, "Naik di Bundaran HI")}${txt(183, 179, 7.4, 400, muted, "Turun di Blok M")}
+    <path d="M174 186 H302" stroke="#d4d4d8" stroke-dasharray="3 2"/>
+    ${txt(238, 199, 6.6, 400, muted, "Jam perkiraan. Selamat jalan!", "middle")}
+    ${pill(130, 222, 100, 32, 8, "#ffffff", "#d4d4d8")}${txt(180, 242, 12, 700, ink, "Tutup", "middle")}
+    ${pill(246, 222, 100, 32, 8, blue)}${txt(296, 242, 12, 700, "#ffffff", "Cetak", "middle")}`;
+  const peta = `<rect x="${CW}" y="55" width="${CW}" height="${H - 55}" fill="#f4f4f5"/><image href="${petaRute}" x="${CW}" y="55" width="${CW}" height="${H - 55}" preserveAspectRatio="xMidYMid slice"/><path d="M${CW} 55 V${H}" stroke="#e4e4e7"/>`;
+  const bodies = { beranda, daftar, detail, cetak };
+  return [
+    `<g transform="scale(${M})"><rect width="${W}" height="${H}" fill="#ffffff"/>${header}</g>`,
+    `<g class="ks-scr" data-scr="peta" transform="scale(${M})">${peta}</g>`,
+    ...SCREEN_SHEETS.map(({ id }) => `<g class="ks-scr" data-scr="${id}" transform="scale(${M})">${bodies[id]}</g>`),
+  ];
 };
 const SCREEN_TOP = SCREEN_L + SCREEN_H / 2;
 const screenO = G.add3(w3([-SCREEN_W / 2, 150 - SCREEN_TOP * SIN, Z_CAB[1] + SCREEN_TOP * COS]), G.mul3(N, GLASS_T[1] + 0.04));
-T.plane({ part: glass, o: screenO, u: [1, 0, 0], v: G.mul3(TUP, -1), svg: screenSvg(), normal: N, fade: [0.02, 0.2] });
+screenSvg().forEach((svg) => T.plane({ part: glass, o: screenO, u: [1, 0, 0], v: G.mul3(TUP, -1), svg, normal: N, fade: [0.02, 0.2] }));
 void bezel;
 
 // aksen emas
@@ -239,7 +289,7 @@ const ticketSvg = () => {
   const row = (y, a, b) => t(6, y, 4.6, 400, "#52525b", a) + t(W - 6, y, 4.6, 700, "#09090b", b, "end");
   return `<g transform="scale(${M})">
     <rect width="${W}" height="${TICKET.d}" fill="#ffffff"/>
-    <rect width="${W}" height="14" fill="#0f47a1"/>
+    <rect width="${W}" height="14" fill="#2f489c"/>
     ${t(W / 2, 8.6, 6.4, 700, "#ffffff", "TransJakarta Lega", "middle")}
     ${t(W / 2, 21, 4.4, 400, "#52525b", "Tiket Rencana Perjalanan", "middle")}
     <path d="M6 25 H94" stroke="#d4d4d8" stroke-width="0.6" stroke-dasharray="2 1.6"/>
@@ -273,7 +323,8 @@ if (argv.includes("--audit")) {
 
 const LABEL = "Kiosk TransJakarta Lega berdiri di atas piringan putar: badan putih dengan layar sentuh miring berbingkai oranye dan slot receipt tempat tiket tercetak meluncur keluar.";
 const backSvg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: BACK });
-const stage = `<div class="iso-stage iso-turn ks-stage" tabindex="0" role="slider" aria-label="Kiosk: seret untuk memutar, panah kiri kanan juga memutar, tombol P mencetak tiket" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" aria-valuetext="kiosk menghadap depan">${backSvg}${out.layerSvg("kiosk", { width: WIDTH, height: HEIGHT })}</div>`;
+const stage = `<div class="iso-stage iso-turn ks-stage" data-tab="beranda" tabindex="0" role="slider" aria-label="Kiosk: seret untuk memutar, panah kiri kanan juga memutar, tombol P mencetak tiket" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" aria-valuetext="kiosk menghadap depan">${backSvg}${out.layerSvg("kiosk", { width: WIDTH, height: HEIGHT })}</div>`;
+const tabs = `<div class="ks-tabs" role="tablist" aria-label="Tampilan layar kiosk">${SCREEN_SHEETS.map(({ id, label }, i) => `<button type="button" role="tab" class="ks-tab" data-tab="${id}" aria-selected="${i === 0}">${label}</button>`).join("")}</div>`;
 const DATA = { turn: out.data, travel: m(TICKET_TRAVEL), travelMm: TICKET_TRAVEL };
 const FOLLOW = `const follow = ${follow.toString()};\nconst printAt = ${printAt.toString()};`;
 const CSS = out.css + "\n" + readFileSync(join(HERE, "kiosk.css"), "utf8");
@@ -288,7 +339,7 @@ const content = k.plateHtml({
     { mark: "lit", label: "Tiket yang meluncur keluar" },
   ],
   caption: "Layar menampilkan beranda aplikasi kiosk. Setelah rencana dipilih, tiket tercetak keluar dari slot di muka kabinet, lalu diambil penumpang.",
-  body: `<style>${CSS}</style>${stage}`,
+  body: `<style>${CSS}</style>${tabs}${stage}`,
 });
 const page = k.pageHtml({ title: "Kiosk TransJakarta Lega", theme, body: content, script: turnScript() + (verify ? `window.__isoVerify = ${JSON.stringify(out.verify)};\n` : "") + LIVE, width: 640 });
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
