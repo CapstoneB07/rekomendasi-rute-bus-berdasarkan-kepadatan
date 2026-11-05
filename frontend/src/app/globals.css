@@ -152,9 +152,37 @@ html {
 .layar-masuk {
   animation: layar-masuk 0.2s ease-out;
 }
+/* Layar tunggu rekomendasi rute: maskot naik-turun pelan, tiga titik berkedip bergantian. */
+@keyframes maskot-tunggu {
+  50% {
+    transform: translateY(-0.35rem);
+  }
+}
+.maskot-tunggu {
+  animation: maskot-tunggu 1.8s ease-in-out infinite;
+}
+/* Bar terisi bertahap: 80% pada perkiraan lama tunggu (seperempat durasi, diisi dari komponen), lalu merayap pelan ke 98% supaya tidak tampak macet bila backend lebih lambat dari perkiraan. */
+@keyframes bar-tunggu {
+  from {
+    width: 0;
+  }
+  25% {
+    width: 80%;
+    animation-timing-function: ease-out;
+  }
+  to {
+    width: 98%;
+  }
+}
+.bar-tunggu > div {
+  animation: bar-tunggu 6s cubic-bezier(0.25, 0.6, 0.4, 1) forwards;
+}
 @media (prefers-reduced-motion: reduce) {
-  .layar-masuk {
+  .layar-masuk,
+  .maskot-tunggu,
+  .bar-tunggu > div {
     animation: none;
+    width: 50%;
   }
   button {
     transition: none;

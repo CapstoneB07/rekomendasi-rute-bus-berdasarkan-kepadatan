@@ -38,6 +38,7 @@ export class GalatApi extends Error {
 
 // POST /api/rute/rekomendasi untuk jam `detik` (detik dalam hari); dipakai kiosk dan animasi rute operator.
 export async function ambilRekomendasi<T>(asal: string, tujuan: string, detik: number, live: boolean): Promise<T> {
+  const mulai = performance.now();
   const r = await fetch(`${API_BASE}/api/rute/rekomendasi`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -54,7 +55,15 @@ export async function ambilRekomendasi<T>(asal: string, tujuan: string, detik: n
     const body = await r.json().catch(() => ({}));
     throw new GalatApi(r.status, typeof body?.detail === 'string' ? body.detail : '');
   }
-  return r.json();
+  const hasil: T = await r.json();
+  durasiRekomendasiMs = 0.5 * durasiRekomendasiMs + 0.5 * (performance.now() - mulai);
+  return hasil;
+}
+
+// Lama tunggu rekomendasi (rata-rata bergerak dari permintaan sukses) supaya bar loading terisi sesuai waktu tunggu sebenarnya.
+let durasiRekomendasiMs = 1500;
+export function perkiraanDurasiRekomendasiMs(): number {
+  return Math.min(Math.max(durasiRekomendasiMs, 300), 15000);
 }
 
 export type GalatTampil = { judul: string; pesan: string; bisaCoba: boolean };

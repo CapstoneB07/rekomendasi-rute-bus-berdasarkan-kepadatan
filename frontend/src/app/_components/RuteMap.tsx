@@ -97,6 +97,28 @@ function buatGambarMoncong(): { data: ImageData; pixelRatio: number } {
   ctx.stroke();
   return { data: ctx.getImageData(0, 0, ukuran, ukuran), pixelRatio };
 }
+// Ikon halte: lencana biru berbingkai putih bergambar atap halte, supaya beda dari titik bus yang bulat.
+function buatGambarHalte(): { data: ImageData; pixelRatio: number } {
+  const pixelRatio = 2;
+  const ukuran = 44;
+  const canvas = document.createElement('canvas');
+  canvas.width = ukuran;
+  canvas.height = ukuran;
+  const ctx = canvas.getContext('2d')!;
+  ctx.beginPath();
+  ctx.roundRect(3, 3, ukuran - 6, ukuran - 6, 9);
+  ctx.fillStyle = '#1d4ed8';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(9, 11, 26, 5); // atap
+  ctx.fillRect(12, 16, 3, 15); // tiang kiri
+  ctx.fillRect(29, 16, 3, 15); // tiang kanan
+  ctx.fillRect(12, 25, 20, 3); // bangku
+  return { data: ctx.getImageData(0, 0, ukuran, ukuran), pixelRatio };
+}
 // Penanda rute dibedakan lewat bentuk dan warna netral/primary, bukan hijau/kuning/merah, karena warna semafor di peta khusus untuk kepadatan.
 const GAYA_PENANDA = {
   // NAIK adalah yang pertama dicari mata: label lebih besar dan selalu di atas penanda lain (z), nomor langkah menyusul urutan perjalanan.
@@ -355,14 +377,14 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = t
         type: 'line',
         source: 'shapes',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': 'rgba(17,24,39,0.35)', 'line-width': 4.5 },
+        paint: { 'line-color': 'rgba(17,24,39,0.25)', 'line-width': 3 },
       });
       map.addLayer({
         id: 'shapes-line',
         type: 'line',
         source: 'shapes',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': WARNA_KORIDOR_EKSPRESI, 'line-width': 2.5 },
+        paint: { 'line-color': WARNA_KORIDOR_EKSPRESI, 'line-width': 1.5 },
       });
       map.addSource('rute', { type: 'geojson', data: EMPTY_LINES });
       // Casing gelap di bawah garis berwarna supaya rute (termasuk koridor kuning) terbaca di peta terang.
@@ -379,6 +401,23 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = t
         source: 'rute',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': ['get', 'warna'], 'line-width': 9 },
+      });
+
+      // Halte di atas garis tetapi di bawah bus.
+      const { data: ikonHalte, pixelRatio: rasioHalte } = buatGambarHalte();
+      map.addImage('halte', ikonHalte, { pixelRatio: rasioHalte });
+      map.addSource('halte', { type: 'geojson', data: EMPTY_POINTS });
+      map.addLayer({
+        id: 'halte-ikon',
+        type: 'symbol',
+        source: 'halte',
+        minzoom: 12,
+        layout: {
+          'icon-image': 'halte',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 16, 0.9],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
       });
 
       // Bus di atas semua garis: titik warna koridor berbingkai putih, cahaya = kepadatan (tanpa cahaya bila tidak ada data), moncong = arah jalan (zoom sedang), nomor koridor di dalam titik (zoom dekat).
@@ -471,6 +510,18 @@ export function RuteMap({ rute, halteMap, bus, koridorFilter, fokus, legenda = t
       setReady(false);
     };
   }, []);
+
+  // ---- Titik halte ----
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const fitur = [...halteMap.values()].map((h) => ({
+      type: 'Feature' as const,
+      properties: { nama: h.nama },
+      geometry: { type: 'Point' as const, coordinates: [h.lng, h.lat] },
+    }));
+    (map.getSource('halte') as GeoJSONSource).setData({ type: 'FeatureCollection', features: fitur });
+  }, [ready, halteMap]);
 
   // ---- Jalur koridor ----
   useEffect(() => {
