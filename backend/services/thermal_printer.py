@@ -103,9 +103,17 @@ def susun_escpos(lebar: int, tinggi: int, bits: bytes, baris: list[str]) -> byte
     return bytes(out)
 
 
-def _tulis_port(port: str, data: bytes, jeda: float) -> None:
-    """Tulis ke port COM via Win32. Port serial wajib dibuka eksklusif (share mode 0), sedangkan
-    open()/os.open() Python selalu memakai share baca/tulis sehingga ditolak "Permission denied"."""
+class _PutusSebelumTulis(OSError):
+    """Tulis gagal pada potongan pertama: belum ada yang tercetak, aman diulang di sambungan baru."""
+
+
+# Handle port dipegang antar-cetakan: membuka port COM Bluetooth memaksa Windows menyambung ke
+# printer (beberapa detik), dan menutupnya memutus tautan. Dibuka malas sekali, lalu dipakai ulang.
+_handle: int | None = None
+_port_terbuka: str | None = None
+
+
+def _k32():
     import ctypes
     from ctypes import wintypes
 
@@ -114,27 +122,63 @@ def _tulis_port(port: str, data: bytes, jeda: float) -> None:
     k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
     k32.WriteFile.argtypes = [wintypes.HANDLE, wintypes.LPCVOID, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), wintypes.LPVOID]
     k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    return k32
+
+
+def _buka_port(port: str) -> int:
+    """Buka port COM via Win32. Port serial wajib dibuka eksklusif (share mode 0), sedangkan
+    open()/os.open() Python selalu memakai share baca/tulis sehingga ditolak "Permission denied"."""
+    import ctypes
 
     generic_write, open_existing = 0x40000000, 3
-    handle = k32.CreateFileW("\\\\.\\" + port, generic_write, 0, None, open_existing, 0, None)
+    handle = _k32().CreateFileW("\\\\.\\" + port, generic_write, 0, None, open_existing, 0, None)
     if handle in (None, ctypes.c_void_p(-1).value):
         raise ctypes.WinError(ctypes.get_last_error())
-    try:
-        for awal in range(0, len(data), 2048):
-            potong = data[awal : awal + 2048]
-            ditulis = wintypes.DWORD(0)
-            if not k32.WriteFile(handle, potong, len(potong), ctypes.byref(ditulis), None):
-                raise ctypes.WinError(ctypes.get_last_error())
-            time.sleep(jeda)
-    finally:
-        k32.CloseHandle(handle)
+    return handle
+
+
+def _tutup_port() -> None:
+    global _handle, _port_terbuka
+    if _handle is not None:
+        _k32().CloseHandle(_handle)
+    _handle = _port_terbuka = None
+
+
+def _tulis_port(handle: int, data: bytes, jeda: float) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    k32 = _k32()
+    for awal in range(0, len(data), 2048):
+        potong = data[awal : awal + 2048]
+        ditulis = wintypes.DWORD(0)
+        if not k32.WriteFile(handle, potong, len(potong), ctypes.byref(ditulis), None):
+            galat = ctypes.WinError(ctypes.get_last_error())
+            raise _PutusSebelumTulis(*galat.args) if awal == 0 else galat
+        time.sleep(jeda)
 
 
 def kirim(data: bytes, *, jeda_pita: float = _JEDA_PITA_DETIK) -> None:
-    """Tulis ke printer. Satu cetakan sekali jalan; permintaan lain menunggu giliran."""
+    """Tulis ke printer. Satu cetakan sekali jalan; permintaan lain menunggu giliran.
+
+    Sambungan dipakai ulang. Bila putus (printer dimatikan/keluar jangkauan) dan belum ada data
+    yang tertulis, port dibuka ulang dan cetakan dicoba sekali lagi tanpa perlu pairing ulang."""
+    global _handle, _port_terbuka
     port = nama_port()
     with _KUNCI:
         try:
-            _tulis_port(port, data, jeda_pita)
+            for percobaan in range(2):
+                if _handle is not None and _port_terbuka != port:
+                    _tutup_port()
+                if _handle is None:
+                    _handle, _port_terbuka = _buka_port(port), port
+                try:
+                    _tulis_port(_handle, data, jeda_pita)
+                    return
+                except _PutusSebelumTulis:
+                    _tutup_port()
+                    if percobaan:
+                        raise
         except OSError as exc:
+            _tutup_port()
             raise PrinterGagal(f"Printer di {port} tidak dapat dihubungi: {exc}") from exc

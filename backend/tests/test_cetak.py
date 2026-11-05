@@ -133,3 +133,45 @@ def test_cetak_tiket_validasi_dan_printer_gagal(monkeypatch):
     monkeypatch.setattr(thermal_printer, "kirim", gagal)
     r = client.post("/api/print/tiket", json=_tiket())
     assert r.status_code == 503 and "COM13" in r.json()["detail"]
+
+
+@pytest.fixture
+def port_palsu(monkeypatch):
+    """Ganti Win32 dengan catatan: tiap _buka_port memberi handle baru, _tulis_port mengikuti `gagal`."""
+    monkeypatch.setenv("PRINTER_PORT", "COM9")
+    monkeypatch.setattr(thermal_printer, "_handle", None)
+    monkeypatch.setattr(thermal_printer, "_port_terbuka", None)
+    monkeypatch.setattr(thermal_printer, "_tutup_port", lambda: (setattr(thermal_printer, "_handle", None), setattr(thermal_printer, "_port_terbuka", None)))
+    catatan = {"buka": 0, "tulis": [], "gagal": set()}
+
+    def buka(port):
+        catatan["buka"] += 1
+        return catatan["buka"]
+
+    def tulis(handle, data, jeda):
+        if handle in catatan["gagal"]:
+            raise thermal_printer._PutusSebelumTulis("putus")
+        catatan["tulis"].append(handle)
+
+    monkeypatch.setattr(thermal_printer, "_buka_port", buka)
+    monkeypatch.setattr(thermal_printer, "_tulis_port", tulis)
+    return catatan
+
+
+def test_kirim_memakai_ulang_sambungan(port_palsu):
+    thermal_printer.kirim(b"a")
+    thermal_printer.kirim(b"b")
+    assert port_palsu["buka"] == 1 and port_palsu["tulis"] == [1, 1]
+
+
+def test_kirim_menyambung_ulang_saat_putus(port_palsu):
+    thermal_printer.kirim(b"a")
+    port_palsu["gagal"].add(1)
+    thermal_printer.kirim(b"b")
+    assert port_palsu["buka"] == 2 and port_palsu["tulis"] == [1, 2]
+
+
+def test_kirim_gagal_bila_sambungan_baru_juga_putus(port_palsu):
+    port_palsu["gagal"].update({1, 2})
+    with pytest.raises(thermal_printer.PrinterGagal, match="COM9"):
+        thermal_printer.kirim(b"a")
