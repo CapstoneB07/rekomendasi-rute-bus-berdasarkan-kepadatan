@@ -57,9 +57,43 @@ function batasNada(luma: Float32Array): [number, number] {
   return [lo, hi];
 }
 
-// Ubah RGBA ke hitam-putih murni di tempat: grayscale, regangkan kontras, lalu dither
-// Floyd-Steinberg. Printer thermal hanya punya titik hitam atau kosong; tanpa dither foto
-// menjadi bercak hitam. Setelah ini setiap piksel bernilai 0 atau 255.
+// Buram kotak (rata-rata jendela (2r+1)^2), dua lintasan terpisah. Tepi gambar memakai piksel yang ada.
+function buramKotak(src: Float32Array, width: number, height: number, r: number): Float32Array {
+  const mendatar = new Float32Array(src.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const a = Math.max(0, x - r);
+      const b = Math.min(width - 1, x + r);
+      let jumlah = 0;
+      for (let k = a; k <= b; k++) jumlah += src[y * width + k];
+      mendatar[y * width + x] = jumlah / (b - a + 1);
+    }
+  }
+  const out = new Float32Array(src.length);
+  for (let y = 0; y < height; y++) {
+    const a = Math.max(0, y - r);
+    const b = Math.min(height - 1, y + r);
+    for (let x = 0; x < width; x++) {
+      let jumlah = 0;
+      for (let k = a; k <= b; k++) jumlah += mendatar[k * width + x];
+      out[y * width + x] = jumlah / (b - a + 1);
+    }
+  }
+  return out;
+}
+
+// Foto sumber kecil (ESP32 320x240) diperbesar ~1,8x sehingga tepinya lembek; unsharp mask
+// mengembalikan ketegasan tepi sebelum menjadi titik. Daerah rata tidak berubah.
+const UNSHARP_RADIUS = 2;
+const UNSHARP_JUMLAH = 1.2;
+// Kepala thermal melebarkan titik hitam, jadi cetakan cenderung lebih gelap dari layar:
+// nada tengah diangkat sedikit (gamma < 1).
+const GAMMA_TERANG = 0.8;
+
+// Ubah RGBA ke hitam-putih murni di tempat: grayscale, pertajam, regangkan kontras, lalu dither
+// Floyd-Steinberg. Printer thermal hanya punya titik hitam atau kosong; tanpa dither foto menjadi
+// bercak hitam. Floyd-Steinberg dipilih karena menjaga nada bayangan (Atkinson membuat area
+// gelap jadi hitam pekat). Setelah ini setiap piksel bernilai 0 atau 255.
 export function ditherThermal({ data, width, height }: PikselRgba): void {
   const n = width * height;
   const luma = new Float32Array(n);
@@ -67,12 +101,16 @@ export function ditherThermal({ data, width, height }: PikselRgba): void {
     luma[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
   }
 
+  const buram = buramKotak(luma, width, height, UNSHARP_RADIUS);
+  for (let i = 0; i < n; i++) luma[i] = Math.min(255, Math.max(0, luma[i] + UNSHARP_JUMLAH * (luma[i] - buram[i])));
+
   const [lo, hi] = batasNada(luma);
   // Frame hampir rata (kamera tertutup/gelap total): jangan memperbesar derau jadi pola acak.
   const rentang = hi - lo;
   if (rentang >= 16) {
     for (let i = 0; i < n; i++) luma[i] = Math.min(255, Math.max(0, ((luma[i] - lo) * 255) / rentang));
   }
+  for (let i = 0; i < n; i++) luma[i] = 255 * Math.pow(luma[i] / 255, GAMMA_TERANG);
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
