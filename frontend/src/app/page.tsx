@@ -86,9 +86,11 @@ export default function Home() {
   );
   // Pilihan operator menimpa pilihan demo setiap kali operator mengganti halte.
   const lokasiOperator = useLokasiOperator();
-  useEffect(() => {
-    if (lokasiOperator) setAsalId(lokasiOperator);
-  }, [lokasiOperator]);
+  const [lokasiDiproses, setLokasiDiproses] = useState<string | null>(null);
+  if (lokasiOperator && lokasiOperator !== lokasiDiproses) {
+    setLokasiDiproses(lokasiOperator);
+    setAsalId(lokasiOperator);
+  }
   const asal = asalId ?? asalDefault?.halte_id ?? null;
   const namaAsal = asal ? (halteMap.get(asal)?.nama ?? '…') : '…';
   const namaTujuan = tujuanId ? (halteMap.get(tujuanId)?.nama ?? null) : null;
