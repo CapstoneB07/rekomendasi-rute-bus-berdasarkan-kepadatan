@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Tiket } from '@/lib/tiket';
+import { kirimKePrinter, pesanGalatCetak } from '@/lib/cetak';
+import { teksBusKe } from '@/lib/route-utils';
+import { barisCetakTiket, type Tiket } from '@/lib/tiket';
 
 import { Button } from '@/components/ui/button';
 
@@ -20,6 +22,22 @@ function Baris({ label, nilai }: { label: string; nilai: string }) {
 
 // Pratinjau tiket. Dipasang langsung di <body> supaya CSS cetak cukup menyembunyikan saudara-saudaranya (seluruh UI kiosk) dan hanya struk ini yang tercetak.
 export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => void }) {
+  const [mencetak, setMencetak] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+
+  const cetak = async () => {
+    setMencetak(true);
+    setGalat(null);
+    try {
+      // Printer Bluetooth tidak punya driver Windows, jadi isi tiket dikirim ke backend yang menulis ESC/POS ke port COM-nya.
+      await kirimKePrinter('/api/print/tiket', { baris: barisCetakTiket(tiket) });
+      onTutup();
+    } catch (err) {
+      setGalat(pesanGalatCetak(err, 'Tiket'));
+      setMencetak(false);
+    }
+  };
+
   useEffect(() => {
     const tutup = (e: KeyboardEvent) => e.key === 'Escape' && onTutup();
     window.addEventListener('keydown', tutup);
@@ -35,11 +53,9 @@ export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => vo
     >
       <article className="tiket rounded-lg shadow-lg">
         <header className="tiket-kepala">
-          <b>TransJakarta Lega</b>
-          <span>Tiket Rencana Perjalanan</span>
+          <b>Tiket Rencana Perjalanan</b>
         </header>
         <div className="tiket-garis" />
-        <Baris label="No. tiket" nilai={tiket.nomor} />
         <Baris label="Dicetak" nilai={tiket.dicetak} />
         <div className="tiket-garis" />
         <Baris label="Dari" nilai={tiket.asal} />
@@ -55,10 +71,10 @@ export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => vo
               <li key={i}>
                 <b>
                   Koridor {l.koridor}
-                  {l.bus && ` · Bus ${l.bus}`}
+                  {teksBusKe(l.busKe) && ` · ${teksBusKe(l.busKe)}`}
                 </b>
-                <Baris label={`Naik ${l.naikDi}`} nilai={l.jamNaik} />
-                <Baris label={`Turun ${l.turunDi}`} nilai={l.jamTurun} />
+                <Baris label={`Naik - ${l.naikDi}`} nilai={l.jamNaik} />
+                <Baris label={`Turun - ${l.turunDi}`} nilai={l.jamTurun} />
               </li>
             ) : (
               <li key={i} className="tiket-transit">
@@ -71,13 +87,19 @@ export function TiketCetak({ tiket, onTutup }: { tiket: Tiket; onTutup: () => vo
         <p className="tiket-kaki">Jam bersifat perkiraan dan dapat berubah. Selamat jalan!</p>
       </article>
 
+      {galat && (
+        <p role="alert" className="tiket-aksi max-w-[24rem] rounded-lg bg-background px-[1rem] py-[0.8rem] text-center text-isi text-destructive shadow-lg">
+          {galat}
+        </p>
+      )}
+
       <div className="tiket-aksi flex w-full max-w-[24rem] gap-[0.8rem]">
         <Button varian="outline" ukuran="lg" onClick={onTutup} className="flex-1">
           Tutup
         </Button>
-        <Button ukuran="lg" autoFocus onClick={() => window.print()} className="flex-1 font-bold">
+        <Button ukuran="lg" autoFocus onClick={cetak} disabled={mencetak} className="flex-1 font-bold">
           <IkonCetak className="h-[1.4rem] w-[1.4rem]" />
-          Cetak
+          {mencetak ? 'Mencetak…' : 'Cetak'}
         </Button>
       </div>
     </div>,

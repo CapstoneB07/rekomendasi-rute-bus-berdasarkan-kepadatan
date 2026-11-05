@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Rute } from '@/lib/route-utils';
@@ -17,7 +17,7 @@ const RUTE = {
       naik_di: 'Harmoni',
       turun_di: 'Monas',
       waktu_menit: 6,
-      bus_rekomendasi: { bus_id: 'TJ-101', eta_menit: 4, leg_clock_detik: JAM_8, label_kepadatan: 'Sepi' },
+      bus_rekomendasi: { bus_id: 'TJ-101', eta_menit: 4, leg_clock_detik: JAM_8, label_kepadatan: 'Sepi', urutan_kedatangan: 2 },
     },
     { tipe: 'transit', transit_di: 'Monas', ke_koridor: 13 },
     { tipe: 'naik', koridor_id: 13, naik_di: 'Monas', turun_di: 'Blok M', waktu_menit: 20, bus_rekomendasi: null },
@@ -36,7 +36,7 @@ describe('DetailRencana', () => {
   it('menampilkan tiap leg dengan bus, jam naik/turun, dan transit', () => {
     tampilkan();
     expect(screen.getByText('Ke Blok M')).toBeTruthy();
-    expect(screen.getByText('TJ-101')).toBeTruthy();
+    expect(screen.getByText('Bus ke-2')).toBeTruthy();
     expect(screen.getByText('08.04')).toBeTruthy();
     expect(screen.getByText('· 6 menit')).toBeTruthy();
     expect(screen.getByText('08.10')).toBeTruthy();
@@ -51,22 +51,44 @@ describe('DetailRencana', () => {
     expect(onKembali).toHaveBeenCalledOnce();
   });
 
-  it('Cetak Informasi membuka pratinjau tiket; Cetak memanggil print, Tutup menutupnya', () => {
-    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+  it('Cetak Informasi membuka pratinjau tiket; Cetak mengirim ke printer, Tutup menutupnya', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"status":"ok"}'));
+    vi.stubGlobal('fetch', fetchMock);
     tampilkan();
     fireEvent.click(screen.getByRole('button', { name: 'Cetak Informasi' }));
 
     const tiket = within(screen.getByRole('dialog', { name: 'Tiket perjalanan' }));
-    expect(tiket.getByText(/^TJ-\d{6}-\d{6}-[0-9A-F]{4}$/)).toBeTruthy();
+    expect(tiket.getByText('Tiket Rencana Perjalanan')).toBeTruthy();
+    expect(tiket.queryByText(/TJ-\d{6}/)).toBeNull();
+    expect(tiket.queryByText('No. tiket')).toBeNull();
+    expect(tiket.getAllByText(/^Naik - /).length).toBeGreaterThan(0);
+    expect(tiket.getByText(/Koridor 1 · Bus ke-2/)).toBeTruthy();
+    expect(tiket.queryByText(/TJ-101/)).toBeNull();
     expect(tiket.getByText('Harmoni')).toBeTruthy();
     expect(tiket.getByText('35 menit')).toBeTruthy();
     expect(tiket.getByText('Pindah di Monas ke koridor 13')).toBeTruthy();
 
     fireEvent.click(tiket.getByRole('button', { name: 'Cetak' }));
-    expect(print).toHaveBeenCalledOnce();
+    // Berhasil dicetak: dialog menutup sendiri.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/print\/tiket$/);
+    const baris = JSON.parse(String(init?.body)).baris;
+    expect(baris[0]).toMatchObject({ teks: 'Tiket Rencana Perjalanan', besar: true });
+    expect(baris).toContainEqual({ teks: 'Koridor 1 - Bus ke-2', tebal: true });
+    vi.unstubAllGlobals();
+  });
 
-    fireEvent.click(tiket.getByRole('button', { name: 'Tutup' }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    print.mockRestore();
+  it('printer tidak terjangkau: pesan tampil dan dialog tetap terbuka', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'x' }), { status: 503 })));
+    tampilkan();
+    fireEvent.click(screen.getByRole('button', { name: 'Cetak Informasi' }));
+    const tiket = within(screen.getByRole('dialog', { name: 'Tiket perjalanan' }));
+
+    fireEvent.click(tiket.getByRole('button', { name: 'Cetak' }));
+    expect((await tiket.findByRole('alert')).textContent).toMatch(/Printer tidak dapat dihubungi/);
+    expect(screen.getByRole('dialog', { name: 'Tiket perjalanan' })).toBeTruthy();
+    expect((tiket.getByRole('button', { name: 'Cetak' }) as HTMLButtonElement).disabled).toBe(false);
+    vi.unstubAllGlobals();
   });
 });

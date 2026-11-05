@@ -245,7 +245,7 @@ function buatLabelLive(): HTMLElement {
 }
 
 function teksLabelLive(p: BusPosisiSimulasi): string {
-  return `LIVE · Bus ${p.bus_id} · ${Math.round(p.estimated_passengers)}/${p.capacity}`;
+  return `LIVE · Koridor ${p.koridor_id} · ${Math.round(p.estimated_passengers)}/${p.capacity}`;
 }
 
 function isiPopupBus(p: BusPosisi): HTMLElement {
@@ -257,8 +257,8 @@ function isiPopupBus(p: BusPosisi): HTMLElement {
     if (tebal) el.className = 'font-bold';
     root.append(el);
   };
-  baris(`Bus ${p.bus_id}`, true);
-  baris(`Koridor ${p.koridor_id} · menuju ${p.next_stop}`);
+  baris(`Koridor ${p.koridor_id}`, true);
+  baris(`Menuju ${p.next_stop}`);
   baris(`Tiba ${p.eta_minutes <= 0 ? 'sebentar lagi' : `${p.eta_minutes} menit lagi`}`);
   if (p.data_source === 'tj_live') {
     baris(

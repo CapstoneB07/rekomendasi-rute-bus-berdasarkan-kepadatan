@@ -1,6 +1,6 @@
 import { formatJam } from './koridor';
 import { jumlahTransit } from './rencana';
-import type { NaikItem, Rute } from './route-utils';
+import { teksBusKe, type NaikItem, type Rute } from './route-utils';
 
 // Jam (detik) naik dan turun satu leg. leg_clock_detik = jam tiba di halte naik (sudah
 // memperhitungkan transit sebelumnya); tanpa bus rekomendasi jamnya tidak diketahui.
@@ -15,7 +15,7 @@ export type LangkahTiket =
   | {
       tipe: 'naik';
       koridor: number;
-      bus: string | null;
+      busKe: number | null;
       naikDi: string;
       turunDi: string;
       jamNaik: string;
@@ -24,7 +24,6 @@ export type LangkahTiket =
   | { tipe: 'transit'; di: string; keKoridor: number };
 
 export type Tiket = {
-  nomor: string;
   dicetak: string;
   asal: string;
   tujuan: string;
@@ -34,6 +33,41 @@ export type Tiket = {
   jumlahTransit: number;
   langkah: LangkahTiket[];
 };
+
+// Satu baris struk teks untuk POST /api/print/tiket. `kanan` membuat baris "label ..... nilai";
+// tata letak kolomnya (48 kolom, rata kanan, pembungkusan) dikerjakan backend.
+export type BarisCetak = { teks?: string; kanan?: string; tebal?: boolean; besar?: boolean; tengah?: boolean; garis?: boolean };
+
+// Isi tiket sama dengan pratinjau di TiketCetak, tetapi sebagai teks polos untuk printer thermal.
+export function barisCetakTiket(t: Tiket): BarisCetak[] {
+  const baris: BarisCetak[] = [
+    { teks: 'Tiket Rencana Perjalanan', tebal: true, besar: true, tengah: true },
+    { garis: true },
+    { teks: 'Dicetak', kanan: t.dicetak },
+    { garis: true },
+    { teks: 'Dari', kanan: t.asal },
+    { teks: 'Ke', kanan: t.tujuan },
+    { teks: 'Berangkat', kanan: t.berangkat },
+    { teks: 'Tiba (perkiraan)', kanan: t.tiba },
+    { teks: 'Estimasi', kanan: `${t.estimasiMenit} menit` },
+    { teks: 'Transit', kanan: t.jumlahTransit === 0 ? 'Langsung' : `${t.jumlahTransit}x` },
+    { garis: true },
+  ];
+  for (const l of t.langkah) {
+    if (l.tipe === 'naik') {
+      const bus = teksBusKe(l.busKe);
+      baris.push(
+        { teks: `Koridor ${l.koridor}${bus ? ` - ${bus}` : ''}`, tebal: true },
+        { teks: `Naik - ${l.naikDi}`, kanan: l.jamNaik },
+        { teks: `Turun - ${l.turunDi}`, kanan: l.jamTurun },
+      );
+    } else {
+      baris.push({ teks: `Pindah di ${l.di} ke koridor ${l.keKoridor}` });
+    }
+  }
+  baris.push({ garis: true }, { teks: 'Jam bersifat perkiraan dan dapat berubah. Selamat jalan!', tengah: true });
+  return baris;
+}
 
 const WIB = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Jakarta',
@@ -65,7 +99,7 @@ export function nomorTiket(date: Date, acak: () => string = acakHex): string {
 
 export function buatTiket(
   rute: Rute,
-  opsi: { asal: string; tujuan: string; simTime: number; dicetak: Date; acak?: () => string },
+  opsi: { asal: string; tujuan: string; simTime: number; dicetak: Date },
 ): Tiket {
   const langkah: LangkahTiket[] = rute.segmen.map((s) => {
     if (s.tipe === 'transit') return { tipe: 'transit', di: s.transit_di, keKoridor: s.ke_koridor };
@@ -73,7 +107,7 @@ export function buatTiket(
     return {
       tipe: 'naik',
       koridor: s.koridor_id,
-      bus: s.bus_rekomendasi?.bus_id ?? null,
+      busKe: s.bus_rekomendasi?.urutan_kedatangan ?? null,
       naikDi: s.naik_di,
       turunDi: s.turun_di,
       jamNaik: jam.naik !== null ? formatJam(jam.naik) : '—',
@@ -84,7 +118,6 @@ export function buatTiket(
   const p = bagianWib(opsi.dicetak);
 
   return {
-    nomor: nomorTiket(opsi.dicetak, opsi.acak),
     dicetak: `${p.day}/${p.month}/${p.year} ${p.hour}.${p.minute}`,
     asal: opsi.asal,
     tujuan: opsi.tujuan,
