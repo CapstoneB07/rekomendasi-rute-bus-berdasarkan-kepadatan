@@ -1,8 +1,9 @@
 'use client';
 
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
 
-import type { GalatTampil } from '@/lib/api';
+import { perkiraanDurasiRekomendasiMs, type GalatTampil } from '@/lib/api';
 import { formatKm, formatRupiah, TARIF_RP, warnaKoridor } from '@/lib/koridor';
 import { halaman } from '@/lib/pilih-halte';
 import { jumlahTransit, labelRencana, type LabelRencana } from '@/lib/rencana';
@@ -201,9 +202,27 @@ export function DaftarRencana({ asal, tujuan, hasilRute, memuat, aktifIdx, galat
           </Button>
         </div>
       ) : memuat && !hasilRute ? (
-        <div aria-busy="true" className="grid min-h-0 flex-1 animate-pulse grid-rows-2 gap-[0.5rem]">
-          <div className="rounded-xl bg-muted" />
-          <div className="rounded-xl bg-muted" />
+        <div
+          role="status"
+          aria-busy="true"
+          className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[0.6rem] rounded-xl bg-muted/50 p-[0.8rem]"
+        >
+          <Image
+            src="/maskot-halte.png"
+            alt=""
+            width={800}
+            height={533}
+            priority
+            sizes="18rem"
+            className="maskot-tunggu h-auto max-h-[60%] w-auto max-w-[18rem] object-contain"
+          />
+          <p className="text-isi font-bold">Mencari rute terbaik</p>
+          <div aria-hidden className="bar-tunggu h-[0.5rem] w-full max-w-[18rem] overflow-hidden rounded-full bg-primary/15">
+            <div className="h-full w-0 rounded-full bg-primary"
+              style={{ animationDuration: `${perkiraanDurasiRekomendasiMs() * 4}ms` }}
+            />
+          </div>
+          <p className="text-kecil text-muted-foreground">Sebentar ya, kami cek bus dan kepadatannya.</p>
         </div>
       ) : (
         // Baris 1fr tanpa tinggi tetap: semua kartu setinggi kartu tertinggi di halaman ini. Wadahnya bergulir bila tetap tidak muat (ringkasan Dari/Ke tidak terhimpit); padding memberi ruang cincin kartu aktif.

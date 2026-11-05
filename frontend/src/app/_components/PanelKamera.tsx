@@ -11,7 +11,7 @@ import { IkonCetak } from './ikon';
 import { skalaBbox, statusKamera, type Bbox, type FrameKameraResponse } from '@/lib/kamera';
 
 // Worker mengunggah frame tiap ±1 detik; polling 2 detik menjaga tampilan tetap dekat realtime.
-const KAMERA_REFRESH_MS = 2_000;
+const KAMERA_REFRESH_MS = 500;
 
 const PESAN = {
   memuat: 'Memuat kamera…',

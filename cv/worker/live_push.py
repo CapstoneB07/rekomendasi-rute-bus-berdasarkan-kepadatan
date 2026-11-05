@@ -34,7 +34,7 @@ LIVE_TABLE = "kepadatan_live"
 CAMERA_TABLE = "kamera_live"
 FRAME_BUCKET = "kamera-frames"
 PUSH_INTERVAL_SECONDS = 3.0
-FRAME_INTERVAL_SECONDS = 1.0
+FRAME_INTERVAL_SECONDS = 0.3
 MEDIAN_WINDOW = 5
 # Cukup untuk beberapa detik: polling operator 2 dtk + jeda klik foto.
 FRAME_RETENTION = 10

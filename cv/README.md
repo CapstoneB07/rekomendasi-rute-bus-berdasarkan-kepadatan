@@ -55,7 +55,7 @@ pembacaan lebih tua dari TTL backend, bus kembali memakai data simulasi.
 
 | Folder | Isi |
 | --- | --- |
-| `worker/` | `mqtt_subscriber.py`, `cv_worker.py`, bobot `yolo26n.pt`, log latensi |
+| `worker/` | `mqtt_subscriber.py`, `cv_worker.py`, log latensi (bobot: `script/models/weights.pt`, hasil fine-tuning) |
 | `experiments/` | `headcount.py`, `headcount_sweep_test.py` (sweep conf/iou/imgsz), `headcount_video.py`, `dataset_deduplicator.py`, skrip latensi MQTT / INA226, `ground_truth.csv`, `best.pt`, hasil sweep, notebook training |
 
 ## Menjalankan
@@ -76,8 +76,8 @@ python cv_worker.py             # terminal 2
 ```
 
 Konfigurasi (broker, topik, `BUS_ID`, `MODEL_PATH`, ambang YOLO) berupa
-konstanta di bagian atas tiap file; hanya kredensial Supabase yang lewat `.env`. Path model dan CSV bersifat relatif ke
-direktori kerja, jadi jalankan dari dalam `worker/`.
+konstanta di bagian atas tiap file; hanya kredensial Supabase yang lewat `.env`. Path model dihitung dari lokasi
+`cv_worker.py`, tetapi CSV log dan `received_images/` relatif ke direktori kerja, jadi jalankan dari dalam `worker/`.
 
 Kedua proses harus memakai nama antrean yang sama: `mqtt_subscriber.py` dan
 `cv_worker.py` sama-sama memakai `cv_task_queue:<BUS_ID>` (saat ini

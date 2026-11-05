@@ -3,6 +3,7 @@ import os
 import time
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from statistics import median
 
 import cv2
@@ -24,7 +25,8 @@ REDIS_DB = 0
 BUS_ID = "Koridor_1_A"
 REDIS_QUEUE_NAME = f"cv_task_queue:{BUS_ID}"
 
-MODEL_PATH = "yolo26n.pt"
+# Hasil fine-tuning (satu kelas: person); satu sumber dengan script/headcount.py.
+MODEL_PATH = str(Path(__file__).resolve().parent.parent / "script" / "models" / "weights.pt")
 MAX_CAPACITY = 80
 
 YOLO_CLASSES = [0]
@@ -194,6 +196,25 @@ def log_to_csv(row):
         csv.writer(f).writerow(row)
 
 
+def latest_frame(queue_item):
+    """
+    BRPOP mengambil frame TERTUA (subscriber memakai LPUSH). Bila inferensi
+    lebih lambat daripada kedatangan frame, antrean menumpuk dan gambar yang
+    tampil makin usang. Ganti dengan frame paling baru dan buang sisanya;
+    pembacaan dan penghapusan satu transaksi supaya frame yang masuk di
+    antaranya tidak ikut hilang.
+    """
+    pipe = redis_client.pipeline(transaction=True)
+    pipe.lrange(REDIS_QUEUE_NAME, 0, 0)
+    pipe.llen(REDIS_QUEUE_NAME)
+    pipe.delete(REDIS_QUEUE_NAME)
+    newest, pending, _ = pipe.execute()
+
+    if not newest:
+        return queue_item, 0
+    return (queue_item[0], newest[0]), pending
+
+
 def warmup_model():
     if not ENABLE_WARMUP:
         return
@@ -261,6 +282,14 @@ try:
 
             total_start = time.perf_counter()
             ts_received = get_current_timestamp()
+
+            queue_item, skipped_frames = latest_frame(queue_item)
+            if skipped_frames:
+                print(
+                    f"[{ts_received}] [QUEUE] "
+                    f"{skipped_frames} frame lama dilewati, "
+                    f"memproses yang terbaru."
+                )
 
             # ==================================================
             # RAW BINARY PAYLOAD

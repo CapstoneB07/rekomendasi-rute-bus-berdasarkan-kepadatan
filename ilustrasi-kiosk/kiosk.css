@@ -1,3 +1,11 @@
 .ks-stage{touch-action:pan-y;cursor:grab;outline:none;border-radius:8px}
 .ks-stage:focus-visible{outline:1px solid var(--anatomy-muted);outline-offset:6px}
 .ks-stage[data-drag]{cursor:grabbing}
+.iso[data-theme="light"]{--anatomy-page:#ffffff;--anatomy-card:#ffffff;--anatomy-paper:#ffffff}
+.ks-scr{display:none}
+.ks-stage[data-tab="beranda"] [data-scr="beranda"],.ks-stage[data-tab="daftar"] [data-scr="daftar"],.ks-stage[data-tab="detail"] [data-scr="detail"],.ks-stage[data-tab="cetak"] [data-scr="cetak"]{display:inline}
+.ks-tabs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 8px}
+.ks-tab{font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--anatomy-mid);background:transparent;color:var(--anatomy-text);cursor:pointer}
+.ks-tab[aria-selected="true"]{background:#2f489c;border-color:#2f489c;color:#fff}
+.ks-tab:focus-visible{outline:2px solid var(--anatomy-muted);outline-offset:2px}
+.ks-stage:not([data-tab="beranda"]) [data-scr="peta"]{display:inline}
