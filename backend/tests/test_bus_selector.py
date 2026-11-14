@@ -284,6 +284,31 @@ def test_jam_sibuk_selector_melihat_beberapa_bus_berikutnya():
     assert rek["extra_wait_menit"] == 16
 
 
+def test_urutan_kedatangan_bus_rekomendasi():
+    """Bus 18 menit lagi dipilih; dua bus lebih dulu lewat, jadi ia bus ke-3."""
+    segmen = [{"tipe": "naik", "koridor_id": 3, "naik_di_id": "PESAKIH"}]
+    jadwal = {
+        nama: [{"halte_id": "PESAKIH", "koridor_id": 3, "waktu_tiba_detik": 9 * 3600 + menit * 60}]
+        for nama, menit in {"B2": 2, "B8": 8, "B18": 18}.items()
+    }
+    realtime = {"B2": 0.74, "B8": 0.68, "B18": 0.35}
+
+    select_bus_per_segmen(segmen, sim_time=9 * 3600, jadwal=jadwal, realtime_kepadatan=realtime)
+    assert segmen[0]["bus_rekomendasi"]["bus_id"] == "B18"
+    assert segmen[0]["bus_rekomendasi"]["urutan_kedatangan"] == 3
+
+
+def test_urutan_kedatangan_bus_pertama_dan_menit_sama():
+    """Bus tercepat = ke-1; dua bus pada menit yang sama tidak saling mendahului."""
+    segmen = [{"tipe": "naik", "koridor_id": 1, "naik_di_id": "A"}]
+    jadwal = {
+        "X1": [{"halte_id": "A", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 120}],
+        "X2": [{"halte_id": "A", "koridor_id": 1, "waktu_tiba_detik": 8 * 3600 + 130}],
+    }
+    select_bus_per_segmen(segmen, sim_time=8 * 3600, jadwal=jadwal, realtime_kepadatan={"X1": 0.2, "X2": 0.2})
+    assert segmen[0]["bus_rekomendasi"]["urutan_kedatangan"] == 1
+
+
 def test_tidak_ada_kandidat_return_none():
     """Tidak ada bus tersisa -> bus_rekomendasi=None (frontend graceful)."""
     segmen = [{

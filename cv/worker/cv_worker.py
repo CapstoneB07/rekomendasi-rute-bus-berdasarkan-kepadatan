@@ -3,6 +3,7 @@ import os
 import time
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from statistics import median
 
 import cv2
@@ -24,7 +25,8 @@ REDIS_DB = 0
 BUS_ID = "Koridor_1_A"
 REDIS_QUEUE_NAME = f"cv_task_queue:{BUS_ID}"
 
-MODEL_PATH = "yolo26n.pt"
+# Hasil fine-tuning (satu kelas: person); satu sumber dengan script/headcount.py.
+MODEL_PATH = str(Path(__file__).resolve().parent.parent / "script" / "models" / "weights.pt")
 MAX_CAPACITY = 80
 
 YOLO_CLASSES = [0]
@@ -100,13 +102,18 @@ def get_image_quality(image):
     return float(np.mean(gray)), float(np.std(gray))
 
 
-def apply_roi(image):
-    h, w = image.shape[:2]
+def roi_box(w, h):
     rx1, ry1, rx2, ry2 = ROI
     x1 = max(0, min(w - 1, int(rx1 * w)))
     y1 = max(0, min(h - 1, int(ry1 * h)))
     x2 = max(x1 + 1, min(w, int(rx2 * w)))
     y2 = max(y1 + 1, min(h, int(ry2 * h)))
+    return x1, y1, x2, y2
+
+
+def apply_roi(image):
+    h, w = image.shape[:2]
+    x1, y1, x2, y2 = roi_box(w, h)
     return image[y1:y2, x1:x2]
 
 
@@ -189,6 +196,25 @@ def log_to_csv(row):
         csv.writer(f).writerow(row)
 
 
+def latest_frame(queue_item):
+    """
+    BRPOP mengambil frame TERTUA (subscriber memakai LPUSH). Bila inferensi
+    lebih lambat daripada kedatangan frame, antrean menumpuk dan gambar yang
+    tampil makin usang. Ganti dengan frame paling baru dan buang sisanya;
+    pembacaan dan penghapusan satu transaksi supaya frame yang masuk di
+    antaranya tidak ikut hilang.
+    """
+    pipe = redis_client.pipeline(transaction=True)
+    pipe.lrange(REDIS_QUEUE_NAME, 0, 0)
+    pipe.llen(REDIS_QUEUE_NAME)
+    pipe.delete(REDIS_QUEUE_NAME)
+    newest, pending, _ = pipe.execute()
+
+    if not newest:
+        return queue_item, 0
+    return (queue_item[0], newest[0]), pending
+
+
 def warmup_model():
     if not ENABLE_WARMUP:
         return
@@ -256,6 +282,14 @@ try:
 
             total_start = time.perf_counter()
             ts_received = get_current_timestamp()
+
+            queue_item, skipped_frames = latest_frame(queue_item)
+            if skipped_frames:
+                print(
+                    f"[{ts_received}] [QUEUE] "
+                    f"{skipped_frames} frame lama dilewati, "
+                    f"memproses yang terbaru."
+                )
 
             # ==================================================
             # RAW BINARY PAYLOAD
@@ -339,6 +373,11 @@ try:
             high_area_rejected = 0
             aspect_rejected = 0
 
+            # Bbox untuk panel operator memakai koordinat frame asli (yang diunggah),
+            # jadi geser dengan pojok ROI bila ROI aktif.
+            roi_x, roi_y = roi_box(original_width, original_height)[:2] if ENABLE_ROI else (0, 0)
+            valid_bboxes = []
+
             processing_height, processing_width = enhanced_frame.shape[:2]
             total_pixels = processing_height * processing_width
             raw_detections = len(results[0].boxes)
@@ -373,6 +412,14 @@ try:
                     continue
 
                 valid_headcount += 1
+                valid_bboxes.append({
+                    "x": x1 + roi_x,
+                    "y": y1 + roi_y,
+                    "w": box_width,
+                    "h": box_height,
+                    "kelas": "person",
+                    "skor": round(float(box.conf[0]), 2),
+                })
 
             postprocess_ms = (time.perf_counter() - t0) * 1000
 
@@ -410,6 +457,7 @@ try:
 
             if live_pusher:
                 live_pusher.submit(output_headcount)
+                live_pusher.submit_frame(image_bytes, valid_bboxes)
 
             print(
                 f"\n[{ts_received}] [CV WORKER] "

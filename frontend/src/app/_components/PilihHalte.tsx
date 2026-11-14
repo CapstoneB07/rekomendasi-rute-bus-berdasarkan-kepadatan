@@ -67,14 +67,14 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
       aria-label={judul}
       tabIndex={-1}
       onKeyDown={saatTombol}
-      className="layar-masuk fixed inset-0 z-50 flex flex-col gap-[0.7rem] bg-background px-[1.6rem] pb-[1rem] pt-[0.8rem] outline-none"
+      className="layar-masuk fixed inset-0 z-50 flex flex-col gap-[0.7rem] bg-background px-[1.6rem] pb-[1rem] pt-[0.8rem] outline-none hp:px-[1rem]"
     >
       <div className="flex items-center gap-[1rem]">
         <Button varian="outline" ukuran="lg" onClick={onTutup}>
           <IkonPanahKiri className="h-[1.3rem] w-[1.3rem]" />
           Kembali
         </Button>
-        <h2 className="text-judul font-bold tracking-tight">{judul}</h2>
+        <h2 className="text-judul font-bold tracking-tight hp:text-besar">{judul}</h2>
       </div>
 
       {/* Tab ala shadcn/ui: wadah abu-abu, tab aktif terangkat putih. */}
@@ -103,7 +103,7 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-3 gap-[0.6rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-3 gap-[0.6rem] hp:grid-cols-2 hp:grid-rows-6">
         {items.map((h) => {
           const nonaktif = h.nama === nonaktifNama;
           const terpilih = h.halte_id === terpilihId;
@@ -135,10 +135,10 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
           ukuran="lg"
           disabled={idxAman === 0}
           onClick={() => setIdx(idxAman - 1)}
-          className="justify-self-start px-[1.4rem]"
+          className="justify-self-start px-[1.4rem] hp:px-[0.9rem]"
         >
           <IkonChevronKanan className="h-[1.2rem] w-[1.2rem] rotate-180" />
-          Sebelumnya
+          <span className="hp:sr-only">Sebelumnya</span>
         </Button>
         <span className="text-isi text-muted-foreground">
           Halaman {idxAman + 1} dari {jumlah}
@@ -148,9 +148,9 @@ export function PilihHalte({ judul, halteList, nonaktifNama, nonaktifAlasan, ter
           ukuran="lg"
           disabled={idxAman >= jumlah - 1}
           onClick={() => setIdx(idxAman + 1)}
-          className="justify-self-end px-[1.4rem]"
+          className="justify-self-end px-[1.4rem] hp:px-[0.9rem]"
         >
-          Berikutnya
+          <span className="hp:sr-only">Berikutnya</span>
           <IkonChevronKanan className="h-[1.2rem] w-[1.2rem]" />
         </Button>
       </div>

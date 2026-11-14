@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { RegistrasiSw } from "./registrasi-sw";
 
 const notoSans = Noto_Sans({
   variable: "--font-noto",
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
 
 // Kiosk iPad: tanpa zoom cubit/dobel-ketuk, memenuhi seluruh layar.
 export const viewport: Viewport = {
-  themeColor: "#0f47a1",
+  themeColor: "#2f489c",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -39,6 +40,7 @@ export default function RootLayout({
     <html lang="id" className={`${notoSans.variable} h-full antialiased`}>
       <body className="h-full" suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <RegistrasiSw />
       </body>
     </html>
   );

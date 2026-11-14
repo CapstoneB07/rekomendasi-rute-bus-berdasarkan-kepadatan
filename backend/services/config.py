@@ -23,10 +23,11 @@ import os
 # ---------------------------------------------------------------------------
 # Cakupan koridor
 # ---------------------------------------------------------------------------
-# Cakupan koridor default = scope yang dipakai untuk mengukur 54,17%
-# (8 koridor). Nilai lama (1-5) tetap bisa dipakai lewat env:
-#   SCOPED_KORIDOR=1,2,3,4,5
-DEFAULT_SCOPED_KORIDOR: tuple[str, ...] = ("1", "2", "3", "4", "5", "8", "9", "12")
+# Cakupan koridor default = 13 koridor (1-13). Angka 54,17% di README diukur
+# pada scope 8 koridor (1,2,3,4,5,8,9,12) dan perlu dijalankan ulang untuk scope
+# ini. Scope lama tetap bisa dipakai lewat env:
+#   SCOPED_KORIDOR=1,2,3,4,5,8,9,12
+DEFAULT_SCOPED_KORIDOR: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13")
 _ENV_SCOPE = "SCOPED_KORIDOR"
 
 

@@ -5,9 +5,15 @@ export const WARNA_KORIDOR: Record<string, { bg: string; teks: string }> = {
   '3': { bg: '#FDCB1C', teks: '#000000' },
   '4': { bg: '#512C62', teks: '#FFFFFF' },
   '5': { bg: '#D46425', teks: '#000000' },
+  '6': { bg: '#4DB04F', teks: '#000000' },
+  '7': { bg: '#E0405E', teks: '#FFFFFF' },
   '8': { bg: '#DD3393', teks: '#FFFFFF' },
   '9': { bg: '#45A49E', teks: '#FFFFFF' },
+  '10': { bg: '#8B1F2D', teks: '#FFFFFF' },
+  '11': { bg: '#2D3A94', teks: '#FFFFFF' },
   '12': { bg: '#7ABF7C', teks: '#000000' },
+  '13': { bg: '#7B3F95', teks: '#FFFFFF' },
+  '14': { bg: '#E8954A', teks: '#000000' },
 };
 const WARNA_KORIDOR_LAIN = { bg: '#6B7280', teks: '#FFFFFF' };
 
