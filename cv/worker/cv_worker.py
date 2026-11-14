@@ -30,8 +30,8 @@ MODEL_PATH = str(Path(__file__).resolve().parent.parent / "script" / "models" / 
 MAX_CAPACITY = 80
 
 YOLO_CLASSES = [0]
-YOLO_CONF = 0.20
-YOLO_IOU = 0.60
+YOLO_CONF = 0.40
+YOLO_IOU = 0.50
 YOLO_IMGSZ = 640
 
 # Preprocessing
