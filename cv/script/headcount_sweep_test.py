@@ -1,8 +1,10 @@
-"""Evaluasi headcount YOLO26 (dan YOLO Ultralytics lain) pada dataset YOLO detection.
+"""Evaluasi headcount YOLO, RT-DETR, dan RF-DETR pada dataset YOLO detection.
 
 Contoh:
-    python script/headcount_sweep_test.py --split val
-    python script/headcount_sweep_test.py --data script/datasets/dataset_full --model script/models/weights.pt --split val
+    python cv/script/headcount_sweep_test.py --split val
+    python cv/script/headcount_sweep_test.py --data cv/script/datasets/dataset_full --model cv/script/models/weights.pt --split val
+    python cv/script/headcount_sweep_test.py --model cv/script/models/rtdetr-l.pt --model-type rtdetr --name rtdetr_uji_01
+    python cv/script/headcount_sweep_test.py --model cv/script/models/weights_rt-detr.pt --model-type rfdetr --model-class-id 1 --name rfdetr_uji_01
 
 Dataset standar:
     dataset/data.yaml
@@ -35,6 +37,7 @@ FULL_CONF = [0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50]
 FULL_IOU = [0.40, 0.50, 0.60, 0.70]
 FULL_IMGSZ = [320, 416, 512, 640]
 FULL_PREPROCESS = ["none", "always", "adaptive"]
+DEFAULT_OUTPUT_DIR = OUTPUTS_DIR / "sweeps" / "current_rt"
 DETAIL_FIELDS = [
     "timestamp", "image", "label", "conf", "iou", "imgsz", "preprocess",
     "image_width", "image_height", "brightness", "contrast", "clahe_applied",
@@ -42,7 +45,7 @@ DETAIL_FIELDS = [
     "count_accuracy_c251", "count_accuracy_bounded", "lf", "low_area_rejected",
     "high_area_rejected", "aspect_rejected", "preprocess_ms", "inference_ms",
     "postprocess_ms", "pipeline_cv_ms", "device", "model", "gt_class_id",
-    "model_class_id",
+    "model_class_id", "model_type",
 ]
 SUMMARY_FIELDS = [
     "conf", "iou", "imgsz", "preprocess", "images", "mae", "rmse", "exact_count_rate",
@@ -52,10 +55,15 @@ SUMMARY_FIELDS = [
 
 
 def parse_args(argv=None):
-    p = argparse.ArgumentParser(description="Headcount sweep untuk anotasi YOLO detection (YOLO26-compatible)")
+    p = argparse.ArgumentParser(description="Headcount sweep YOLO / RT-DETR / RF-DETR untuk anotasi YOLO detection")
     p.add_argument("--data", type=Path, default=DATASETS_DIR / "dataset_full" / "data.yaml",
                    help="data.yaml atau folder root dataset YOLO")
-    p.add_argument("--model", default=str(MODELS_DIR / "yolo26n.pt"), help=".pt pretrained atau best.pt fine-tuned")
+    p.add_argument("--model", default=str(MODELS_DIR / "yolo26n.pt"), help="Checkpoint YOLO / RT-DETR / RF-DETR pretrained atau fine-tuned")
+    p.add_argument("--model-type", choices=("auto", "yolo", "rtdetr", "rfdetr"), default="auto",
+                   help="auto mendeteksi arsitektur checkpoint; rtdetr memakai predictor RT-DETR")
+    p.add_argument("--rfdetr-variant", choices=("auto", "nano", "small", "medium", "large", "base"),
+                   default="auto", help="Varian RF-DETR; auto membaca bentuk bobot checkpoint")
+    p.add_argument("--imgsz", type=int, nargs="+", help="Ukuran inferensi; mengganti daftar ukuran bawaan sweep")
     p.add_argument("--split", choices=("train", "val", "valid", "test"), default="val",
                    help="Gunakan val untuk tuning; test hanya untuk evaluasi final")
     p.add_argument("--gt-class-id", type=int, default=None,
@@ -64,9 +72,11 @@ def parse_args(argv=None):
                    help="Class ID orang pada model; auto-detect dari model.names")
     p.add_argument("--max-images", type=int, default=None)
     p.add_argument("--capacity", type=int, default=80)
-    p.add_argument("--output", type=Path, default=OUTPUTS_DIR / "sweeps" / "current")
+    p.add_argument("--output", type=Path,
+                   help="Path folder hasil; jika --name diisi, menjadi folder induknya")
+    p.add_argument("--name", help="Nama folder eksperimen di outputs/sweeps/ atau di dalam --output")
     p.add_argument("--full-sweep", action="store_true",
-                   help="Sweep asli: 7 conf x 4 IoU x 4 imgsz x 3 preprocessing = 336 konfigurasi")
+                   help="YOLO: 336 konfigurasi; RT-DETR/RF-DETR: 84 konfigurasi (tanpa variasi IoU)")
     p.add_argument("--benchmark-runs", type=int, default=1)
     p.add_argument("--warmup-runs", type=int, default=1)
     p.add_argument("--top-k", type=int, default=5)
@@ -76,7 +86,67 @@ def parse_args(argv=None):
     p.add_argument("--min-area-ratio", type=float, default=0.0005)
     p.add_argument("--max-area-ratio", type=float, default=0.70)
     p.add_argument("--min-aspect-ratio", type=float, default=0.20)
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    if args.imgsz is not None and any(size <= 0 for size in args.imgsz):
+        p.error("--imgsz harus positif")
+    if args.name is not None:
+        if (not args.name.strip() or args.name in {".", ".."}
+                or any(char in args.name for char in '<>:"/\\|?*')
+                or args.name.endswith((" ", "."))):
+            p.error("--name harus satu nama folder; gunakan --output untuk path lengkap")
+        args.output = (args.output if args.output is not None else OUTPUTS_DIR / "sweeps") / args.name
+    elif args.output is None:
+        args.output = DEFAULT_OUTPUT_DIR
+    args.output = args.output.expanduser()
+    return args
+
+
+def load_model(model_path, model_type="auto", rfdetr_variant="auto", device="cpu"):
+    """Pilih predictor berdasarkan arsitektur, termasuk checkpoint bernama best.pt."""
+    if model_type == "rfdetr":
+        from rfdetr_adapter import RFDETRAdapter
+        return RFDETRAdapter(model_path, rfdetr_variant, device), "rfdetr"
+    try:
+        from ultralytics import RTDETR, YOLO
+    except ImportError as exc:
+        raise SystemExit("Paket ultralytics belum terpasang. Jalankan: pip install ultralytics") from exc
+
+    try:
+        model = RTDETR(model_path) if model_type == "rtdetr" else YOLO(model_path)
+    except AttributeError as exc:
+        if "has no attribute 'float'" in str(exc):
+            if model_type == "auto":
+                from rfdetr_adapter import RFDETRAdapter
+                return RFDETRAdapter(model_path, rfdetr_variant, device), "rfdetr"
+            raise ValueError(
+                f"{model_path} berisi state_dict, bukan checkpoint model Ultralytics. "
+                "Gunakan checkpoint YOLO/RT-DETR Ultralytics. Checkpoint RF-DETR "
+                "(meskipun nama filenya rt-detr) memakai --model-type rfdetr."
+            ) from exc
+        raise
+    core = model.model
+    layers = getattr(core, "model", None)
+    head_name = type(layers[-1]).__name__ if layers is not None and len(layers) else ""
+    detected = "rtdetr" if "rtdetr" in (type(core).__name__ + head_name).lower() else "yolo"
+    if model_type != "auto" and model_type != detected:
+        raise ValueError(f"Checkpoint berarsitektur {detected}, tetapi --model-type={model_type}")
+    if detected == "rtdetr" and not isinstance(model, RTDETR):
+        # Kompatibilitas Ultralytics lama yang belum mengalihkan YOLO ke RTDETR otomatis.
+        model = RTDETR(model_path)
+    if model.task != "detect":
+        raise ValueError("Sweep headcount membutuhkan model object detection")
+    return model, detected
+
+
+def sweep_parameters(full_sweep, model_type):
+    if full_sweep:
+        confs, ious, sizes, preps = FULL_CONF, FULL_IOU, FULL_IMGSZ, FULL_PREPROCESS
+    else:
+        confs, ious, sizes, preps = [0.15, 0.25, 0.40], [0.50], [416, 640], ["none", "adaptive"]
+    # RT-DETR end-to-end tidak menggunakan NMS; None ditulis sebagai kolom IoU kosong.
+    if model_type in {"rtdetr", "rfdetr"}:
+        ious = [None]
+    return confs, ious, sizes, preps
 
 
 def class_map(names):
@@ -213,8 +283,10 @@ def detect(model, image, conf, iou, imgsz, class_id, device, benchmark_runs):
     for _ in range(benchmark_runs):
         sync_cuda(device)
         start = time.perf_counter()
-        result = model.predict(image, conf=conf, iou=iou, imgsz=imgsz,
-                               classes=[class_id], device=device, verbose=False)[0]
+        kwargs = dict(conf=conf, imgsz=imgsz, classes=[class_id], device=device, verbose=False)
+        if iou is not None:
+            kwargs["iou"] = iou
+        result = model.predict(image, **kwargs)[0]
         sync_cuda(device)
         timings.append((time.perf_counter() - start) * 1000)
     return result, float(np.mean(timings))
@@ -269,12 +341,14 @@ def one_inference(model, frame, img_path, label, actual, conf, iou, imgsz, mode,
         "inference_ms": infer_ms, "postprocess_ms": post_ms,
         "pipeline_cv_ms": pre_ms + infer_ms + post_ms, "device": device,
         "model": args.model, "gt_class_id": gt_class, "model_class_id": model_class,
+        "model_type": args.model_type,
     }
     return row, boxes, processed
 
 
 def config_tuple(row):
-    return (float(row["conf"]), float(row["iou"]), int(row["imgsz"]), row["preprocess"])
+    iou = None if row["iou"] is None or row["iou"] == "" else float(row["iou"])
+    return (float(row["conf"]), iou, int(row["imgsz"]), row["preprocess"])
 
 
 def summarize(rows):
@@ -341,25 +415,24 @@ def main(argv=None):
     # Dibaca sekali di awal agar error label diketahui sebelum proses inferensi panjang.
     counts = {p: read_yolo_count(lbl, gt_class, strict=args.strict_labels) for p, lbl in pairs}
 
-    try:
-        from ultralytics import YOLO
-    except ImportError as e:
-        raise SystemExit("Paket ultralytics belum terpasang. Jalankan: pip install ultralytics") from e
-
-    model = YOLO(args.model)
-    model_class = person_class(model.names, args.model_class_id, "model.names")
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    if args.full_sweep:
-        confs, ious, sizes, preps = FULL_CONF, FULL_IOU, FULL_IMGSZ, FULL_PREPROCESS
-    else:
-        confs, ious, sizes, preps = [0.15, 0.25, 0.40], [0.50], [416, 640], ["none", "adaptive"]
+    model, args.model_type = load_model(args.model, args.model_type, args.rfdetr_variant, device)
+    model_class = person_class(model.names, args.model_class_id, "model.names")
+    confs, ious, sizes, preps = sweep_parameters(args.full_sweep, args.model_type)
+    if args.imgsz is not None:
+        sizes = list(dict.fromkeys(args.imgsz))
+    if args.model_type == "rfdetr":
+        sizes = model.sweep_sizes(sizes, strict=args.imgsz is not None)
     configs = list(itertools.product(confs, ious, sizes, preps))
     LOG.info("Dataset: %s | images=%d | GT person class=%d | model person class=%d",
              image_dir, len(pairs), gt_class, model_class)
-    LOG.info("Model: %s | device: %s | configs: %d | estimated predictions: %d",
-             args.model, device, len(configs), len(configs) * len(pairs) * args.benchmark_runs)
-    LOG.info("IoU sweep mungkin tidak berpengaruh pada model YOLO26 end-to-end yang NMS-free; "
-             "bandingkan output untuk memverifikasi.")
+    LOG.info("Model: %s | type: %s | device: %s | configs: %d | estimated predictions: %d",
+             args.model, args.model_type, device, len(configs), len(configs) * len(pairs) * args.benchmark_runs)
+    if args.model_type in {"rtdetr", "rfdetr"}:
+        LOG.info("%s: variasi IoU dilewati karena tidak menggunakan NMS; kolom iou CSV kosong.", args.model_type.upper())
+    else:
+        LOG.info("IoU sweep mungkin tidak berpengaruh pada model YOLO26 end-to-end yang NMS-free; "
+                 "bandingkan output untuk memverifikasi.")
     if args.split in {"test"} and len(configs) > 1:
         LOG.warning("Sweep pada test set menghasilkan pemilihan hyperparameter yang bias. "
                     "Gunakan --split val untuk tuning, lalu test sekali dengan konfigurasi terpilih.")
@@ -418,12 +491,16 @@ def main(argv=None):
                 save_annotation(processed, boxes, row, out)
     print("\n=== TOP CONFIGURATIONS (ranking MAE -> exact -> latency) ===")
     for i, r in enumerate(top, 1):
-        print(f"{i}. conf={r['conf']:.2f}, iou={r['iou']:.2f}, imgsz={r['imgsz']}, "
+        iou_text = "n/a" if r["iou"] is None else f"{r['iou']:.2f}"
+        print(f"{i}. conf={r['conf']:.2f}, iou={iou_text}, imgsz={r['imgsz']}, "
               f"pre={r['preprocess']}, MAE={r['mae']:.3f}, "
               f"exact={r['exact_count_rate']:.1f}%, latency={r['mean_pipeline_cv_ms']:.1f} ms")
     print(f"\nOutput: {args.output.resolve()}")
-    print("CATATAN: mAP/precision/recall deteksi bounding-box belum dihitung dalam script ini. "
-          "Gunakan model.val(data='...', split='test') untuk itu.")
+    print("CATATAN: mAP/precision/recall deteksi bounding-box belum dihitung dalam script ini.")
+    if args.model_type == "rfdetr":
+        print("Gunakan API evaluasi RF-DETR untuk metrik deteksi bounding-box.")
+    else:
+        print("Gunakan model.val(data='...', split='test') untuk metrik deteksi bounding-box.")
 
 
 if __name__ == "__main__":

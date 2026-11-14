@@ -1,0 +1,2 @@
+# Opsional untuk RF-DETR; dependency YOLO/RT-DETR tetap di cv/requirements.txt.
+rfdetr==1.11.2
