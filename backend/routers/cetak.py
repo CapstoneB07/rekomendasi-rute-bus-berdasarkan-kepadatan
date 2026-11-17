@@ -3,16 +3,34 @@ import binascii
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path, Response
 from pydantic import BaseModel, Field
 
-from services import thermal_printer
+from services import antrean_cetak, thermal_printer
 
 router = APIRouter(prefix="/api/print")
 logger = logging.getLogger(__name__)
 
 Baris = Annotated[str, Field(max_length=48)]
 Teks = Annotated[str, Field(max_length=200)]
+
+
+def _cetak(jenis: str, data: bytes, response: Response) -> dict[str, str | int]:
+    """Cetak langsung ke printer komputer ini, atau (PRINT_MODE=antrean) titipkan ke agen cetak."""
+    if antrean_cetak.aktif():
+        try:
+            id_cetak = antrean_cetak.antre(jenis, data)
+        except antrean_cetak.AntreanGagal as exc:
+            logger.warning("antre cetak %s gagal: %s", jenis, exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        response.status_code = 202
+        return {"status": "antre", "id": id_cetak}
+    try:
+        thermal_printer.kirim(data)
+    except thermal_printer.PrinterGagal as exc:
+        logger.warning("cetak %s gagal: %s", jenis, exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"status": "ok"}
 
 
 class FotoCetak(BaseModel):
@@ -25,19 +43,14 @@ class FotoCetak(BaseModel):
 
 
 @router.post("/foto")
-def cetak_foto(body: FotoCetak) -> dict[str, str]:
-    """Cetak foto kamera ke printer thermal yang terhubung ke komputer backend."""
+def cetak_foto(body: FotoCetak, response: Response) -> dict[str, str | int]:
+    """Cetak foto kamera ke printer thermal (langsung, atau lewat antrean cetak bila PRINT_MODE=antrean)."""
     try:
         bits = base64.b64decode(body.bits_b64, validate=True)
         data = thermal_printer.susun_escpos(body.lebar, body.tinggi, bits, body.baris)
     except (binascii.Error, ValueError) as exc:
         raise HTTPException(status_code=400, detail="Bitmap tidak valid") from exc
-    try:
-        thermal_printer.kirim(data)
-    except thermal_printer.PrinterGagal as exc:
-        logger.warning("cetak foto gagal: %s", exc)
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return {"status": "ok"}
+    return _cetak("foto", data, response)
 
 
 class BarisTiket(BaseModel):
@@ -56,12 +69,21 @@ class TiketCetak(BaseModel):
 
 
 @router.post("/tiket")
-def cetak_tiket(body: TiketCetak) -> dict[str, str]:
-    """Cetak tiket rencana perjalanan ke printer thermal yang terhubung ke komputer backend."""
+def cetak_tiket(body: TiketCetak, response: Response) -> dict[str, str | int]:
+    """Cetak tiket rencana perjalanan ke printer thermal (langsung, atau lewat antrean bila PRINT_MODE=antrean)."""
     data = thermal_printer.susun_escpos_teks([thermal_printer.BarisTeks(**b.model_dump()) for b in body.baris])
+    return _cetak("tiket", data, response)
+
+
+@router.get("/antrean/{id_cetak}")
+def status_antrean(id_cetak: Annotated[int, Path(ge=1, le=9_223_372_036_854_775_807)]) -> dict[str, str | None]:
+    """Status satu cetakan di antrean: menunggu | mencetak | selesai | gagal (+ galat)."""
+    if not antrean_cetak.aktif():
+        raise HTTPException(status_code=404, detail="Antrean cetak tidak aktif")
     try:
-        thermal_printer.kirim(data)
-    except thermal_printer.PrinterGagal as exc:
-        logger.warning("cetak tiket gagal: %s", exc)
+        baris = antrean_cetak.status(id_cetak)
+    except antrean_cetak.AntreanGagal as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return {"status": "ok"}
+    if baris is None:
+        raise HTTPException(status_code=404, detail="Cetakan tidak ditemukan")
+    return {"status": baris["status"], "galat": baris["galat"]}

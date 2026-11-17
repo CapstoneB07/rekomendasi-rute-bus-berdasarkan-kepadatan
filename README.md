@@ -47,6 +47,21 @@ python mqtt_subscriber.py       # terminal 1
 python cv_worker.py             # terminal 2
 ```
 
+## Cetak Struk dari Browser Tanpa Web Bluetooth (iPad/Safari)
+
+Browser dengan Web Bluetooth (Chrome/Edge) mencetak langsung ke printer. Safari/iPad tidak punya itu, jadi cetakan dikirim ke backend, sedangkan backend produksi (server) tidak terhubung ke printer. Solusinya antrean cetak lewat Supabase:
+
+1. Jalankan [`backend/sql/antrean_cetak.sql`](backend/sql/antrean_cetak.sql) di Supabase SQL editor (sekali; aman diulang).
+2. Di backend produksi set `PRINT_MODE=antrean`. `POST /api/print/*` lalu menaruh cetakan di tabel `antrean_cetak` dan browser memantau hasilnya lewat `GET /api/print/antrean/{id}`. Tanpa variabel ini backend mencetak langsung ke port COM-nya (perilaku lama, mis. saat dev lokal).
+3. Di laptop yang ter-pairing dengan printer (port COM, atur `PRINTER_PORT` bila bukan `COM13`), isi `backend/.env` dengan `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY`, lalu biarkan agen ini hidup selama kiosk dipakai:
+
+```bash
+cd backend
+.venv\Scripts\python scripts\agen_cetak.py
+```
+
+Cetakan yang tidak diambil agen dalam 30 detik digugurkan (browser menampilkan "Printer tidak dapat dihubungi"), jadi menyalakan agen belakangan tidak mencetak antrean lama.
+
 ## Catatan Routing (per 2026-09-19)
 
 - Candidate generation: edge-blocking + corridor-blocking (blokir seluruh koridor rute utama) untuk menghasilkan alternatif koridor yang benar-benar berbeda.
