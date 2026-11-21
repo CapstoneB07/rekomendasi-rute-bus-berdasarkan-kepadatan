@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { API_BASE, waktuWib } from '@/lib/api';
@@ -52,14 +52,33 @@ function useJam(keadaan: KeadaanWaktu, selisihMs = 0) {
 export type WaktuSimulasi = ReturnType<typeof useWaktuOperator>;
 export type JamHalaman = Pick<WaktuSimulasi, 'simTime' | 'isLive'>;
 
-// Jam milik operator: bisa digeser, dijeda, dipercepat; setiap perubahan dipublikasikan untuk halaman kiosk.
+// Jam milik operator: bisa digeser, dijeda, dipercepat; setiap perubahan oleh operator dipublikasikan untuk halaman kiosk.
+// Saat dibuka, operator memulai dari keadaan yang sedang berlaku di backend (yang juga dilihat kiosk),
+// bukan dari LIVE: membuka atau me-reload /operator tidak boleh mengubah jam kiosk.
 export function useWaktuOperator() {
   const [keadaan, setKeadaan] = useState<KeadaanWaktu>(LIVE_AWAL);
   const simTime = useJam(keadaan);
+  // Perubahan dari operator (bukan dari backend) yang belum dikirim.
+  const perluKirim = useRef(false);
+  const sudahDiubah = useRef(false);
 
-  // Publikasikan tiap perubahan ke backend; false = kiosk tidak menerima jam operator.
+  // false = kiosk tidak menerima jam operator.
   const [tersinkron, setTersinkron] = useState<boolean | null>(null);
   useEffect(() => {
+    const abort = new AbortController();
+    ambilKeadaanBersama(abort.signal)
+      .then(({ keadaan: k, selisihMs }) => {
+        // Jangkar dari backend memakai jam server; ubah ke jam perangkat ini. Pilihan operator yang lebih baru menang.
+        if (!sudahDiubah.current) setKeadaan({ ...k, ts: k.ts - selisihMs });
+        setTersinkron(true);
+      })
+      .catch(() => !abort.signal.aborted && setTersinkron(false));
+    return () => abort.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!perluKirim.current) return;
+    perluKirim.current = false;
     const abort = new AbortController();
     kirimKeadaan(keadaan, abort.signal)
       .then(() => setTersinkron(true))
@@ -69,6 +88,7 @@ export function useWaktuOperator() {
 
   // Jangkar baru dimulai dari jam saat ini.
   const ubah = useCallback((f: (k: KeadaanWaktu, sekarangSim: number) => Partial<KeadaanWaktu>) => {
+    perluKirim.current = sudahDiubah.current = true;
     setKeadaan((k) => {
       const sekarang = Date.now();
       return { ...k, ...f(k, hitungSimTime(k, sekarang)), ts: sekarang };
@@ -124,18 +144,20 @@ async function kirimKeadaan(k: KeadaanWaktu, signal: AbortSignal) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
 }
 
+// Keadaan jam di backend beserta selisih jam perangkat ini terhadap server (latensi dianggap simetris).
+async function ambilKeadaanBersama(signal?: AbortSignal) {
+  const t0 = Date.now();
+  const r = await fetch(`${API_BASE}/api/waktu`, { signal });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const { keadaan, server_now }: ResponsWaktu = await r.json();
+  return { keadaan: dariApi(keadaan), selisihMs: server_now - (t0 + Date.now()) / 2 };
+}
+
 // Jam halaman kiosk: mengikuti operator di perangkat mana pun lewat backend; tanpa operator, jam nyata WIB (live).
 export function useWaktuIkut(): JamHalaman {
   const { data } = useQuery({
     queryKey: ['waktu-bersama'],
-    queryFn: async () => {
-      const t0 = Date.now();
-      const r = await fetch(`${API_BASE}/api/waktu`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const { keadaan, server_now }: ResponsWaktu = await r.json();
-      // Selisih jam perangkat ini terhadap server, dengan menganggap latensi simetris.
-      return { keadaan: dariApi(keadaan), selisihMs: server_now - (t0 + Date.now()) / 2 };
-    },
+    queryFn: () => ambilKeadaanBersama(),
     refetchInterval: POLLING_WAKTU_MS,
   });
   const keadaan = data?.keadaan ?? LIVE_AWAL;

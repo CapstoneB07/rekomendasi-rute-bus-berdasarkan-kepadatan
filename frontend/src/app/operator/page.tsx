@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ambilRekomendasi, API_BASE } from '@/lib/api';
 import { formatJam } from '@/lib/koridor';
 import { statusBusAsli, type HalteOpsi, type Rute } from '@/lib/route-utils';
-import { useBagikanLokasi } from '@/lib/use-lokasi';
+import { halteLokasiDefault, useAturLokasi, useLokasiOperator } from '@/lib/use-lokasi';
 import { usePencarianKiosk } from '@/lib/use-pencarian';
 import { usePosisiBus } from '@/lib/use-posisi-bus';
 import { useRelayBusTj } from '@/lib/relay-bus-tj';
@@ -29,7 +29,6 @@ export default function Operator() {
   useRelayBusTj();
   const { posisiBus, busAsli, busAsliError } = usePosisiBus(simTime, isLive);
   const [pemilihTerbuka, setPemilihTerbuka] = useState(false);
-  const [halteId, setHalteId] = useState<string | null>(null);
 
   const { data: halteList, isError: halteError } = useQuery<HalteOpsi[]>({
     queryKey: ['halte-user'],
@@ -41,8 +40,11 @@ export default function Operator() {
     staleTime: 10 * 60_000,
   });
   const halteMap = useMemo(() => new Map((halteList ?? []).map((h) => [h.halte_id, h])), [halteList]);
+  // Halte lokasi dibaca dari backend, sama dengan yang dilihat kiosk (termasuk setelah halaman ini di-reload).
+  const lokasiBackend = useLokasiOperator();
+  const aturLokasi = useAturLokasi();
+  const halteId = lokasiBackend ?? halteLokasiDefault(halteList)?.halte_id ?? null;
   const halte = halteId ? halteMap.get(halteId) : undefined;
-  useBagikanLokasi(halteId);
 
   // Rute yang sedang dicari di kiosk: dihitung ulang di sini (jam operator) lalu digambar bertahap di peta.
   const pencarian = usePencarianKiosk();
@@ -107,7 +109,7 @@ export default function Operator() {
           halteList={halteList}
           terpilihId={halteId}
           onPilih={(id) => {
-            setHalteId(id);
+            aturLokasi(id);
             setPemilihTerbuka(false);
           }}
           onTutup={() => setPemilihTerbuka(false)}

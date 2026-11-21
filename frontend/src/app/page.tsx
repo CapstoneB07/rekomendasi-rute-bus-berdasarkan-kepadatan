@@ -13,7 +13,7 @@ import { PeringatanIdle } from './_components/PeringatanIdle';
 import { PilihHalte } from './_components/PilihHalte';
 import { Button } from '@/components/ui/button';
 import { ambilRekomendasi, API_BASE, galatRute, waktuWib } from '@/lib/api';
-import { useLokasiOperator } from '@/lib/use-lokasi';
+import { halteLokasiDefault, useLokasiOperator } from '@/lib/use-lokasi';
 import { useBagikanPencarian } from '@/lib/use-pencarian';
 import { formatTanggal } from '@/lib/koridor';
 import type { Halte, HalteOpsi, Rute } from '@/lib/route-utils';
@@ -36,7 +36,6 @@ const RUTE_BUCKET_DETIK = 300;
 const IDLE_RESET_MS = 60_000;
 // Peringatan tampil selama jendela ini sebelum reset.
 const IDLE_PERINGATAN_MS = 10_000;
-const HALTE_ASAL_DEFAULT = 'Harmoni';
 
 type Layar = 'beranda' | 'daftar' | 'detail';
 type Pemilih = 'tujuan' | 'asal' | null;
@@ -44,7 +43,8 @@ type Pemilih = 'tujuan' | 'asal' | null;
 export default function Home() {
   const [layar, setLayar] = useState<Layar>('beranda');
   const [pemilih, setPemilih] = useState<Pemilih>(null);
-  const [asalId, setAsalId] = useState<string | null>(null);
+  // Pilihan halte asal di kiosk sendiri (hanya mode demo); lihat lokasiOperator di bawah.
+  const [asalDemo, setAsalDemo] = useState<string | null>(null);
   const [tujuanId, setTujuanId] = useState<string | null>(null);
   const [aktifIdx, setAktifIdx] = useState(0);
 
@@ -79,19 +79,15 @@ export default function Home() {
     () => new Map<string, Halte>((halteList ?? []).map((h) => [h.halte_id, h])),
     [halteList],
   );
-  // Halte kiosk: pilihan demo, atau Harmoni (halte asal bawaan desain) selama belum dipilih.
-  const asalDefault = useMemo(
-    () => halteList?.find((h) => h.nama === HALTE_ASAL_DEFAULT) ?? halteList?.[0],
-    [halteList],
-  );
-  // Pilihan operator menimpa pilihan demo setiap kali operator mengganti halte.
+  // Halte kiosk mengikuti operator (sumber tunggal, sama dengan yang tampil di /operator).
+  // Pilihan demo di kiosk hanya berlaku sampai operator mengganti halte; belum ada pilihan = bawaan desain.
   const lokasiOperator = useLokasiOperator();
   const [lokasiDiproses, setLokasiDiproses] = useState<string | null>(null);
-  if (lokasiOperator && lokasiOperator !== lokasiDiproses) {
+  if (lokasiOperator !== lokasiDiproses) {
     setLokasiDiproses(lokasiOperator);
-    setAsalId(lokasiOperator);
+    setAsalDemo(null);
   }
-  const asal = asalId ?? asalDefault?.halte_id ?? null;
+  const asal = asalDemo ?? lokasiOperator ?? halteLokasiDefault(halteList)?.halte_id ?? null;
   const namaAsal = asal ? (halteMap.get(asal)?.nama ?? '…') : '…';
   const namaTujuan = tujuanId ? (halteMap.get(tujuanId)?.nama ?? null) : null;
 
@@ -165,7 +161,7 @@ export default function Home() {
     setPemilih(null);
   };
   const pilihAsal = (id: string) => {
-    setAsalId(id);
+    setAsalDemo(id);
     setPemilih(null);
     setAktifIdx(0);
     // Asal baru sama dengan tujuan: pencarian tidak mungkin, ulangi dari beranda.
